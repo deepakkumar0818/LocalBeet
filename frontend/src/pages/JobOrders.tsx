@@ -87,7 +87,7 @@ const JobOrders: React.FC = () => {
   const filteredJobOrders = jobOrders.filter(jobOrder => {
     const matchesSearch = jobOrder.jobOrderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           jobOrder.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          jobOrder.customerEmail.toLowerCase().includes(searchTerm.toLowerCase())
+                          jobOrder.customerId.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesStatus = filterStatus === '' || jobOrder.status.toLowerCase() === filterStatus.toLowerCase()
     const matchesPriority = filterPriority === '' || jobOrder.priority.toLowerCase() === filterPriority.toLowerCase()
@@ -314,7 +314,7 @@ const JobOrders: React.FC = () => {
                   <td className="table-cell">
                     <div>
                       <div className="text-gray-900">{jobOrder.customerName}</div>
-                      <div className="text-gray-500 text-sm">{jobOrder.customerEmail}</div>
+                      <div className="text-gray-500 text-sm">{jobOrder.customerId}</div>
                     </div>
                   </td>
                   <td className="table-cell">{new Date(jobOrder.orderDate).toLocaleDateString()}</td>
@@ -323,7 +323,7 @@ const JobOrders: React.FC = () => {
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                       jobOrder.status === 'Completed' ? 'bg-green-100 text-green-800' :
                       jobOrder.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                      jobOrder.status === 'Approved' ? 'bg-purple-100 text-purple-800' :
+                      jobOrder.status === 'Completed' ? 'bg-purple-100 text-purple-800' :
                       jobOrder.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
                       'bg-yellow-100 text-yellow-800'
                     }`}>
@@ -405,7 +405,7 @@ const JobOrders: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Customer Email</label>
-                  <p className="text-gray-900">{selectedJobOrder.customerEmail}</p>
+                  <p className="text-gray-900">{selectedJobOrder.customerId}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Customer Contact</label>
@@ -424,7 +424,7 @@ const JobOrders: React.FC = () => {
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                     selectedJobOrder.status === 'Completed' ? 'bg-green-100 text-green-800' :
                     selectedJobOrder.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                    selectedJobOrder.status === 'Approved' ? 'bg-purple-100 text-purple-800' :
+                    selectedJobOrder.status === 'Completed' ? 'bg-purple-100 text-purple-800' :
                     selectedJobOrder.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
                     'bg-yellow-100 text-yellow-800'
                   }`}>
@@ -457,10 +457,10 @@ const JobOrders: React.FC = () => {
               )}
 
               {/* Special Instructions */}
-              {selectedJobOrder.specialInstructions && (
+              {selectedJobOrder.notes && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Special Instructions</label>
-                  <p className="text-gray-900">{selectedJobOrder.specialInstructions}</p>
+                  <p className="text-gray-900">{selectedJobOrder.notes}</p>
                 </div>
               )}
 

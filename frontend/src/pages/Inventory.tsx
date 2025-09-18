@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Search, Filter, Download, Eye, AlertTriangle, TrendingUp, TrendingDown, Package, BarChart3, RefreshCw } from 'lucide-react'
+import { Search, Download, Eye, AlertTriangle, TrendingUp, TrendingDown, Package, BarChart3, RefreshCw } from 'lucide-react'
 import { InventoryItem, StockMovement } from '../types'
 
 const Inventory: React.FC = () => {

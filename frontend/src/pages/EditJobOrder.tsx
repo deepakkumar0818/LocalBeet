@@ -32,7 +32,7 @@ const EditJobOrder: React.FC = () => {
   const statusOptions = ['Draft', 'Approved', 'In Progress', 'Completed', 'Cancelled']
 
   // Mock data - in real app, fetch from API
-  const _mockJobOrder: JobOrder = {
+  const mockJobOrder: JobOrder = {
     id: '1',
     jobOrderNumber: 'JO-2024-001',
     customerName: 'ABC Manufacturing Ltd.',
@@ -46,7 +46,7 @@ const EditJobOrder: React.FC = () => {
     items: [
       {
         product: 'PROD-001',
-        productCode: 'PROD-001',
+        // productCode: 'PROD-001',
         productName: 'Steel Frame Assembly',
         quantity: 10,
         unitPrice: 1250.00,
@@ -56,7 +56,7 @@ const EditJobOrder: React.FC = () => {
       },
       {
         product: 'PROD-002',
-        productCode: 'PROD-002',
+        // productCode: 'PROD-002',
         productName: 'Aluminum Brackets',
         quantity: 50,
         unitPrice: 65.00,
@@ -114,7 +114,7 @@ const EditJobOrder: React.FC = () => {
             priority: jobOrder.priority,
             status: jobOrder.status,
             totalAmount: jobOrder.totalAmount,
-            items: jobOrder.items.map(item => ({
+            items: jobOrder.items.map((item: any) => ({
               bomId: item.bomId,
               bomCode: item.bomCode,
               product: item.product,
@@ -129,8 +129,8 @@ const EditJobOrder: React.FC = () => {
             specialInstructions: jobOrder.specialInstructions || ''
           })
         } else {
-          console.error('Failed to load job order:', response.message)
-          alert('Failed to load job order: ' + response.message)
+          console.error('Failed to load job order:', 'API Error')
+          alert('Failed to load job order: API Error')
         }
       } catch (error) {
         console.error('Error loading job order:', error)

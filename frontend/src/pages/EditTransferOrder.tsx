@@ -119,7 +119,7 @@ const EditTransferOrder: React.FC = () => {
         receivedBy: mockTransferOrder.receivedBy || '',
         transferType: mockTransferOrder.transferType,
         reason: mockTransferOrder.reason,
-        notes: mockTransferOrder.notes
+        notes: mockTransferOrder.notes || ''
       })
       setLoading(false)
     }, 500)

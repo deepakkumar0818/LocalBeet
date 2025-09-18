@@ -56,7 +56,7 @@ const EditPurchaseOrder: React.FC = () => {
         quantity: 100,
         unitPrice: 45.50,
         totalPrice: 4550.00,
-        specifications: 'Grade A, 12mm diameter',
+        // specifications: 'Grade A, 12mm diameter',
         deliveryDate: '2024-02-10'
       },
       {
@@ -66,7 +66,7 @@ const EditPurchaseOrder: React.FC = () => {
         quantity: 50,
         unitPrice: 125.00,
         totalPrice: 6250.00,
-        specifications: 'Anodized finish, Grade 6061',
+        // specifications: 'Anodized finish, Grade 6061',
         deliveryDate: '2024-02-15'
       },
       {
@@ -76,7 +76,7 @@ const EditPurchaseOrder: React.FC = () => {
         quantity: 200,
         unitPrice: 23.75,
         totalPrice: 4750.00,
-        specifications: 'Insulated, 10 AWG',
+        // specifications: 'Insulated, 10 AWG',
         deliveryDate: '2024-02-12'
       }
     ],
@@ -100,7 +100,7 @@ const EditPurchaseOrder: React.FC = () => {
         orderDate: mockPurchaseOrder.orderDate.toISOString().split('T')[0],
         expectedDeliveryDate: mockPurchaseOrder.expectedDeliveryDate.toISOString().split('T')[0],
         priority: 'High',
-        status: mockPurchaseOrder.status,
+        status: 'Confirmed',
         paymentTerms: 'Net 30',
         shippingMethod: 'Express',
         totalAmount: mockPurchaseOrder.totalAmount,
@@ -149,11 +149,11 @@ const EditPurchaseOrder: React.FC = () => {
     }
 
     // Calculate total amount
-    const totalAmount = formData.items.reduce((sum, item) => sum + item.totalAmount, 0)
+    const totalAmount = formData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0)
 
     const updatedPurchaseOrder: PurchaseOrder = {
       ...mockPurchaseOrder,
-      purchaseOrderNumber: formData.purchaseOrderNumber,
+      poNumber: formData.purchaseOrderNumber,
       supplierName: formData.supplierName,
       supplierContact: formData.supplierContact,
       supplierEmail: formData.supplierEmail,

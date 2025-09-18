@@ -60,7 +60,7 @@ const GoodReceiptNotes: React.FC = () => {
     }
   }
 
-  const _getQualityStatusColor = (status: string) => {
+  const getQualityStatusColor = (status: string) => {
     switch (status) {
       case 'Accepted': return 'bg-green-100 text-green-800'
       case 'Rejected': return 'bg-red-100 text-red-800'
@@ -140,7 +140,7 @@ const GoodReceiptNotes: React.FC = () => {
         return
       }
 
-      const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim())
+      // const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim())
       const dataRows = lines.slice(1)
 
       let successCount = 0
@@ -156,7 +156,7 @@ const GoodReceiptNotes: React.FC = () => {
             supplierId: 'SUP-001',
             supplierName: values[2] || '',
             receiptDate: new Date(values[3] || new Date().toISOString().split('T')[0]),
-            status: values[4] || 'Draft',
+            status: (values[4] || 'Draft') as 'Draft' | 'Approved' | 'Rejected',
             totalAmount: parseFloat(values[5]) || 0,
             items: [],
             createdBy: values[6] || 'admin',
