@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://localbeet.onrender.com';
 
 class ApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -7,7 +7,7 @@ class ApiService {
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
-        
+
         ...options.headers,
       },
       ...options,
