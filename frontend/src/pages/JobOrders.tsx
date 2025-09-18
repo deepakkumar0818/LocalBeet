@@ -323,7 +323,7 @@ const JobOrders: React.FC = () => {
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                       jobOrder.status === 'Completed' ? 'bg-green-100 text-green-800' :
                       jobOrder.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                      jobOrder.status === 'Completed' ? 'bg-purple-100 text-purple-800' :
+                      jobOrder.status === 'In Progress' ? 'bg-purple-100 text-purple-800' :
                       jobOrder.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
                       'bg-yellow-100 text-yellow-800'
                     }`}>
@@ -409,7 +409,7 @@ const JobOrders: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Customer Contact</label>
-                  <p className="text-gray-900">{selectedJobOrder.customerContact || 'N/A'}</p>
+                  <p className="text-gray-900">{selectedJobOrder.customerId || 'N/A'}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Order Date</label>
@@ -424,7 +424,7 @@ const JobOrders: React.FC = () => {
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                     selectedJobOrder.status === 'Completed' ? 'bg-green-100 text-green-800' :
                     selectedJobOrder.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                    selectedJobOrder.status === 'Completed' ? 'bg-purple-100 text-purple-800' :
+                    selectedJobOrder.status === 'In Progress' ? 'bg-purple-100 text-purple-800' :
                     selectedJobOrder.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
                     'bg-yellow-100 text-yellow-800'
                   }`}>

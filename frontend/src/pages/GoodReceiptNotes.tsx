@@ -60,7 +60,7 @@ const GoodReceiptNotes: React.FC = () => {
     }
   }
 
-  const getQualityStatusColor = (status: string) => {
+  const _getQualityStatusColor = (status: string) => {
     switch (status) {
       case 'Accepted': return 'bg-green-100 text-green-800'
       case 'Rejected': return 'bg-red-100 text-red-800'
@@ -155,12 +155,17 @@ const GoodReceiptNotes: React.FC = () => {
             poNumber: values[1] || '',
             supplierId: 'SUP-001',
             supplierName: values[2] || '',
+            warehouseId: 'WH-001',
+            warehouseName: 'Main Warehouse',
             receiptDate: new Date(values[3] || new Date().toISOString().split('T')[0]),
             status: (values[4] || 'Draft') as 'Draft' | 'Approved' | 'Rejected',
             totalAmount: parseFloat(values[5]) || 0,
             items: [],
+            receivedBy: values[6] || 'admin',
             createdBy: values[6] || 'admin',
-            updatedBy: values[7] || 'admin'
+            updatedBy: values[7] || 'admin',
+            createdAt: new Date(),
+            updatedAt: new Date()
           }
 
           setGRNs(prev => [...prev, grnData])

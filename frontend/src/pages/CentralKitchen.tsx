@@ -342,14 +342,10 @@ const CentralKitchen: React.FC = () => {
   const addSampleDataAutomatically = () => {
     console.log('Automatically adding sample data to Central Kitchen...')
     
-    // Create a default outlet if none exists
-    const defaultOutlet = outlet || {
-      id: 'central-kitchen-001',
-      outletCode: 'CK-001',
-      outletName: 'Central Kitchen',
-      outletType: 'Central Kitchen',
-      isCentralKitchen: true
-    }
+    // Use outlet or create default values
+    const outletId = outlet?.id || 'central-kitchen-001'
+    const outletCode = outlet?.outletCode || 'CK-001'
+    const outletName = outlet?.outletName || 'Central Kitchen'
 
     // Sample Raw Materials data
     const sampleRawMaterials = [
@@ -874,9 +870,9 @@ const CentralKitchen: React.FC = () => {
       // Sample Finished Goods data
       const sampleFinishedGoods = [
         {
-          outletId: defaultOutlet.id,
-          outletCode: defaultOutlet.outletCode,
-          outletName: defaultOutlet.outletName,
+          outletId: outletId,
+          outletCode: outletCode,
+          outletName: outletName,
           productId: 'FG-001',
           productCode: 'FG-001',
           productName: 'Fresh Green Smoothie',
@@ -906,9 +902,9 @@ const CentralKitchen: React.FC = () => {
           transferSource: 'Production'
         },
         {
-          outletId: defaultOutlet.id,
-          outletCode: defaultOutlet.outletCode,
-          outletName: defaultOutlet.outletName,
+          outletId: outletId,
+          outletCode: outletCode,
+          outletName: outletName,
           productId: 'FG-002',
           productCode: 'FG-002',
           productName: 'Protein Power Bowl',
@@ -938,9 +934,9 @@ const CentralKitchen: React.FC = () => {
           transferSource: 'Production'
         },
         {
-          outletId: defaultOutlet.id,
-          outletCode: defaultOutlet.outletCode,
-          outletName: defaultOutlet.outletName,
+          outletId: outletId,
+          outletCode: outletCode,
+          outletName: outletName,
           productId: 'FG-003',
           productCode: 'FG-003',
           productName: 'Detox Juice Blend',
@@ -970,9 +966,9 @@ const CentralKitchen: React.FC = () => {
           transferSource: 'Production'
         },
         {
-          outletId: defaultOutlet.id,
-          outletCode: defaultOutlet.outletCode,
-          outletName: defaultOutlet.outletName,
+          outletId: outletId,
+          outletCode: outletCode,
+          outletName: outletName,
           productId: 'FG-004',
           productCode: 'FG-004',
           productName: 'Quinoa Salad',
@@ -1171,10 +1167,8 @@ const CentralKitchen: React.FC = () => {
             if (existingItem) {
               // Add stock to existing item
               const updatedStock = existingItem.currentStock + stockToAdd
-              const _updatedItem = {
-                ...existingItem,
-                currentStock: updatedStock
-              }
+              // Update the item (this would need proper API calls)
+              // For now, we'll just log the update
               
               console.log(`Adding ${stockToAdd} stock to ${itemCode}. New total: ${updatedStock}`)
               

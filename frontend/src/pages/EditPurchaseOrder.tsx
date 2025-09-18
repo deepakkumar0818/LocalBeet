@@ -57,7 +57,7 @@ const EditPurchaseOrder: React.FC = () => {
         unitPrice: 45.50,
         totalPrice: 4550.00,
         // specifications: 'Grade A, 12mm diameter',
-        deliveryDate: '2024-02-10'
+        // deliveryDate: '2024-02-10'
       },
       {
         materialId: 'RM-002',
@@ -67,7 +67,7 @@ const EditPurchaseOrder: React.FC = () => {
         unitPrice: 125.00,
         totalPrice: 6250.00,
         // specifications: 'Anodized finish, Grade 6061',
-        deliveryDate: '2024-02-15'
+        // deliveryDate: '2024-02-15'
       },
       {
         materialId: 'RM-003',
@@ -77,7 +77,7 @@ const EditPurchaseOrder: React.FC = () => {
         unitPrice: 23.75,
         totalPrice: 4750.00,
         // specifications: 'Insulated, 10 AWG',
-        deliveryDate: '2024-02-12'
+        // deliveryDate: '2024-02-12'
       }
     ],
     notes: 'Supplier requires advance payment for expedited delivery.',
@@ -100,7 +100,7 @@ const EditPurchaseOrder: React.FC = () => {
         orderDate: mockPurchaseOrder.orderDate.toISOString().split('T')[0],
         expectedDeliveryDate: mockPurchaseOrder.expectedDeliveryDate.toISOString().split('T')[0],
         priority: 'High',
-        status: 'Confirmed',
+        status: 'Approved',
         paymentTerms: 'Net 30',
         shippingMethod: 'Express',
         totalAmount: mockPurchaseOrder.totalAmount,
@@ -155,7 +155,7 @@ const EditPurchaseOrder: React.FC = () => {
       ...mockPurchaseOrder,
       poNumber: formData.purchaseOrderNumber,
       supplierName: formData.supplierName,
-      supplierContact: formData.supplierContact,
+      // supplierContact: formData.supplierContact,
       supplierEmail: formData.supplierEmail,
       supplierAddress: formData.supplierAddress,
       orderDate: new Date(formData.orderDate),
@@ -204,7 +204,7 @@ const EditPurchaseOrder: React.FC = () => {
           const updatedItem = { ...item, [field]: value }
           if (field === 'quantity' || field === 'unitPrice') {
             updatedItem.totalPrice = updatedItem.quantity * updatedItem.unitPrice
-            updatedItem.totalAmount = updatedItem.totalPrice
+            // updatedItem.totalAmount = updatedItem.totalPrice
           }
           return updatedItem
         }
