@@ -229,7 +229,7 @@ const MallFoodCourt: React.FC = () => {
         return
       }
 
-      const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim())
+      // const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim())
       const dataRows = lines.slice(1)
 
       let successCount = 0

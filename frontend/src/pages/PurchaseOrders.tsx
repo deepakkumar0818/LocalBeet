@@ -284,7 +284,7 @@ const PurchaseOrders: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Source</label>
-                  {selectedPO.generatedFromForecast ? (
+                  {false ? (
                     <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                       📦 Auto-Generated from Forecast
                     </span>
@@ -520,7 +520,7 @@ const PurchaseOrders: React.FC = () => {
                   </td>
                   <td className="table-cell font-medium">{po.totalAmount.toFixed(2)} KWD</td>
                   <td className="table-cell">
-                    {po.generatedFromForecast ? (
+                    {false ? (
                       <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                         📦 Auto-Generated
                       </span>
