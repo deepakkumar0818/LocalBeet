@@ -1,0 +1,92 @@
+import { Routes, Route } from 'react-router-dom'
+import Layout from './components/Layout'
+import Dashboard from './pages/Dashboard'
+import RawMaterials from './pages/RawMaterials'
+import AddMaterial from './pages/AddMaterial'
+import EditMaterial from './pages/EditMaterial'
+import BillOfMaterials from './pages/BillOfMaterials'
+import AddBOM from './pages/AddBOM'
+import EditBOM from './pages/EditBOM'
+import JobOrders from './pages/JobOrders'
+import AddJobOrder from './pages/AddJobOrder'
+import EditJobOrder from './pages/EditJobOrder'
+import PurchaseOrders from './pages/PurchaseOrders'
+import AddPurchaseOrder from './pages/AddPurchaseOrder'
+import EditPurchaseOrder from './pages/EditPurchaseOrder'
+import GoodReceiptNotes from './pages/GoodReceiptNotes'
+import AddGRN from './pages/AddGRN'
+import EditGRN from './pages/EditGRN'
+import WarehouseMaster from './pages/WarehouseMaster'
+import AddWarehouse from './pages/AddWarehouse'
+import EditWarehouse from './pages/EditWarehouse'
+import TransferOrders from './pages/TransferOrders'
+import AddTransferOrder from './pages/AddTransferOrder'
+import EditTransferOrder from './pages/EditTransferOrder'
+import Inventory from './pages/Inventory'
+import OutletMaster from './pages/OutletMaster'
+import AddOutlet from './pages/AddOutlet'
+import EditOutlet from './pages/EditOutlet'
+import CentralKitchen from './pages/CentralKitchen'
+import DowntownRestaurant from './pages/DowntownRestaurant'
+import MarinaWalkCafe from './pages/MarinaWalkCafe'
+import MallFoodCourt from './pages/MallFoodCourt'
+import DriveThruExpress from './pages/DriveThruExpress'
+import RawMaterialForecast from './pages/RawMaterialForecast'
+import AddForecast from './pages/AddForecast'
+import SalesOrders from './pages/SalesOrders'
+import AddSalesOrder from './pages/AddSalesOrder'
+
+function App() {
+  return (
+    <Layout>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/raw-materials" element={<RawMaterials />} />
+        <Route path="/raw-materials/add" element={<AddMaterial />} />
+        <Route path="/raw-materials/edit/:id" element={<EditMaterial />} />
+        <Route path="/bill-of-materials" element={<BillOfMaterials />} />
+        <Route path="/bill-of-materials/add" element={<AddBOM />} />
+        <Route path="/bill-of-materials/edit/:id" element={<EditBOM />} />
+        <Route path="/job-orders" element={<JobOrders />} />
+        <Route path="/job-orders/add" element={<AddJobOrder />} />
+        <Route path="/job-orders/edit/:id" element={<EditJobOrder />} />
+        <Route path="/purchase-orders" element={<PurchaseOrders />} />
+        <Route path="/purchase-orders/add" element={<AddPurchaseOrder />} />
+        <Route path="/purchase-orders/edit/:id" element={<EditPurchaseOrder />} />
+        <Route path="/good-receipt-notes" element={<GoodReceiptNotes />} />
+        <Route path="/good-receipt-notes/add" element={<AddGRN />} />
+        <Route path="/good-receipt-notes/edit/:id" element={<EditGRN />} />
+        <Route path="/warehouse-master" element={<WarehouseMaster />} />
+        <Route path="/warehouse-master/add" element={<AddWarehouse />} />
+        <Route path="/warehouse-master/edit/:id" element={<EditWarehouse />} />
+        <Route path="/transfer-orders" element={<TransferOrders />} />
+        <Route path="/transfer-orders/add" element={<AddTransferOrder />} />
+        <Route path="/transfer-orders/edit/:id" element={<EditTransferOrder />} />
+        <Route path="/inventory" element={<Inventory />} />
+        <Route path="/outlets" element={<OutletMaster />} />
+        <Route path="/outlets/add" element={<AddOutlet />} />
+        <Route path="/outlets/edit/:id" element={<EditOutlet />} />
+        <Route path="/central-kitchen" element={<CentralKitchen />} />
+        <Route path="/downtown-restaurant" element={<DowntownRestaurant />} />
+        <Route path="/marina-walk-cafe" element={<MarinaWalkCafe />} />
+        <Route path="/mall-food-court" element={<MallFoodCourt />} />
+        <Route path="/drive-thru-express" element={<DriveThruExpress />} />
+        <Route path="/raw-material-forecast" element={<RawMaterialForecast />} />
+        <Route path="/raw-material-forecast/add" element={<AddForecast />} />
+        <Route path="/sales-orders" element={<SalesOrders />} />
+        <Route path="/sales-orders/add" element={<AddSalesOrder />} />
+        <Route path="/downtown-restaurant/sales-orders" element={<SalesOrders />} />
+        <Route path="/downtown-restaurant/sales-orders/add" element={<AddSalesOrder />} />
+        <Route path="/marina-walk-cafe/sales-orders" element={<SalesOrders />} />
+        <Route path="/marina-walk-cafe/sales-orders/add" element={<AddSalesOrder />} />
+        <Route path="/mall-food-court/sales-orders" element={<SalesOrders />} />
+        <Route path="/mall-food-court/sales-orders/add" element={<AddSalesOrder />} />
+        <Route path="/drive-thru-express/sales-orders" element={<SalesOrders />} />
+        <Route path="/drive-thru-express/sales-orders/add" element={<AddSalesOrder />} />
+      </Routes>
+    </Layout>
+  )
+}
+
+export default App

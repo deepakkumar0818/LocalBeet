@@ -1,0 +1,27 @@
+{
+  "name": "localbeat",
+  "version": "1.0.0",
+  "description": "LocalBeet - Restaurant Management System",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm start",
+    "build": "cd frontend && npm run build",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "start": "cd backend && npm start",
+    "lint": "cd frontend && npm run lint",
+    "test": "cd frontend && npm run test"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  }
+}
