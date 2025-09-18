@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft, Save, X, Plus, Trash2, Search, ShoppingCart, User, Phone, Mail, MapPin, Clock } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, ShoppingCart, User, Phone, Mail, MapPin, Clock, Package } from 'lucide-react'
 import { apiService } from '../services/api'
 
 interface SalesOrderItem {
@@ -81,7 +81,7 @@ const AddSalesOrder: React.FC = () => {
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchTerm] = useState('')
 
   // Detect outlet from URL parameter
   useEffect(() => {
@@ -369,7 +369,7 @@ const AddSalesOrder: React.FC = () => {
       setFormData(prev => ({
         ...prev,
         [parent]: {
-          ...prev[parent as keyof typeof prev],
+          ...(prev[parent as keyof typeof prev] || {}),
           [child]: value
         }
       }))
@@ -738,7 +738,7 @@ const AddSalesOrder: React.FC = () => {
                     step="0.01"
                     className="input-field"
                     value={formData.orderSummary.discountAmount}
-                    onChange={(e) => handleInputChange('orderSummary.discountAmount', parseFloat(e.target.value) || 0)}
+                    onChange={(e) => handleInputChange('orderSummary.discountAmount', (parseFloat(e.target.value) || 0).toString())}
                   />
                 </div>
 
@@ -829,7 +829,7 @@ const AddSalesOrder: React.FC = () => {
                     min="1"
                     className="input-field"
                     value={formData.orderTiming.estimatedPrepTime}
-                    onChange={(e) => handleInputChange('orderTiming.estimatedPrepTime', parseInt(e.target.value) || 15)}
+                    onChange={(e) => handleInputChange('orderTiming.estimatedPrepTime', (parseInt(e.target.value) || 15).toString())}
                   />
                 </div>
               </div>

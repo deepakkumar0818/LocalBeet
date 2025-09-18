@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Save, X } from 'lucide-react'
-import { RawMaterial } from '../types'
+// import { RawMaterial } from '../types'
 import { apiService } from '../services/api'
 
 const AddMaterial: React.FC = () => {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit, Trash2, Eye, Filter, Download, X, ArrowRight, Truck } from 'lucide-react'
-import { TransferOrder, TransferOrderItem } from '../types'
+import { Plus, Search, Edit, Trash2, Eye, Filter, Download, X, ArrowRight } from 'lucide-react'
+import { TransferOrder } from '../types'
 
 const TransferOrders: React.FC = () => {
   const navigate = useNavigate()

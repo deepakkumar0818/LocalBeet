@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit, Trash2, Eye, Filter, Download, MapPin, User } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Filter, Download, MapPin, User } from 'lucide-react'
 import { Warehouse } from '../types'
 
 const WarehouseMaster: React.FC = () => {

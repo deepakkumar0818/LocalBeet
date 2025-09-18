@@ -129,7 +129,7 @@ const BillOfMaterialsPage: React.FC = () => {
         bom.version,
         new Date(bom.createdAt).toLocaleDateString(),
         new Date(bom.updatedAt).toLocaleDateString(),
-        bom.notes || ''
+        ''
       ].map(field => `"${field}"`).join(','))
     ].join('\n')
 
@@ -167,7 +167,7 @@ const BillOfMaterialsPage: React.FC = () => {
         return
       }
 
-      const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim())
+      // const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim())
       const dataRows = lines.slice(1)
 
       let successCount = 0
@@ -435,7 +435,7 @@ const BillOfMaterialsPage: React.FC = () => {
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                       bom.status === 'Active' ? 'bg-green-100 text-green-800' :
                       bom.status === 'Draft' ? 'bg-yellow-100 text-yellow-800' :
-                      bom.status === 'Inactive' ? 'bg-gray-100 text-gray-800' :
+                      bom.status === 'Obsolete' ? 'bg-gray-100 text-gray-800' :
                       'bg-red-100 text-red-800'
                     }`}>
                       {bom.status}
@@ -517,7 +517,7 @@ const BillOfMaterialsPage: React.FC = () => {
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                     selectedBOM.status === 'Active' ? 'bg-green-100 text-green-800' :
                     selectedBOM.status === 'Draft' ? 'bg-yellow-100 text-yellow-800' :
-                    selectedBOM.status === 'Inactive' ? 'bg-gray-100 text-gray-800' :
+                    selectedBOM.status === 'Obsolete' ? 'bg-gray-100 text-gray-800' :
                     'bg-red-100 text-red-800'
                   }`}>
                     {selectedBOM.status}

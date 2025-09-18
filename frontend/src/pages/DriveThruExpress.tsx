@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Package, TrendingUp, TrendingDown, AlertTriangle, BarChart3, Store, Truck, Users, Clock, RefreshCw, Car } from 'lucide-react'
+import { Package, TrendingUp, TrendingDown, AlertTriangle, BarChart3, Truck, Users, Clock, RefreshCw, Car } from 'lucide-react'
 import { apiService } from '../services/api'
 
 interface OutletInventoryItem {

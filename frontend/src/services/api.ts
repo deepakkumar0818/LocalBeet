@@ -7,6 +7,7 @@ class ApiService {
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
+        
         ...options.headers,
       },
       ...options,

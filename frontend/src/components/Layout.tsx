@@ -8,7 +8,6 @@ import {
   ShoppingCart, 
   Receipt, 
   Warehouse, 
-  Archive,
   Truck,
   BarChart3,
   TrendingUp,
@@ -179,7 +178,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               return (
                 <Link
                   key={item.name}
-                  to={item.href}
+                  to={item.href || '#'}
                   className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                     isActive
                       ? 'bg-primary-100 text-primary-700'
@@ -265,7 +264,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               return (
                 <Link
                   key={item.name}
-                  to={item.href}
+                  to={item.href || '#'}
                   className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                     isActive
                       ? 'bg-primary-100 text-primary-700'

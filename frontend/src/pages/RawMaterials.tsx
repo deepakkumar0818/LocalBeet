@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit, Trash2, Eye, Filter, Download, Upload } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Filter, Download, Upload } from 'lucide-react'
 import { RawMaterial } from '../types'
 import { apiService } from '../services/api'
 

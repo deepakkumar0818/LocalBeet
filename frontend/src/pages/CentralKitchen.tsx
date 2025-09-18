@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Package, TrendingUp, TrendingDown, AlertTriangle, BarChart3, Store, Truck, Users, Clock, RefreshCw, ChefHat, Utensils, Download, Upload } from 'lucide-react'
+import { Package, TrendingUp, TrendingDown, AlertTriangle, BarChart3, Store, Truck, Users, Clock, RefreshCw, Utensils, Download, Upload } from 'lucide-react'
 import { apiService } from '../services/api'
 
 interface OutletInventoryItem {
@@ -161,7 +161,7 @@ const CentralKitchen: React.FC = () => {
         console.log('Loaded Central Kitchen Finished Goods Inventory:', finishedGoodsResponse.data)
         setFinishedGoodInventoryItems(finishedGoodsResponse.data)
       } else {
-        console.error('Failed to load finished goods inventory:', finishedGoodsResponse.message)
+        console.error('Failed to load finished goods inventory:', 'API Error')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load inventory')
@@ -196,7 +196,7 @@ const CentralKitchen: React.FC = () => {
           'Total Value': item.totalValue,
           'Location': item.location,
           'Batch Number': item.batchNumber,
-          'Supplier': item.supplier,
+          'Supplier': item.supplier || '',
           'Status': item.status,
           'Last Updated': new Date(item.lastUpdated).toLocaleDateString(),
           'Notes': item.notes
@@ -216,7 +216,7 @@ const CentralKitchen: React.FC = () => {
           'Total Value': item.totalValue,
           'Location': item.storageLocation,
           'Batch Number': item.batchNumber,
-          'Supplier': item.supplier,
+          'Supplier': item.supplier || '',
           'Status': item.qualityStatus,
           'Last Updated': new Date(item.lastUpdated).toLocaleDateString(),
           'Notes': item.notes

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit, Trash2, Eye, Filter, Download, RefreshCw, MapPin, Clock, Users, Store } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Eye, Filter, Download, RefreshCw, MapPin, Users, Store } from 'lucide-react'
 import { apiService } from '../services/api'
 
 interface Outlet {

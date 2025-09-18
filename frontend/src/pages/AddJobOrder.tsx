@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save, X, Plus, Trash2, Search } from 'lucide-react'
-import { JobOrder, JobOrderItem, BillOfMaterials } from '../types'
+import { ArrowLeft, Save, X, Plus, Trash2 } from 'lucide-react'
+import { JobOrderItem, BillOfMaterials } from '../types'
 import { apiService } from '../services/api'
 
 const AddJobOrder: React.FC = () => {

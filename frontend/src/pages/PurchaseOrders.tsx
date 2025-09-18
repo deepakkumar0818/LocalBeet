@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Edit, Trash2, Eye, Filter, Download, Upload, X, RefreshCw } from 'lucide-react'
-import { PurchaseOrder, PurchaseOrderItem } from '../types'
+import { PurchaseOrder } from '../types'
 import { apiService } from '../services/api'
 
 const PurchaseOrders: React.FC = () => {
@@ -103,7 +103,7 @@ const PurchaseOrders: React.FC = () => {
   }
 
   const handleExport = () => {
-    if (filteredPurchaseOrders.length === 0) {
+    if (purchaseOrders.length === 0) {
       alert('No purchase orders to export')
       return
     }
@@ -123,7 +123,7 @@ const PurchaseOrders: React.FC = () => {
         'Notes'
       ].join(','),
       // Data rows
-      ...filteredPurchaseOrders.map(po => [
+      ...purchaseOrders.map(po => [
         po.poNumber,
         po.supplierName,
         po.orderDate.toLocaleDateString(),
@@ -171,7 +171,7 @@ const PurchaseOrders: React.FC = () => {
         return
       }
 
-      const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim())
+      // const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim())
       const dataRows = lines.slice(1)
 
       let successCount = 0
@@ -444,7 +444,7 @@ const PurchaseOrders: React.FC = () => {
               onClick={handleExport}
               className="btn-secondary flex items-center"
               title="Export purchase orders to CSV"
-              disabled={filteredPurchaseOrders.length === 0}
+              disabled={purchaseOrders.length === 0}
             >
               <Download className="h-4 w-4 mr-2" />
               Export

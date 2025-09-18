@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Save, X, Plus, Trash2 } from 'lucide-react'
-import { BillOfMaterials, BOMItem } from '../types'
+import { BOMItem } from '../types'
 import { apiService } from '../services/api'
 
 const AddBOM: React.FC = () => {

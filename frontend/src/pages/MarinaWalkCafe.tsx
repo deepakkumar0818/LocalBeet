@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Package, TrendingUp, TrendingDown, AlertTriangle, BarChart3, Store, Truck, Users, Clock, RefreshCw, ShoppingCart, ChefHat, Coffee, Download, Upload } from 'lucide-react'
+import { Package, TrendingUp, TrendingDown, AlertTriangle, BarChart3, Store, Truck, Users, Clock, RefreshCw, ShoppingCart, Coffee, Download, Upload } from 'lucide-react'
 import { apiService } from '../services/api'
 
 interface OutletInventoryItem {
@@ -83,7 +83,7 @@ const MarinaWalkCafe: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('')
   const [sortBy, setSortBy] = useState('materialName')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
-  const [activeView, setActiveView] = useState<'raw-materials' | 'finished-goods' | 'sales-orders'>('raw-materials')
+  const [activeView] = useState<'raw-materials' | 'finished-goods' | 'sales-orders'>('raw-materials')
   const [importing, setImporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -159,7 +159,7 @@ const MarinaWalkCafe: React.FC = () => {
         console.log('Loaded Marina Walk Cafe Finished Goods Inventory:', finishedGoodsResponse.data)
         setFinishedGoodInventoryItems(finishedGoodsResponse.data)
       } else {
-        console.error('Failed to load finished goods inventory:', finishedGoodsResponse.message)
+        console.error('Failed to load finished goods inventory:', 'API Error')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load inventory')
@@ -347,7 +347,7 @@ const MarinaWalkCafe: React.FC = () => {
             // Add to local state
             const newItem: OutletInventoryItem = {
               id: `rm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              outletId: outlet?.id || '',
+              outletId: outlet?.id || 'marina-walk-cafe-001',
               outletCode: outlet?.outletCode || '',
               outletName: outlet?.outletName || '',
               materialId: materialData.materialCode,
@@ -391,7 +391,7 @@ const MarinaWalkCafe: React.FC = () => {
             // Add to local state
             const newItem: FinishedGoodInventoryItem = {
               id: `fg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              outletId: outlet?.id || '',
+              outletId: outlet?.id || 'marina-walk-cafe-001',
               outletCode: outlet?.outletCode || '',
               outletName: outlet?.outletName || '',
               productId: productData.productCode,

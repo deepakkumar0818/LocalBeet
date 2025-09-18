@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Eye, Filter, Download, ShoppingCart, Clock, CheckCircle, XCircle, RefreshCw, X } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, ShoppingCart, RefreshCw, X } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { apiService } from '../services/api';
 
@@ -356,19 +356,19 @@ const SalesOrders: React.FC = () => {
     }
   };
 
-  const handleStatusUpdate = async (id: string, newStatus: string) => {
-    try {
-      const response = await apiService.updateSalesOrderStatus(id, { orderStatus: newStatus });
-      if (response.success) {
-        alert('Order status updated successfully');
-        loadSalesOrders();
-      } else {
-        alert(response.message || 'Failed to update order status');
-      }
-    } catch (err: any) {
-      alert(err.message || 'An error occurred during status update');
-    }
-  };
+  // const handleStatusUpdate = async (id: string, newStatus: string) => {
+  //   try {
+  //     const response = await apiService.updateSalesOrderStatus(id, { orderStatus: newStatus });
+  //     if (response.success) {
+  //       alert('Order status updated successfully');
+  //       loadSalesOrders();
+  //     } else {
+  //       alert(response.message || 'Failed to update order status');
+  //     }
+  //   } catch (err: any) {
+  //     alert(err.message || 'An error occurred during status update');
+  //   }
+  // };
 
   const getStatusColor = (status: string) => {
     switch (status) {

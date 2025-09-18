@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save, X } from 'lucide-react'
+import { ArrowLeft, Save } from 'lucide-react'
 import { apiService } from '../services/api'
 
 const AddOutlet: React.FC = () => {
@@ -113,7 +113,7 @@ const AddOutlet: React.FC = () => {
       setFormData(prev => ({
         ...prev,
         [parent]: {
-          ...prev[parent as keyof typeof prev],
+          ...(prev[parent as keyof typeof prev] || {}),
           [child]: value
         }
       }))
