@@ -55,6 +55,8 @@ const WarehouseMaster: React.FC = () => {
   ])
 
   const [searchTerm, setSearchTerm] = useState('')
+  const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null)
+  const [showModal, setShowModal] = useState(false)
 
   const filteredWarehouses = warehouses.filter(warehouse =>
     warehouse.warehouseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -77,7 +79,7 @@ const WarehouseMaster: React.FC = () => {
     }
   }
 
-  const WarehouseModal: React.FC = () => (
+  const _WarehouseModal: React.FC = () => (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
       <div className="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
         <div className="mt-3">

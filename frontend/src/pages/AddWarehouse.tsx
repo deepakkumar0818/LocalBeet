@@ -89,7 +89,7 @@ const AddWarehouse: React.FC = () => {
         city: formData.city,
         state: formData.state,
         country: formData.country,
-        postalCode: formData.postalCode
+        zipCode: formData.postalCode
       },
       city: formData.city,
       state: formData.state,

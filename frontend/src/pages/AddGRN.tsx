@@ -1,7 +1,17 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Save, X, Plus, Trash2 } from 'lucide-react'
-import { GoodReceiptNote, GRNItem } from '../types'
+import { GRNItem } from '../types'
+
+// Extended GRNItem interface for AddGRN
+interface ExtendedGRNItem extends GRNItem {
+  acceptedQuantity: number;
+  rejectedQuantity: number;
+  totalAmount: number;
+  specifications: string;
+  batchNumber: string;
+  expiryDate: string;
+}
 
 const AddGRN: React.FC = () => {
   const navigate = useNavigate()
@@ -14,10 +24,10 @@ const AddGRN: React.FC = () => {
     receiptDate: '',
     receivedBy: '',
     inspectedBy: '',
-    status: 'Draft' as 'Draft' | 'Received' | 'Inspected' | 'Approved' | 'Rejected',
+    status: 'Draft' as 'Draft' | 'Approved' | 'Rejected',
     warehouseLocation: '',
     totalAmount: 0,
-    items: [] as GRNItem[],
+    items: [] as ExtendedGRNItem[],
     notes: '',
     qualityRemarks: '',
     deliveryChallanNumber: '',
@@ -27,7 +37,7 @@ const AddGRN: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const statusOptions = ['Draft', 'Received', 'Inspected', 'Approved', 'Rejected']
+  const statusOptions = ['Draft', 'Approved', 'Rejected']
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -65,25 +75,31 @@ const AddGRN: React.FC = () => {
     // Calculate total amount
     const totalAmount = formData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0)
 
-    const newGRN: GoodReceiptNote = {
+    const newGRN = {
       id: Date.now().toString(),
       grnNumber: formData.grnNumber,
-      purchaseOrderNumber: formData.purchaseOrderNumber,
+      poNumber: formData.purchaseOrderNumber,
+      supplierId: 'SUP-001',
       supplierName: formData.supplierName,
-      supplierContact: formData.supplierContact,
-      supplierEmail: formData.supplierEmail,
       receiptDate: new Date(formData.receiptDate),
-      receivedBy: formData.receivedBy,
-      inspectedBy: formData.inspectedBy,
-      status: formData.status as 'Draft' | 'Rejected' | 'Approved',
-      warehouseLocation: formData.warehouseLocation,
+      status: formData.status,
       totalAmount,
-      items: formData.items,
+      items: formData.items.map(item => ({
+        poItemId: item.poItemId,
+        materialId: item.materialId,
+        materialCode: item.materialCode,
+        materialName: item.materialName,
+        orderedQuantity: item.orderedQuantity,
+        receivedQuantity: item.receivedQuantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice,
+        qualityStatus: item.qualityStatus,
+        remarks: item.remarks
+      })),
+      warehouseId: 'WH-001',
+      warehouseName: formData.warehouseLocation,
+      receivedBy: formData.receivedBy,
       notes: formData.notes,
-      qualityRemarks: formData.qualityRemarks,
-      deliveryChallanNumber: formData.deliveryChallanNumber,
-      transporterName: formData.transporterName,
-      vehicleNumber: formData.vehicleNumber,
       createdAt: new Date(),
       updatedAt: new Date(),
       createdBy: 'admin',
@@ -102,20 +118,23 @@ const AddGRN: React.FC = () => {
   }
 
   const addGRNItem = () => {
-    const newItem: GRNItem = {
+    const newItem: ExtendedGRNItem = {
+      poItemId: '',
       materialId: '',
       materialCode: '',
       materialName: '',
       orderedQuantity: 0,
       receivedQuantity: 0,
+      unitPrice: 0,
+      totalPrice: 0,
+      qualityStatus: 'Accepted',
+      remarks: '',
       acceptedQuantity: 0,
       rejectedQuantity: 0,
-      unitPrice: 0,
       totalAmount: 0,
       specifications: '',
       batchNumber: '',
-      expiryDate: '',
-      qualityStatus: 'Partial' as 'Partial' | 'Accepted' | 'Rejected'
+      expiryDate: ''
     }
     setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }))
   }

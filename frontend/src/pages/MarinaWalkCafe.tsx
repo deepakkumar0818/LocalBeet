@@ -279,7 +279,7 @@ const MarinaWalkCafe: React.FC = () => {
         item.maximumStock.toString(),
         item.totalValue.toFixed(2),
         item.status,
-        item.supplier || '',
+        '',
         new Date(item.lastUpdated).toLocaleDateString(),
         item.notes || ''
       ].map(field => `"${field}"`).join(','))
@@ -347,7 +347,7 @@ const MarinaWalkCafe: React.FC = () => {
             // Add to local state
             const newItem: OutletInventoryItem = {
               id: `rm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              outletId: outlet?.id || 'marina-walk-cafe-001',
+              outletId: 'marina-walk-cafe-001',
               outletCode: outlet?.outletCode || '',
               outletName: outlet?.outletName || '',
               materialId: materialData.materialCode,
@@ -391,7 +391,7 @@ const MarinaWalkCafe: React.FC = () => {
             // Add to local state
             const newItem: FinishedGoodInventoryItem = {
               id: `fg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              outletId: outlet?.id || 'marina-walk-cafe-001',
+              outletId: 'marina-walk-cafe-001',
               outletCode: outlet?.outletCode || '',
               outletName: outlet?.outletName || '',
               productId: productData.productCode,

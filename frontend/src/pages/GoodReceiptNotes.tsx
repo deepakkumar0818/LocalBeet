@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit, Trash2, Eye, Filter, Download, Upload, X } from 'lucide-react'
-import { GoodReceiptNote, GRNItem } from '../types'
+import { Plus, Search, Edit, Trash2, Eye, Filter, Download, Upload } from 'lucide-react'
+import { GoodReceiptNote } from '../types'
 
 const GoodReceiptNotes: React.FC = () => {
   const navigate = useNavigate()
@@ -41,8 +41,8 @@ const GoodReceiptNotes: React.FC = () => {
   ])
 
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedGRN, setSelectedGRN] = useState<GoodReceiptNote | null>(null)
-  const [showDetailsModal, setShowDetailsModal] = useState(false)
+  const [_selectedGRN, setSelectedGRN] = useState<GoodReceiptNote | null>(null)
+  const [_showDetailsModal, setShowDetailsModal] = useState(false)
   const [importing, setImporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -60,7 +60,7 @@ const GoodReceiptNotes: React.FC = () => {
     }
   }
 
-  const getQualityStatusColor = (status: string) => {
+  const _getQualityStatusColor = (status: string) => {
     switch (status) {
       case 'Accepted': return 'bg-green-100 text-green-800'
       case 'Rejected': return 'bg-red-100 text-red-800'

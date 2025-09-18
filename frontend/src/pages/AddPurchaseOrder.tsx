@@ -68,21 +68,23 @@ const AddPurchaseOrder: React.FC = () => {
 
     const newPurchaseOrder: PurchaseOrder = {
       id: Date.now().toString(),
-      purchaseOrderNumber: formData.purchaseOrderNumber,
+      poNumber: formData.purchaseOrderNumber,
+      supplierId: 'SUP-001',
       supplierName: formData.supplierName,
-      supplierContact: formData.supplierContact,
-      supplierEmail: formData.supplierEmail,
-      supplierAddress: formData.supplierAddress,
       orderDate: new Date(formData.orderDate),
       expectedDeliveryDate: new Date(formData.expectedDeliveryDate),
-      priority: formData.priority,
-      status: formData.status as 'Draft' | 'Completed' | 'Cancelled' | 'Sent' | 'Confirmed' | 'Partial',
-      paymentTerms: formData.paymentTerms,
-      shippingMethod: formData.shippingMethod,
+      status: formData.status as 'Draft' | 'Sent' | 'Confirmed' | 'Partial' | 'Completed' | 'Cancelled',
       totalAmount,
-      items: formData.items,
+      items: formData.items.map(item => ({
+        materialId: item.materialId,
+        materialCode: item.materialCode,
+        materialName: item.materialName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice
+      })),
+      terms: formData.paymentTerms,
       notes: formData.notes,
-      specialInstructions: formData.specialInstructions,
       createdAt: new Date(),
       updatedAt: new Date(),
       createdBy: 'admin',
@@ -107,9 +109,7 @@ const AddPurchaseOrder: React.FC = () => {
       materialName: '',
       quantity: 0,
       unitPrice: 0,
-      totalPrice: 0,
-      specifications: '',
-      deliveryDate: ''
+      totalPrice: 0
     }
     setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }))
   }

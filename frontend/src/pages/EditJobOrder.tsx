@@ -32,7 +32,7 @@ const EditJobOrder: React.FC = () => {
   const statusOptions = ['Draft', 'Approved', 'In Progress', 'Completed', 'Cancelled']
 
   // Mock data - in real app, fetch from API
-  const mockJobOrder: JobOrder = {
+  const _mockJobOrder: JobOrder = {
     id: '1',
     jobOrderNumber: 'JO-2024-001',
     customerName: 'ABC Manufacturing Ltd.',
@@ -45,7 +45,7 @@ const EditJobOrder: React.FC = () => {
     totalAmount: 15750.00,
     items: [
       {
-        productId: 'PROD-001',
+        product: 'PROD-001',
         productCode: 'PROD-001',
         productName: 'Steel Frame Assembly',
         quantity: 10,
@@ -55,7 +55,7 @@ const EditJobOrder: React.FC = () => {
         deliveryDate: '2024-02-10'
       },
       {
-        productId: 'PROD-002',
+        product: 'PROD-002',
         productCode: 'PROD-002',
         productName: 'Aluminum Brackets',
         quantity: 50,

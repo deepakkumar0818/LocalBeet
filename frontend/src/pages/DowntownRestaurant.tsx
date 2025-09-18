@@ -278,7 +278,7 @@ const DowntownRestaurant: React.FC = () => {
         item.maximumStock.toString(),
         item.totalValue.toFixed(2),
         item.status,
-        item.supplier || '',
+        '',
         new Date(item.lastUpdated).toLocaleDateString(),
         item.notes || ''
       ].map(field => `"${field}"`).join(','))
@@ -346,7 +346,7 @@ const DowntownRestaurant: React.FC = () => {
             // Add to local state
             const newItem: OutletInventoryItem = {
               id: `rm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              outletId: outlet?.id || 'downtown-restaurant-001',
+              outletId: 'downtown-restaurant-001',
               outletCode: outlet?.outletCode || '',
               outletName: outlet?.outletName || '',
               materialId: materialData.materialCode,
@@ -390,7 +390,7 @@ const DowntownRestaurant: React.FC = () => {
             // Add to local state
             const newItem: FinishedGoodInventoryItem = {
               id: `fg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              outletId: outlet?.id || 'downtown-restaurant-001',
+              outletId: 'downtown-restaurant-001',
               outletCode: outlet?.outletCode || '',
               outletName: outlet?.outletName || '',
               productId: productData.productCode,

@@ -196,7 +196,7 @@ const CentralKitchen: React.FC = () => {
           'Total Value': item.totalValue,
           'Location': item.location,
           'Batch Number': item.batchNumber,
-          'Supplier': item.supplier || '',
+          'Supplier': '',
           'Status': item.status,
           'Last Updated': new Date(item.lastUpdated).toLocaleDateString(),
           'Notes': item.notes
@@ -216,7 +216,7 @@ const CentralKitchen: React.FC = () => {
           'Total Value': item.totalValue,
           'Location': item.storageLocation,
           'Batch Number': item.batchNumber,
-          'Supplier': item.supplier || '',
+          'Supplier': '',
           'Status': item.qualityStatus,
           'Last Updated': new Date(item.lastUpdated).toLocaleDateString(),
           'Notes': item.notes

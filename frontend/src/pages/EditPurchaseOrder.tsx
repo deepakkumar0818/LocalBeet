@@ -44,7 +44,7 @@ const EditPurchaseOrder: React.FC = () => {
     orderDate: new Date('2024-01-15'),
     expectedDeliveryDate: new Date('2024-02-15'),
     priority: 'High',
-    status: 'Approved',
+    status: 'Confirmed',
     paymentTerms: 'Net 30',
     shippingMethod: 'Express',
     totalAmount: 15750.00,
@@ -55,7 +55,7 @@ const EditPurchaseOrder: React.FC = () => {
         materialName: 'Steel Rod 12mm',
         quantity: 100,
         unitPrice: 45.50,
-        totalAmount: 4550.00,
+        totalPrice: 4550.00,
         specifications: 'Grade A, 12mm diameter',
         deliveryDate: '2024-02-10'
       },
@@ -65,7 +65,7 @@ const EditPurchaseOrder: React.FC = () => {
         materialName: 'Aluminum Sheet 2mm',
         quantity: 50,
         unitPrice: 125.00,
-        totalAmount: 6250.00,
+        totalPrice: 6250.00,
         specifications: 'Anodized finish, Grade 6061',
         deliveryDate: '2024-02-15'
       },
@@ -75,7 +75,7 @@ const EditPurchaseOrder: React.FC = () => {
         materialName: 'Copper Wire 10 AWG',
         quantity: 200,
         unitPrice: 23.75,
-        totalAmount: 4750.00,
+        totalPrice: 4750.00,
         specifications: 'Insulated, 10 AWG',
         deliveryDate: '2024-02-12'
       }
@@ -92,21 +92,24 @@ const EditPurchaseOrder: React.FC = () => {
     // Simulate API call
     setTimeout(() => {
       setFormData({
-        purchaseOrderNumber: mockPurchaseOrder.purchaseOrderNumber,
+        purchaseOrderNumber: mockPurchaseOrder.poNumber,
         supplierName: mockPurchaseOrder.supplierName,
-        supplierContact: mockPurchaseOrder.supplierContact,
-        supplierEmail: mockPurchaseOrder.supplierEmail,
-        supplierAddress: mockPurchaseOrder.supplierAddress,
+        supplierContact: 'John Smith',
+        supplierEmail: 'john@abcsteel.com',
+        supplierAddress: '123 Industrial Street',
         orderDate: mockPurchaseOrder.orderDate.toISOString().split('T')[0],
         expectedDeliveryDate: mockPurchaseOrder.expectedDeliveryDate.toISOString().split('T')[0],
-        priority: mockPurchaseOrder.priority,
+        priority: 'High',
         status: mockPurchaseOrder.status,
-        paymentTerms: mockPurchaseOrder.paymentTerms,
-        shippingMethod: mockPurchaseOrder.shippingMethod,
+        paymentTerms: 'Net 30',
+        shippingMethod: 'Express',
         totalAmount: mockPurchaseOrder.totalAmount,
-        items: mockPurchaseOrder.items,
-        notes: mockPurchaseOrder.notes,
-        specialInstructions: mockPurchaseOrder.specialInstructions
+        items: mockPurchaseOrder.items.map(item => ({
+          ...item,
+          totalAmount: item.totalPrice
+        })),
+        notes: mockPurchaseOrder.notes || '',
+        specialInstructions: 'Special handling required'
       })
       setLoading(false)
     }, 500)
@@ -158,7 +161,7 @@ const EditPurchaseOrder: React.FC = () => {
       orderDate: new Date(formData.orderDate),
       expectedDeliveryDate: new Date(formData.expectedDeliveryDate),
       priority: formData.priority,
-      status: formData.status,
+      status: formData.status as 'Draft' | 'Sent' | 'Confirmed' | 'Partial' | 'Completed' | 'Cancelled',
       paymentTerms: formData.paymentTerms,
       shippingMethod: formData.shippingMethod,
       totalAmount,
@@ -181,15 +184,14 @@ const EditPurchaseOrder: React.FC = () => {
   }
 
   const addPurchaseOrderItem = () => {
-    const newItem: PurchaseOrderItem = {
+    const newItem = {
       materialId: '',
       materialCode: '',
       materialName: '',
       quantity: 0,
       unitPrice: 0,
-      totalAmount: 0,
-      specifications: '',
-      deliveryDate: ''
+      totalPrice: 0,
+      totalAmount: 0
     }
     setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }))
   }
@@ -201,7 +203,8 @@ const EditPurchaseOrder: React.FC = () => {
         if (i === index) {
           const updatedItem = { ...item, [field]: value }
           if (field === 'quantity' || field === 'unitPrice') {
-            updatedItem.totalAmount = updatedItem.quantity * updatedItem.unitPrice
+            updatedItem.totalPrice = updatedItem.quantity * updatedItem.unitPrice
+            updatedItem.totalAmount = updatedItem.totalPrice
           }
           return updatedItem
         }
@@ -491,7 +494,7 @@ const EditPurchaseOrder: React.FC = () => {
                     <input
                       type="date"
                       className="input-field text-sm"
-                      value={item.deliveryDate}
+                      value=""
                       onChange={(e) => updatePurchaseOrderItem(index, 'deliveryDate', e.target.value)}
                     />
                   </div>
@@ -500,7 +503,7 @@ const EditPurchaseOrder: React.FC = () => {
                     <input
                       type="text"
                       className="input-field text-sm"
-                      value={item.specifications}
+                      value=""
                       onChange={(e) => updatePurchaseOrderItem(index, 'specifications', e.target.value)}
                       placeholder="Grade A, 12mm"
                     />
@@ -516,7 +519,7 @@ const EditPurchaseOrder: React.FC = () => {
                   </div>
                   <div className="col-span-7">
                     <div className="text-sm text-gray-600">
-                      Total Amount: {item.totalAmount.toFixed(2)} KWD
+                      Total Amount: {(item.totalPrice || 0).toFixed(2)} KWD
                     </div>
                   </div>
                 </div>
@@ -527,7 +530,7 @@ const EditPurchaseOrder: React.FC = () => {
               <div className="mt-4 p-4 bg-blue-50 rounded-lg">
                 <div className="text-right">
                   <span className="text-lg font-semibold text-gray-900">
-                    Total Order Amount: {formData.items.reduce((sum, item) => sum + item.totalAmount, 0).toFixed(2)} KWD
+                    Total Order Amount: {formData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0).toFixed(2)} KWD
                   </span>
                 </div>
               </div>
