@@ -400,7 +400,7 @@ const AddPurchaseOrder: React.FC = () => {
                     <input
                       type="date"
                       className="input-field text-sm"
-                      value={item.deliveryDate || ''}
+                      value=""
                       onChange={(e) => updatePurchaseOrderItem(index, 'deliveryDate', e.target.value)}
                     />
                   </div>
@@ -409,7 +409,7 @@ const AddPurchaseOrder: React.FC = () => {
                     <input
                       type="text"
                       className="input-field text-sm"
-                      value={item.specifications || ''}
+                      value=""
                       onChange={(e) => updatePurchaseOrderItem(index, 'specifications', e.target.value)}
                       placeholder="Grade A, 12mm"
                     />
