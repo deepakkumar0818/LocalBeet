@@ -55,8 +55,7 @@ const WarehouseMaster: React.FC = () => {
   ])
 
   const [searchTerm, setSearchTerm] = useState('')
-  const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null)
-  const [_showModal, setShowModal] = useState(false)
+  // Unused state variables removed
 
   const filteredWarehouses = warehouses.filter(warehouse =>
     warehouse.warehouseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -79,111 +78,7 @@ const WarehouseMaster: React.FC = () => {
     }
   }
 
-  const _WarehouseModal: React.FC = () => (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-        <div className="mt-3">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            {editingWarehouse ? 'Edit Warehouse' : 'Create New Warehouse'}
-          </h3>
-          <form className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Warehouse Code</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  defaultValue={editingWarehouse?.warehouseCode || ''}
-                  placeholder="WH-001"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Warehouse Name</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  defaultValue={editingWarehouse?.warehouseName || ''}
-                  placeholder="Main Warehouse"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Description</label>
-              <textarea
-                className="input-field"
-                rows={3}
-                defaultValue={editingWarehouse?.description || ''}
-                placeholder="Warehouse description"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Capacity</label>
-                <input
-                  type="number"
-                  className="input-field"
-                  defaultValue={editingWarehouse?.capacity || ''}
-                  placeholder="10000"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Current Capacity</label>
-                <input
-                  type="number"
-                  className="input-field"
-                  defaultValue={editingWarehouse?.currentCapacity || ''}
-                  placeholder="7500"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Manager</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  defaultValue={editingWarehouse?.managerName || ''}
-                  placeholder="John Smith"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Storage Types</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  defaultValue={editingWarehouse?.storageTypes.join(', ') || ''}
-                  placeholder="Dry Storage, Cold Storage"
-                />
-              </div>
-            </div>
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                defaultChecked={editingWarehouse?.isActive ?? true}
-              />
-              <label className="ml-2 block text-sm text-gray-900">Active</label>
-            </div>
-            <div className="flex justify-end space-x-3 pt-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowModal(false)
-                  setEditingWarehouse(null)
-                }}
-                className="btn-secondary"
-              >
-                Cancel
-              </button>
-              <button type="submit" className="btn-primary">
-                {editingWarehouse ? 'Update Warehouse' : 'Create Warehouse'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  )
+  // Unused component removed
 
   return (
     <div className="space-y-6">

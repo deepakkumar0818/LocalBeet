@@ -341,11 +341,6 @@ const CentralKitchen: React.FC = () => {
 
   const addSampleDataAutomatically = () => {
     console.log('Automatically adding sample data to Central Kitchen...')
-    
-    // Use outlet or create default values
-    const outletId = outlet?.id || 'central-kitchen-001'
-    const outletCode = outlet?.outletCode || 'CK-001'
-    const outletName = outlet?.outletName || 'Central Kitchen'
 
     // Sample Raw Materials data
     const sampleRawMaterials = [
@@ -722,7 +717,7 @@ const CentralKitchen: React.FC = () => {
     console.log('Added', sampleRawMaterials.length, 'raw materials automatically')
 
     // Add finished goods to local state
-    setFinishedGoodInventoryItems(sampleFinishedGoods)
+    setFinishedGoodInventoryItems(sampleFinishedGoods as unknown as FinishedGoodInventoryItem[])
     console.log('Added', sampleFinishedGoods.length, 'finished goods automatically')
 
     console.log('Central Kitchen automatically populated with sample data')
@@ -870,9 +865,9 @@ const CentralKitchen: React.FC = () => {
       // Sample Finished Goods data
       const sampleFinishedGoods = [
         {
-          outletId: outletId,
-          outletCode: outletCode,
-          outletName: outletName,
+          outletId: outlet?.id || 'central-kitchen-001',
+          outletCode: outlet?.outletCode || 'CK-001',
+          outletName: outlet?.outletName || 'Central Kitchen',
           productId: 'FG-001',
           productCode: 'FG-001',
           productName: 'Fresh Green Smoothie',
@@ -902,9 +897,9 @@ const CentralKitchen: React.FC = () => {
           transferSource: 'Production'
         },
         {
-          outletId: outletId,
-          outletCode: outletCode,
-          outletName: outletName,
+          outletId: outlet?.id || 'central-kitchen-001',
+          outletCode: outlet?.outletCode || 'CK-001',
+          outletName: outlet?.outletName || 'Central Kitchen',
           productId: 'FG-002',
           productCode: 'FG-002',
           productName: 'Protein Power Bowl',
@@ -934,9 +929,9 @@ const CentralKitchen: React.FC = () => {
           transferSource: 'Production'
         },
         {
-          outletId: outletId,
-          outletCode: outletCode,
-          outletName: outletName,
+          outletId: outlet?.id || 'central-kitchen-001',
+          outletCode: outlet?.outletCode || 'CK-001',
+          outletName: outlet?.outletName || 'Central Kitchen',
           productId: 'FG-003',
           productCode: 'FG-003',
           productName: 'Detox Juice Blend',
@@ -966,9 +961,9 @@ const CentralKitchen: React.FC = () => {
           transferSource: 'Production'
         },
         {
-          outletId: outletId,
-          outletCode: outletCode,
-          outletName: outletName,
+          outletId: outlet?.id || 'central-kitchen-001',
+          outletCode: outlet?.outletCode || 'CK-001',
+          outletName: outlet?.outletName || 'Central Kitchen',
           productId: 'FG-004',
           productCode: 'FG-004',
           productName: 'Quinoa Salad',

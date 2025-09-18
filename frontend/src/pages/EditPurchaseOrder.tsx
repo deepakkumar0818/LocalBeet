@@ -17,7 +17,7 @@ const EditPurchaseOrder: React.FC = () => {
     expectedDeliveryDate: '',
     priority: 'Medium' as 'Low' | 'Medium' | 'High' | 'Urgent',
     status: 'Draft' as 'Draft' | 'Approved' | 'Sent' | 'Received' | 'Cancelled',
-    paymentTerms: 'Net 30',
+    // paymentTerms: 'Net 30',
     shippingMethod: 'Standard',
     totalAmount: 0,
     items: [] as PurchaseOrderItem[],
@@ -36,17 +36,18 @@ const EditPurchaseOrder: React.FC = () => {
   // Mock data - in real app, fetch from API
   const mockPurchaseOrder: PurchaseOrder = {
     id: '1',
-    purchaseOrderNumber: 'PO-2024-001',
+    poNumber: 'PO-2024-001',
+    supplierId: 'SUP-001',
     supplierName: 'ABC Steel Suppliers',
-    supplierContact: 'John Smith',
-    supplierEmail: 'john@abcsteel.com',
-    supplierAddress: '123 Industrial Street, Manufacturing District, City, State 12345',
+    // supplierContact: 'John Smith',
+    // supplierEmail: 'john@abcsteel.com',
+    // supplierAddress: '123 Industrial Street, Manufacturing District, City, State 12345',
     orderDate: new Date('2024-01-15'),
     expectedDeliveryDate: new Date('2024-02-15'),
-    priority: 'High',
+    // priority: 'High',
     status: 'Confirmed',
-    paymentTerms: 'Net 30',
-    shippingMethod: 'Express',
+    // paymentTerms: 'Net 30',
+    // shippingMethod: 'Express',
     totalAmount: 15750.00,
     items: [
       {
@@ -81,7 +82,7 @@ const EditPurchaseOrder: React.FC = () => {
       }
     ],
     notes: 'Supplier requires advance payment for expedited delivery.',
-    specialInstructions: 'All materials must be certified and include material certificates. Delivery to loading dock only.',
+    // specialInstructions: 'All materials must be certified and include material certificates. Delivery to loading dock only.',
     createdAt: new Date('2024-01-15'),
     updatedAt: new Date('2024-01-20'),
     createdBy: 'admin',
@@ -99,9 +100,10 @@ const EditPurchaseOrder: React.FC = () => {
         supplierAddress: '123 Industrial Street',
         orderDate: mockPurchaseOrder.orderDate.toISOString().split('T')[0],
         expectedDeliveryDate: mockPurchaseOrder.expectedDeliveryDate.toISOString().split('T')[0],
+        // priority: 'High',
         priority: 'High',
         status: 'Approved',
-        paymentTerms: 'Net 30',
+        // paymentTerms: 'Net 30',
         shippingMethod: 'Express',
         totalAmount: mockPurchaseOrder.totalAmount,
         items: mockPurchaseOrder.items.map(item => ({
@@ -156,18 +158,18 @@ const EditPurchaseOrder: React.FC = () => {
       poNumber: formData.purchaseOrderNumber,
       supplierName: formData.supplierName,
       // supplierContact: formData.supplierContact,
-      supplierEmail: formData.supplierEmail,
-      supplierAddress: formData.supplierAddress,
+      // supplierEmail: formData.supplierEmail,
+      // supplierAddress: formData.supplierAddress,
       orderDate: new Date(formData.orderDate),
       expectedDeliveryDate: new Date(formData.expectedDeliveryDate),
-      priority: formData.priority,
+      // priority: formData.priority,
       status: formData.status as 'Draft' | 'Sent' | 'Confirmed' | 'Partial' | 'Completed' | 'Cancelled',
-      paymentTerms: formData.paymentTerms,
-      shippingMethod: formData.shippingMethod,
+      // paymentTerms: formData.paymentTerms,
+      // shippingMethod: formData.shippingMethod,
       totalAmount,
       items: formData.items,
       notes: formData.notes,
-      specialInstructions: formData.specialInstructions,
+      // specialInstructions: formData.specialInstructions,
       updatedAt: new Date(),
       updatedBy: 'admin'
     }
@@ -401,7 +403,7 @@ const EditPurchaseOrder: React.FC = () => {
                 </label>
                 <select
                   className="input-field"
-                  value={formData.paymentTerms}
+                  value=""
                   onChange={(e) => handleInputChange('paymentTerms', e.target.value)}
                 >
                   {paymentTermsOptions.map(term => (

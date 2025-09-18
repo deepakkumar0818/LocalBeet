@@ -323,7 +323,7 @@ const JobOrders: React.FC = () => {
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                       jobOrder.status === 'Completed' ? 'bg-green-100 text-green-800' :
                       jobOrder.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                      jobOrder.status === 'In Progress' ? 'bg-purple-100 text-purple-800' :
+                      jobOrder.status === 'Pending' ? 'bg-purple-100 text-purple-800' :
                       jobOrder.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
                       'bg-yellow-100 text-yellow-800'
                     }`}>
@@ -424,7 +424,7 @@ const JobOrders: React.FC = () => {
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                     selectedJobOrder.status === 'Completed' ? 'bg-green-100 text-green-800' :
                     selectedJobOrder.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                    selectedJobOrder.status === 'In Progress' ? 'bg-purple-100 text-purple-800' :
+                    selectedJobOrder.status === 'Pending' ? 'bg-purple-100 text-purple-800' :
                     selectedJobOrder.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
                     'bg-yellow-100 text-yellow-800'
                   }`}>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, X, Plus, Trash2 } from 'lucide-react'
-import { JobOrder, JobOrderItem, BillOfMaterials } from '../types'
+import { JobOrderItem, BillOfMaterials } from '../types'
 import { apiService } from '../services/api'
 
 const EditJobOrder: React.FC = () => {
@@ -31,47 +31,7 @@ const EditJobOrder: React.FC = () => {
   const priorityOptions = ['Low', 'Medium', 'High', 'Urgent']
   const statusOptions = ['Draft', 'Approved', 'In Progress', 'Completed', 'Cancelled']
 
-  // Mock data - in real app, fetch from API
-  const _mockJobOrder: JobOrder = {
-    id: '1',
-    jobOrderNumber: 'JO-2024-001',
-    customerName: 'ABC Manufacturing Ltd.',
-    customerContact: 'John Smith',
-    customerEmail: 'john@abcmfg.com',
-    orderDate: new Date('2024-01-15'),
-    deliveryDate: new Date('2024-02-15'),
-    priority: 'High',
-    status: 'In Progress',
-    totalAmount: 15750.00,
-    items: [
-      {
-        product: 'PROD-001',
-        // productCode: 'PROD-001',
-        // productName: 'Steel Frame Assembly',
-        quantity: 10,
-        unitPrice: 1250.00,
-        totalAmount: 12500.00,
-        specifications: 'Custom dimensions: 2m x 1m x 0.5m',
-        deliveryDate: '2024-02-10'
-      },
-      {
-        product: 'PROD-002',
-        // productCode: 'PROD-002',
-        // productName: 'Aluminum Brackets',
-        quantity: 50,
-        unitPrice: 65.00,
-        totalAmount: 3250.00,
-        specifications: 'Anodized finish, Grade 6061',
-        deliveryDate: '2024-02-15'
-      }
-    ],
-    notes: 'Customer requires expedited delivery due to project timeline.',
-    specialInstructions: 'All welds must be inspected and certified. Use only Grade A materials.',
-    createdAt: new Date('2024-01-15'),
-    updatedAt: new Date('2024-01-20'),
-    createdBy: 'admin',
-    updatedBy: 'admin'
-  }
+  // Mock data removed - not used in the component
 
   useEffect(() => {
     const loadData = async () => {

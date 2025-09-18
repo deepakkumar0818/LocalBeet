@@ -60,14 +60,7 @@ const GoodReceiptNotes: React.FC = () => {
     }
   }
 
-  const _getQualityStatusColor = (status: string) => {
-    switch (status) {
-      case 'Accepted': return 'bg-green-100 text-green-800'
-      case 'Rejected': return 'bg-red-100 text-red-800'
-      case 'Partial': return 'bg-yellow-100 text-yellow-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
+  // Function removed - not used in the component
 
   const handleDelete = (id: string) => {
     if (window.confirm('Are you sure you want to delete this GRN?')) {
