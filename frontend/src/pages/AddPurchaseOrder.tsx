@@ -64,7 +64,7 @@ const AddPurchaseOrder: React.FC = () => {
     }
 
     // Calculate total amount
-    const totalAmount = formData.items.reduce((sum, item) => sum + item.totalAmount, 0)
+    const totalAmount = formData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0)
 
     const newPurchaseOrder: PurchaseOrder = {
       id: Date.now().toString(),
@@ -76,7 +76,7 @@ const AddPurchaseOrder: React.FC = () => {
       orderDate: new Date(formData.orderDate),
       expectedDeliveryDate: new Date(formData.expectedDeliveryDate),
       priority: formData.priority,
-      status: formData.status,
+      status: formData.status as 'Draft' | 'Completed' | 'Cancelled' | 'Sent' | 'Confirmed' | 'Partial',
       paymentTerms: formData.paymentTerms,
       shippingMethod: formData.shippingMethod,
       totalAmount,
@@ -107,7 +107,7 @@ const AddPurchaseOrder: React.FC = () => {
       materialName: '',
       quantity: 0,
       unitPrice: 0,
-      totalAmount: 0,
+      totalPrice: 0,
       specifications: '',
       deliveryDate: ''
     }
@@ -121,7 +121,7 @@ const AddPurchaseOrder: React.FC = () => {
         if (i === index) {
           const updatedItem = { ...item, [field]: value }
           if (field === 'quantity' || field === 'unitPrice') {
-            updatedItem.totalAmount = updatedItem.quantity * updatedItem.unitPrice
+            updatedItem.totalPrice = updatedItem.quantity * updatedItem.unitPrice
           }
           return updatedItem
         }
@@ -400,7 +400,7 @@ const AddPurchaseOrder: React.FC = () => {
                     <input
                       type="date"
                       className="input-field text-sm"
-                      value={item.deliveryDate}
+                      value={item.deliveryDate || ''}
                       onChange={(e) => updatePurchaseOrderItem(index, 'deliveryDate', e.target.value)}
                     />
                   </div>
@@ -409,7 +409,7 @@ const AddPurchaseOrder: React.FC = () => {
                     <input
                       type="text"
                       className="input-field text-sm"
-                      value={item.specifications}
+                      value={item.specifications || ''}
                       onChange={(e) => updatePurchaseOrderItem(index, 'specifications', e.target.value)}
                       placeholder="Grade A, 12mm"
                     />
@@ -425,7 +425,7 @@ const AddPurchaseOrder: React.FC = () => {
                   </div>
                   <div className="col-span-7">
                     <div className="text-sm text-gray-600">
-                      Total Amount: {item.totalAmount.toFixed(2)} KWD
+                      Total Amount: {(item.totalPrice || 0).toFixed(2)} KWD
                     </div>
                   </div>
                 </div>
@@ -436,7 +436,7 @@ const AddPurchaseOrder: React.FC = () => {
               <div className="mt-4 p-4 bg-blue-50 rounded-lg">
                 <div className="text-right">
                   <span className="text-lg font-semibold text-gray-900">
-                    Total Order Amount: {formData.items.reduce((sum, item) => sum + item.totalAmount, 0).toFixed(2)} KWD
+                    Total Order Amount: {formData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0).toFixed(2)} KWD
                   </span>
                 </div>
               </div>

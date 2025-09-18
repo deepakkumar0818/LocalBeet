@@ -63,7 +63,7 @@ const AddGRN: React.FC = () => {
     }
 
     // Calculate total amount
-    const totalAmount = formData.items.reduce((sum, item) => sum + item.totalAmount, 0)
+    const totalAmount = formData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0)
 
     const newGRN: GoodReceiptNote = {
       id: Date.now().toString(),
@@ -75,7 +75,7 @@ const AddGRN: React.FC = () => {
       receiptDate: new Date(formData.receiptDate),
       receivedBy: formData.receivedBy,
       inspectedBy: formData.inspectedBy,
-      status: formData.status,
+      status: formData.status as 'Draft' | 'Rejected' | 'Approved',
       warehouseLocation: formData.warehouseLocation,
       totalAmount,
       items: formData.items,
@@ -115,7 +115,7 @@ const AddGRN: React.FC = () => {
       specifications: '',
       batchNumber: '',
       expiryDate: '',
-      qualityStatus: 'Pending'
+      qualityStatus: 'Partial' as 'Partial' | 'Accepted' | 'Rejected'
     }
     setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }))
   }
@@ -126,8 +126,8 @@ const AddGRN: React.FC = () => {
       items: prev.items.map((item, i) => {
         if (i === index) {
           const updatedItem = { ...item, [field]: value }
-          if (field === 'acceptedQuantity' || field === 'unitPrice') {
-            updatedItem.totalAmount = updatedItem.acceptedQuantity * updatedItem.unitPrice
+          if (field === 'receivedQuantity' || field === 'unitPrice') {
+            updatedItem.totalPrice = updatedItem.receivedQuantity * updatedItem.unitPrice
           }
           return updatedItem
         }
@@ -432,8 +432,8 @@ const AddGRN: React.FC = () => {
                     <input
                       type="number"
                       className="input-field text-sm"
-                      value={item.acceptedQuantity}
-                      onChange={(e) => updateGRNItem(index, 'acceptedQuantity', parseFloat(e.target.value) || 0)}
+                      value={item.receivedQuantity}
+                      onChange={(e) => updateGRNItem(index, 'receivedQuantity', parseFloat(e.target.value) || 0)}
                       placeholder="0"
                     />
                   </div>
@@ -453,7 +453,7 @@ const AddGRN: React.FC = () => {
                     <input
                       type="text"
                       className="input-field text-sm"
-                      value={item.batchNumber}
+                      value={item.batchNumber || ''}
                       onChange={(e) => updateGRNItem(index, 'batchNumber', e.target.value)}
                       placeholder="B001"
                     />
@@ -474,7 +474,7 @@ const AddGRN: React.FC = () => {
                         <input
                           type="text"
                           className="input-field text-sm"
-                          value={item.specifications}
+                          value={item.specifications || ''}
                           onChange={(e) => updateGRNItem(index, 'specifications', e.target.value)}
                           placeholder="Grade A, 12mm"
                         />
@@ -484,7 +484,7 @@ const AddGRN: React.FC = () => {
                         <input
                           type="date"
                           className="input-field text-sm"
-                          value={item.expiryDate}
+                          value={item.expiryDate || ''}
                           onChange={(e) => updateGRNItem(index, 'expiryDate', e.target.value)}
                         />
                       </div>
@@ -502,7 +502,7 @@ const AddGRN: React.FC = () => {
                       </div>
                     </div>
                     <div className="mt-2 text-sm text-gray-600">
-                      Total Amount: {item.totalAmount.toFixed(2)} KWD
+                      Total Amount: {(item.totalPrice || 0).toFixed(2)} KWD
                     </div>
                   </div>
                 </div>
@@ -513,7 +513,7 @@ const AddGRN: React.FC = () => {
               <div className="mt-4 p-4 bg-blue-50 rounded-lg">
                 <div className="text-right">
                   <span className="text-lg font-semibold text-gray-900">
-                    Total GRN Amount: {formData.items.reduce((sum, item) => sum + item.totalAmount, 0).toFixed(2)} KWD
+                    Total GRN Amount: {formData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0).toFixed(2)} KWD
                   </span>
                 </div>
               </div>

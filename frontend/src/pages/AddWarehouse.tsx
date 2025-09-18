@@ -84,7 +84,13 @@ const AddWarehouse: React.FC = () => {
       warehouseName: formData.warehouseName,
       warehouseType: formData.warehouseType,
       location: formData.location,
-      address: formData.address,
+      address: {
+        street: formData.address,
+        city: formData.city,
+        state: formData.state,
+        country: formData.country,
+        postalCode: formData.postalCode
+      },
       city: formData.city,
       state: formData.state,
       country: formData.country,

@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, X, Plus, Trash2 } from 'lucide-react'
-import { GoodReceiptNote, GRNItem } from '../types'
+import { GRNItem } from '../types'
+
+// Extended GRNItem interface for EditGRN
+interface ExtendedGRNItem extends GRNItem {
+  acceptedQuantity: number;
+  rejectedQuantity: number;
+  totalAmount: number;
+  specifications: string;
+  batchNumber: string;
+  expiryDate: string;
+}
 
 const EditGRN: React.FC = () => {
   const navigate = useNavigate()
@@ -16,10 +26,10 @@ const EditGRN: React.FC = () => {
     receiptDate: '',
     receivedBy: '',
     inspectedBy: '',
-    status: 'Draft' as 'Draft' | 'Received' | 'Inspected' | 'Approved' | 'Rejected',
+    status: 'Draft' as 'Draft' | 'Approved' | 'Rejected',
     warehouseLocation: '',
     totalAmount: 0,
-    items: [] as GRNItem[],
+    items: [] as ExtendedGRNItem[],
     notes: '',
     qualityRemarks: '',
     deliveryChallanNumber: '',
@@ -30,74 +40,60 @@ const EditGRN: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
-  const statusOptions = ['Draft', 'Received', 'Inspected', 'Approved', 'Rejected']
+  const statusOptions = ['Draft', 'Approved', 'Rejected']
 
   // Mock data - in real app, fetch from API
-  const mockGRN: GoodReceiptNote = {
+  const mockGRN = {
     id: '1',
     grnNumber: 'GRN-2024-001',
-    purchaseOrderNumber: 'PO-2024-001',
+    poNumber: 'PO-2024-001',
+    supplierId: 'SUP-001',
     supplierName: 'ABC Steel Suppliers',
-    supplierContact: 'John Smith',
-    supplierEmail: 'john@abcsteel.com',
     receiptDate: new Date('2024-01-20'),
-    receivedBy: 'Warehouse Manager',
-    inspectedBy: 'Quality Inspector',
-    status: 'Inspected',
-    warehouseLocation: 'Main Warehouse - Zone A',
+    status: 'Approved' as 'Draft' | 'Approved' | 'Rejected',
     totalAmount: 15750.00,
     items: [
       {
+        poItemId: 'POI-001',
         materialId: 'RM-001',
         materialCode: 'RM-001',
         materialName: 'Steel Rod 12mm',
         orderedQuantity: 100,
         receivedQuantity: 100,
-        acceptedQuantity: 95,
-        rejectedQuantity: 5,
         unitPrice: 45.50,
-        totalAmount: 4322.50,
-        specifications: 'Grade A, 12mm diameter',
-        batchNumber: 'B001',
-        expiryDate: '2025-12-31',
-        qualityStatus: 'Approved'
+        totalPrice: 4550.00,
+        qualityStatus: 'Accepted' as 'Accepted' | 'Rejected' | 'Partial',
+        remarks: 'Good quality'
       },
       {
+        poItemId: 'POI-002',
         materialId: 'RM-002',
         materialCode: 'RM-002',
         materialName: 'Aluminum Sheet 2mm',
         orderedQuantity: 50,
         receivedQuantity: 50,
-        acceptedQuantity: 50,
-        rejectedQuantity: 0,
         unitPrice: 125.00,
-        totalAmount: 6250.00,
-        specifications: 'Anodized finish, Grade 6061',
-        batchNumber: 'B002',
-        expiryDate: '2025-12-31',
-        qualityStatus: 'Approved'
+        totalPrice: 6250.00,
+        qualityStatus: 'Accepted' as 'Accepted' | 'Rejected' | 'Partial',
+        remarks: 'Excellent quality'
       },
       {
+        poItemId: 'POI-003',
         materialId: 'RM-003',
         materialCode: 'RM-003',
         materialName: 'Copper Wire 10 AWG',
         orderedQuantity: 200,
         receivedQuantity: 200,
-        acceptedQuantity: 200,
-        rejectedQuantity: 0,
         unitPrice: 23.75,
-        totalAmount: 4750.00,
-        specifications: 'Insulated, 10 AWG',
-        batchNumber: 'B003',
-        expiryDate: '2025-12-31',
-        qualityStatus: 'Approved'
+        totalPrice: 4750.00,
+        qualityStatus: 'Accepted' as 'Accepted' | 'Rejected' | 'Partial',
+        remarks: 'Good quality'
       }
     ],
-    notes: 'All materials received in good condition. Minor damage to 5 steel rods noted.',
-    qualityRemarks: 'Quality inspection completed. All materials meet specifications except for 5 steel rods with minor surface damage.',
-    deliveryChallanNumber: 'DC-2024-001',
-    transporterName: 'ABC Logistics',
-    vehicleNumber: 'MH-12-AB-1234',
+    warehouseId: 'WH-001',
+    warehouseName: 'Main Warehouse',
+    receivedBy: 'Warehouse Manager',
+    notes: 'All materials received in good condition.',
     createdAt: new Date('2024-01-20'),
     updatedAt: new Date('2024-01-21'),
     createdBy: 'admin',
@@ -109,22 +105,30 @@ const EditGRN: React.FC = () => {
     setTimeout(() => {
       setFormData({
         grnNumber: mockGRN.grnNumber,
-        purchaseOrderNumber: mockGRN.purchaseOrderNumber,
+        purchaseOrderNumber: mockGRN.poNumber,
         supplierName: mockGRN.supplierName,
-        supplierContact: mockGRN.supplierContact,
-        supplierEmail: mockGRN.supplierEmail,
+        supplierContact: 'John Smith',
+        supplierEmail: 'john@abcsteel.com',
         receiptDate: mockGRN.receiptDate.toISOString().split('T')[0],
         receivedBy: mockGRN.receivedBy,
-        inspectedBy: mockGRN.inspectedBy,
+        inspectedBy: 'Quality Inspector',
         status: mockGRN.status,
-        warehouseLocation: mockGRN.warehouseLocation,
+        warehouseLocation: mockGRN.warehouseName,
         totalAmount: mockGRN.totalAmount,
-        items: mockGRN.items,
-        notes: mockGRN.notes,
-        qualityRemarks: mockGRN.qualityRemarks,
-        deliveryChallanNumber: mockGRN.deliveryChallanNumber,
-        transporterName: mockGRN.transporterName,
-        vehicleNumber: mockGRN.vehicleNumber
+        items: mockGRN.items.map(item => ({
+          ...item,
+          acceptedQuantity: item.receivedQuantity,
+          rejectedQuantity: 0,
+          totalAmount: item.totalPrice,
+          specifications: 'Standard specifications',
+          batchNumber: 'BATCH-001',
+          expiryDate: '2025-12-31'
+        })),
+        notes: mockGRN.notes || '',
+        qualityRemarks: 'Quality inspection completed',
+        deliveryChallanNumber: 'DC-2024-001',
+        transporterName: 'ABC Logistics',
+        vehicleNumber: 'MH-12-AB-1234'
       })
       setLoading(false)
     }, 500)
@@ -166,25 +170,29 @@ const EditGRN: React.FC = () => {
     // Calculate total amount
     const totalAmount = formData.items.reduce((sum, item) => sum + item.totalAmount, 0)
 
-    const updatedGRN: GoodReceiptNote = {
+    const updatedGRN = {
       ...mockGRN,
       grnNumber: formData.grnNumber,
-      purchaseOrderNumber: formData.purchaseOrderNumber,
+      poNumber: formData.purchaseOrderNumber,
       supplierName: formData.supplierName,
-      supplierContact: formData.supplierContact,
-      supplierEmail: formData.supplierEmail,
       receiptDate: new Date(formData.receiptDate),
       receivedBy: formData.receivedBy,
-      inspectedBy: formData.inspectedBy,
       status: formData.status,
-      warehouseLocation: formData.warehouseLocation,
+      warehouseName: formData.warehouseLocation,
       totalAmount,
-      items: formData.items,
+      items: formData.items.map(item => ({
+        poItemId: item.poItemId,
+        materialId: item.materialId,
+        materialCode: item.materialCode,
+        materialName: item.materialName,
+        orderedQuantity: item.orderedQuantity,
+        receivedQuantity: item.receivedQuantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalAmount,
+        qualityStatus: item.qualityStatus,
+        remarks: item.remarks
+      })),
       notes: formData.notes,
-      qualityRemarks: formData.qualityRemarks,
-      deliveryChallanNumber: formData.deliveryChallanNumber,
-      transporterName: formData.transporterName,
-      vehicleNumber: formData.vehicleNumber,
       updatedAt: new Date(),
       updatedBy: 'admin'
     }
@@ -201,20 +209,23 @@ const EditGRN: React.FC = () => {
   }
 
   const addGRNItem = () => {
-    const newItem: GRNItem = {
+    const newItem: ExtendedGRNItem = {
+      poItemId: '',
       materialId: '',
       materialCode: '',
       materialName: '',
       orderedQuantity: 0,
       receivedQuantity: 0,
+      unitPrice: 0,
+      totalPrice: 0,
+      qualityStatus: 'Accepted',
+      remarks: '',
       acceptedQuantity: 0,
       rejectedQuantity: 0,
-      unitPrice: 0,
       totalAmount: 0,
       specifications: '',
       batchNumber: '',
-      expiryDate: '',
-      qualityStatus: 'Pending'
+      expiryDate: ''
     }
     setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }))
   }

@@ -891,7 +891,10 @@ const CentralKitchen: React.FC = () => {
           storageTemperature: '4°C',
           storageLocation: 'Cold Storage B',
           notes: 'Freshly prepared green smoothie',
-          isActive: true
+          isActive: true,
+          qualityNotes: 'Freshly prepared',
+          status: 'In Stock',
+          transferSource: 'Production'
         },
         {
           outletId: outlet.id,
@@ -920,7 +923,10 @@ const CentralKitchen: React.FC = () => {
           storageTemperature: '2°C',
           storageLocation: 'Cold Storage B',
           notes: 'High protein meal bowl',
-          isActive: true
+          isActive: true,
+          qualityNotes: 'High protein content',
+          status: 'In Stock',
+          transferSource: 'Production'
         },
         {
           outletId: outlet.id,
@@ -949,7 +955,10 @@ const CentralKitchen: React.FC = () => {
           storageTemperature: '4°C',
           storageLocation: 'Cold Storage B',
           notes: 'Fresh detox juice blend',
-          isActive: true
+          isActive: true,
+          qualityNotes: 'Fresh detox blend',
+          status: 'In Stock',
+          transferSource: 'Production'
         },
         {
           outletId: outlet.id,
@@ -978,7 +987,10 @@ const CentralKitchen: React.FC = () => {
           storageTemperature: '2°C',
           storageLocation: 'Cold Storage B',
           notes: 'Healthy quinoa salad',
-          isActive: true
+          isActive: true,
+          qualityNotes: 'Healthy quinoa salad',
+          status: 'In Stock',
+          transferSource: 'Production'
         }
       ]
 

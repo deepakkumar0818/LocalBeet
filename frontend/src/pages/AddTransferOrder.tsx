@@ -137,7 +137,9 @@ const AddTransferOrder: React.FC = () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       createdBy: 'admin',
-      updatedBy: 'admin'
+      updatedBy: 'admin',
+      requestedBy: 'admin',
+      reason: 'Transfer request'
     }
 
     console.log('Creating Transfer Order:', newTransferOrder)

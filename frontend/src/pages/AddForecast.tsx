@@ -169,8 +169,8 @@ const AddForecast: React.FC = () => {
         let message = 'Forecast created successfully!'
         
         // Check if Purchase Order was generated
-        if (response.generatedPurchaseOrder) {
-          const po = response.generatedPurchaseOrder
+        if (response.data && response.data.generatedPurchaseOrder) {
+          const po = response.data.generatedPurchaseOrder
           message += `\n\n📦 Purchase Order Generated:\n` +
                     `PO Number: ${po.poNumber}\n` +
                     `Total Amount: ${po.totalAmount.toFixed(2)} KWD\n` +
