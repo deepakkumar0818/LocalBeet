@@ -79,22 +79,238 @@ const OutletMaster: React.FC = () => {
     try {
       setLoading(true)
       setError(null)
-      const response = await apiService.getOutlets({
-        limit: 1000,
-        search: searchTerm,
-        outletType: filterType,
-        status: filterStatus,
-        isCentralKitchen: filterCentralKitchen,
-        sortBy,
-        sortOrder
-      })
+      
+      // Use sample data with updated outlet names
+      const sampleOutlets: Outlet[] = [
+        {
+          id: 'outlet-001',
+          outletCode: 'KC001',
+          outletName: 'Kuwait City',
+          outletType: 'Restaurant',
+          description: 'Main restaurant outlet in Kuwait City',
+          address: {
+            street: '123 Main Street',
+            city: 'Kuwait City',
+            state: 'Kuwait',
+            zipCode: '12345',
+            country: 'Kuwait'
+          },
+          contactInfo: {
+            phone: '+965-1234-5678',
+            email: 'kuwait@localbeat.com',
+            managerName: 'Ahmed Al-Sabah',
+            managerPhone: '+965-1234-5679',
+            managerEmail: 'ahmed@localbeat.com'
+          },
+          operatingHours: {
+            monday: { open: '08:00', close: '22:00', isOpen: true },
+            tuesday: { open: '08:00', close: '22:00', isOpen: true },
+            wednesday: { open: '08:00', close: '22:00', isOpen: true },
+            thursday: { open: '08:00', close: '22:00', isOpen: true },
+            friday: { open: '08:00', close: '22:00', isOpen: true },
+            saturday: { open: '08:00', close: '22:00', isOpen: true },
+            sunday: { open: '08:00', close: '22:00', isOpen: true }
+          },
+          capacity: {
+            seatingCapacity: 100,
+            kitchenCapacity: 50,
+            storageCapacity: 200,
+            capacityUnit: 'sqft'
+          },
+          status: 'Active',
+          isCentralKitchen: false,
+          features: ['Dine-in', 'Takeaway', 'Delivery'],
+          timezone: 'Asia/Kuwait',
+          notes: 'Main restaurant outlet',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          createdBy: 'admin',
+          updatedBy: 'admin'
+        },
+        {
+          id: 'outlet-002',
+          outletCode: 'M360001',
+          outletName: '360 Mall',
+          outletType: 'Cafe',
+          description: 'Cafe outlet in 360 Mall',
+          address: {
+            street: '360 Mall, Level 2',
+            city: 'Kuwait City',
+            state: 'Kuwait',
+            zipCode: '12346',
+            country: 'Kuwait'
+          },
+          contactInfo: {
+            phone: '+965-2345-6789',
+            email: 'mall360@localbeat.com',
+            managerName: 'Sarah Johnson',
+            managerPhone: '+965-2345-6790',
+            managerEmail: 'sarah@localbeat.com'
+          },
+          operatingHours: {
+            monday: { open: '10:00', close: '23:00', isOpen: true },
+            tuesday: { open: '10:00', close: '23:00', isOpen: true },
+            wednesday: { open: '10:00', close: '23:00', isOpen: true },
+            thursday: { open: '10:00', close: '23:00', isOpen: true },
+            friday: { open: '10:00', close: '23:00', isOpen: true },
+            saturday: { open: '10:00', close: '23:00', isOpen: true },
+            sunday: { open: '10:00', close: '23:00', isOpen: true }
+          },
+          capacity: {
+            seatingCapacity: 80,
+            kitchenCapacity: 30,
+            storageCapacity: 150,
+            capacityUnit: 'sqft'
+          },
+          status: 'Active',
+          isCentralKitchen: false,
+          features: ['Dine-in', 'Takeaway'],
+          timezone: 'Asia/Kuwait',
+          notes: 'Mall cafe outlet',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          createdBy: 'admin',
+          updatedBy: 'admin'
+        },
+        {
+          id: 'outlet-003',
+          outletCode: 'VC001',
+          outletName: 'Vibes Complex',
+          outletType: 'Food Court',
+          description: 'Food court outlet in Vibes Complex',
+          address: {
+            street: 'Vibes Complex, Food Court',
+            city: 'Kuwait City',
+            state: 'Kuwait',
+            zipCode: '12347',
+            country: 'Kuwait'
+          },
+          contactInfo: {
+            phone: '+965-3456-7890',
+            email: 'vibes@localbeat.com',
+            managerName: 'Mohammed Al-Rashid',
+            managerPhone: '+965-3456-7891',
+            managerEmail: 'mohammed@localbeat.com'
+          },
+          operatingHours: {
+            monday: { open: '09:00', close: '24:00', isOpen: true },
+            tuesday: { open: '09:00', close: '24:00', isOpen: true },
+            wednesday: { open: '09:00', close: '24:00', isOpen: true },
+            thursday: { open: '09:00', close: '24:00', isOpen: true },
+            friday: { open: '09:00', close: '24:00', isOpen: true },
+            saturday: { open: '09:00', close: '24:00', isOpen: true },
+            sunday: { open: '09:00', close: '24:00', isOpen: true }
+          },
+          capacity: {
+            seatingCapacity: 120,
+            kitchenCapacity: 40,
+            storageCapacity: 180,
+            capacityUnit: 'sqft'
+          },
+          status: 'Active',
+          isCentralKitchen: false,
+          features: ['Dine-in', 'Takeaway', 'Food Court'],
+          timezone: 'Asia/Kuwait',
+          notes: 'Food court outlet',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          createdBy: 'admin',
+          updatedBy: 'admin'
+        },
+        {
+          id: 'outlet-004',
+          outletCode: 'TH001',
+          outletName: 'Taiba Hospital',
+          outletType: 'Drive-Thru',
+          description: 'Drive-thru outlet at Taiba Hospital',
+          address: {
+            street: 'Taiba Hospital, Ground Floor',
+            city: 'Kuwait City',
+            state: 'Kuwait',
+            zipCode: '12348',
+            country: 'Kuwait'
+          },
+          contactInfo: {
+            phone: '+965-4567-8901',
+            email: 'taiba@localbeat.com',
+            managerName: 'Fatima Al-Zahra',
+            managerPhone: '+965-4567-8902',
+            managerEmail: 'fatima@localbeat.com'
+          },
+          operatingHours: {
+            monday: { open: '06:00', close: '02:00', isOpen: true },
+            tuesday: { open: '06:00', close: '02:00', isOpen: true },
+            wednesday: { open: '06:00', close: '02:00', isOpen: true },
+            thursday: { open: '06:00', close: '02:00', isOpen: true },
+            friday: { open: '06:00', close: '02:00', isOpen: true },
+            saturday: { open: '06:00', close: '02:00', isOpen: true },
+            sunday: { open: '06:00', close: '02:00', isOpen: true }
+          },
+          capacity: {
+            seatingCapacity: 20,
+            kitchenCapacity: 25,
+            storageCapacity: 100,
+            capacityUnit: 'sqft'
+          },
+          status: 'Active',
+          isCentralKitchen: false,
+          features: ['Drive-Thru', 'Takeaway'],
+          timezone: 'Asia/Kuwait',
+          notes: 'Hospital drive-thru outlet',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          createdBy: 'admin',
+          updatedBy: 'admin'
+        },
+        {
+          id: 'outlet-005',
+          outletCode: 'CK001',
+          outletName: 'Central Kitchen',
+          outletType: 'Central Kitchen',
+          description: 'Central kitchen for all outlets',
+          address: {
+            street: 'Industrial Area, Block 5',
+            city: 'Kuwait City',
+            state: 'Kuwait',
+            zipCode: '12349',
+            country: 'Kuwait'
+          },
+          contactInfo: {
+            phone: '+965-5678-9012',
+            email: 'central@localbeat.com',
+            managerName: 'Chef Abdullah',
+            managerPhone: '+965-5678-9013',
+            managerEmail: 'chef@localbeat.com'
+          },
+          operatingHours: {
+            monday: { open: '05:00', close: '23:00', isOpen: true },
+            tuesday: { open: '05:00', close: '23:00', isOpen: true },
+            wednesday: { open: '05:00', close: '23:00', isOpen: true },
+            thursday: { open: '05:00', close: '23:00', isOpen: true },
+            friday: { open: '05:00', close: '23:00', isOpen: true },
+            saturday: { open: '05:00', close: '23:00', isOpen: true },
+            sunday: { open: '05:00', close: '23:00', isOpen: true }
+          },
+          capacity: {
+            seatingCapacity: 0,
+            kitchenCapacity: 200,
+            storageCapacity: 500,
+            capacityUnit: 'sqft'
+          },
+          status: 'Active',
+          isCentralKitchen: true,
+          features: ['Production', 'Storage', 'Distribution'],
+          timezone: 'Asia/Kuwait',
+          notes: 'Central kitchen for all outlets',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          createdBy: 'admin',
+          updatedBy: 'admin'
+        }
+      ]
 
-      if (response.success) {
-        console.log('Loaded Outlets:', response.data)
-        setOutlets(response.data)
-      } else {
-        setError('Failed to load outlets')
-      }
+      console.log('Loaded Outlets:', sampleOutlets)
+      setOutlets(sampleOutlets)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load outlets')
       console.error('Error loading outlets:', err)

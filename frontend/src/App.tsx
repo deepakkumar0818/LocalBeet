@@ -40,6 +40,7 @@ import RawMaterialForecast from './pages/RawMaterialForecast'
 import AddForecast from './pages/AddForecast'
 import SalesOrders from './pages/SalesOrders'
 import AddSalesOrder from './pages/AddSalesOrder'
+import POSCreateOrder from './pages/POSCreateOrder'
 
 function App() {
   return (
@@ -96,12 +97,16 @@ function App() {
         <Route path="/sales-orders/add" element={<AddSalesOrder />} />
         <Route path="/downtown-restaurant/sales-orders" element={<SalesOrders />} />
         <Route path="/downtown-restaurant/sales-orders/add" element={<AddSalesOrder />} />
+        <Route path="/downtown-restaurant/pos-sales/create-order" element={<POSCreateOrder />} />
         <Route path="/marina-walk-cafe/sales-orders" element={<SalesOrders />} />
         <Route path="/marina-walk-cafe/sales-orders/add" element={<AddSalesOrder />} />
+        <Route path="/marina-walk-cafe/pos-sales/create-order" element={<POSCreateOrder />} />
         <Route path="/mall-food-court/sales-orders" element={<SalesOrders />} />
         <Route path="/mall-food-court/sales-orders/add" element={<AddSalesOrder />} />
+        <Route path="/mall-food-court/pos-sales/create-order" element={<POSCreateOrder />} />
         <Route path="/drive-thru-express/sales-orders" element={<SalesOrders />} />
         <Route path="/drive-thru-express/sales-orders/add" element={<AddSalesOrder />} />
+        <Route path="/drive-thru-express/pos-sales/create-order" element={<POSCreateOrder />} />
       </Routes>
     </Layout>
   )
