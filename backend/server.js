@@ -36,6 +36,8 @@ app.use('/api/finished-goods', require('./routes/finishedGoods'));
 app.use('/api/finished-good-inventory', require('./routes/finishedGoodInventory'));
 app.use('/api/sales-orders', require('./routes/salesOrders'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/central-kitchen', require('./routes/centralKitchen'));
+app.use('/api/central-kitchen-inventory', require('./routes/centralKitchenInventory'));
 
 // Health check
 app.get('/api/health', (req, res) => {

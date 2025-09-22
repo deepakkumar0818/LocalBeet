@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Save, Package, Plus } from 'lucide-react'
+import { apiService } from '../services/api'
 
 interface Outlet {
   id: string
@@ -36,16 +37,38 @@ const AddInventoryItem: React.FC = () => {
 
   const loadCentralKitchenData = async () => {
     try {
-      // Set default central kitchen outlet
+      // Get central kitchen from backend
+      const centralKitchensResponse = await apiService.getCentralKitchens()
+      
+      if (centralKitchensResponse.success && centralKitchensResponse.data.length > 0) {
+        const centralKitchen = centralKitchensResponse.data[0]
+        setOutlet({
+          id: centralKitchen._id,
+          outletCode: centralKitchen.kitchenCode,
+          outletName: centralKitchen.kitchenName,
+          outletType: 'Central Kitchen',
+          isCentralKitchen: true
+        })
+      } else {
+        // Fallback if no central kitchen found
+        setOutlet({
+          id: '',
+          outletCode: 'CK-001',
+          outletName: 'Central Kitchen',
+          outletType: 'Central Kitchen',
+          isCentralKitchen: true
+        })
+      }
+    } catch (err) {
+      console.error('Error loading central kitchen data:', err)
+      // Fallback if API fails
       setOutlet({
-        id: 'central-kitchen-001',
+        id: '',
         outletCode: 'CK-001',
         outletName: 'Central Kitchen',
         outletType: 'Central Kitchen',
         isCentralKitchen: true
       })
-    } catch (err) {
-      console.error('Error loading central kitchen data:', err)
     }
   }
 
@@ -59,56 +82,84 @@ const AddInventoryItem: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!outlet) {
-      alert('Central Kitchen outlet not found')
+    if (!outlet || !outlet.id) {
+      alert('Central Kitchen outlet not found. Please make sure the central kitchen is set up.')
+      return
+    }
+
+    // Validate required fields
+    if (!formData.sku || !formData.itemName || !formData.parentCategory) {
+      alert('Please fill in all required fields (SKU, Item Name, Category)')
       return
     }
 
     try {
       setLoading(true)
       
-      const newItem = {
-        outletId: outlet.id,
-        outletCode: outlet.outletCode,
-        outletName: outlet.outletName,
-        materialId: formData.sku,
-        materialCode: formData.sku,
-        materialName: formData.itemName,
-        category: formData.parentCategory,
-        subCategory: formData.subCategoryName,
-        unitOfMeasure: formData.unitName,
-        purchaseUnit: formData.defaultPurchaseUnitName,
-        unitPrice: parseFloat(formData.unitPrice) || 0,
-        currentStock: parseFloat(formData.currentStock) || 0,
-        reservedStock: 0,
-        availableStock: parseFloat(formData.currentStock) || 0,
-        minimumStock: parseFloat(formData.minimumStock) || 0,
-        maximumStock: parseFloat(formData.maximumStock) || 0,
-        reorderPoint: parseFloat(formData.minimumStock) || 0,
-        totalValue: (parseFloat(formData.unitPrice) || 0) * (parseFloat(formData.currentStock) || 0),
-        location: 'Central Kitchen Storage',
-        batchNumber: `BATCH-${formData.sku}-${Date.now()}`,
-        supplier: formData.supplier,
-        lastUpdated: new Date().toISOString(),
-        status: 'In Stock',
-        notes: formData.notes,
-        isActive: true
-      }
+      if (formData.itemType === 'raw-material') {
+        // Create Raw Material first
+        const rawMaterialData = {
+          materialCode: formData.sku,
+          materialName: formData.itemName,
+          category: formData.parentCategory,
+          unitOfMeasure: formData.unitName,
+          unitPrice: parseFloat(formData.unitPrice) || 0,
+          currentStock: parseFloat(formData.currentStock) || 0,
+          minimumStock: parseFloat(formData.minimumStock) || 0,
+          maximumStock: parseFloat(formData.maximumStock) || 0,
+          supplier: formData.supplier,
+          notes: formData.notes,
+          createdBy: 'user',
+          updatedBy: 'user'
+        }
 
-      // Here you would typically make an API call to save the item
-      console.log('Creating new item:', newItem)
+        // Create raw material
+        const rawMaterialResponse = await apiService.createRawMaterial(rawMaterialData)
+        
+        if (!rawMaterialResponse.success) {
+          throw new Error(rawMaterialResponse.message || 'Failed to create raw material')
+        }
+
+        // Create Central Kitchen Inventory entry
+        const inventoryData = {
+          centralKitchenId: outlet.id,
+          centralKitchenName: outlet.outletName,
+          itemId: rawMaterialResponse.data._id,
+          itemType: 'RawMaterial',
+          itemCode: formData.sku,
+          itemName: formData.itemName,
+          category: formData.parentCategory,
+          unitOfMeasure: formData.unitName,
+          unitPrice: parseFloat(formData.unitPrice) || 0,
+          currentStock: parseFloat(formData.currentStock) || 0,
+          reservedStock: 0,
+          minimumStock: parseFloat(formData.minimumStock) || 0,
+          maximumStock: parseFloat(formData.maximumStock) || 0,
+          reorderPoint: parseFloat(formData.minimumStock) || 0,
+          notes: formData.notes,
+          createdBy: 'user',
+          updatedBy: 'user'
+        }
+
+        const inventoryResponse = await apiService.createCentralKitchenInventoryItem(inventoryData)
+        
+        if (!inventoryResponse.success) {
+          throw new Error(inventoryResponse.message || 'Failed to create inventory entry')
+        }
+
+        alert('Raw Material created successfully and added to Central Kitchen inventory!')
+      } else {
+        // Handle finished goods if needed in the future
+        alert('Finished goods creation not implemented yet')
+        return
+      }
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      alert(`${formData.itemType === 'raw-material' ? 'Raw Material' : 'Finished Good'} created successfully!`)
-      
-      // Navigate back to Central Kitchen
-      navigate('/central-kitchen')
+      // Navigate back to Central Kitchen Raw Materials
+      navigate('/central-kitchen/raw-materials')
 
     } catch (err) {
       console.error('Error creating item:', err)
-      alert('Failed to create item. Please try again.')
+      alert(`Failed to create ${formData.itemType === 'raw-material' ? 'raw material' : 'item'}: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
       setLoading(false)
     }

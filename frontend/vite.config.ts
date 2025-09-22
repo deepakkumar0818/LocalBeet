@@ -7,7 +7,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'https://appsail-10105439996.development.catalystappsail.com',
+        target: 'http://localhost:5000',
         changeOrigin: true,
         secure: true,
         configure: (proxy, _options) => {

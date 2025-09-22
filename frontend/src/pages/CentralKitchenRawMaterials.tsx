@@ -50,6 +50,16 @@ const CentralKitchenRawMaterials: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('')
   const [sortBy, setSortBy] = useState('materialName')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [editingItem, setEditingItem] = useState<OutletInventoryItem | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    currentStock: '',
+    minimumStock: '',
+    maximumStock: '',
+    reorderPoint: '',
+    unitPrice: '',
+    notes: ''
+  })
 
   useEffect(() => {
     loadCentralKitchenData()
@@ -67,17 +77,21 @@ const CentralKitchenRawMaterials: React.FC = () => {
       setLoading(true)
       setError(null)
       
-      // Set up Central Kitchen outlet data
-      const centralKitchen = {
-        id: 'central-kitchen-001',
-        outletCode: 'CK001',
-        outletName: 'Central Kitchen',
-        outletType: 'Central Kitchen',
-        isCentralKitchen: true
+      // Get central kitchen outlet from backend
+      const outletsResponse = await apiService.getCentralKitchens()
+      if (outletsResponse.success && outletsResponse.data.length > 0) {
+        const centralKitchen = outletsResponse.data[0]
+        setOutlet({
+          id: centralKitchen._id,
+          outletCode: centralKitchen.kitchenCode,
+          outletName: centralKitchen.kitchenName,
+          outletType: 'Central Kitchen',
+          isCentralKitchen: true
+        })
+        await loadInventory(centralKitchen._id)
+      } else {
+        setError('Central Kitchen not found')
       }
-      
-      setOutlet(centralKitchen)
-      await loadInventory(centralKitchen.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load central kitchen data')
       console.error('Error loading central kitchen data:', err)
@@ -87,148 +101,69 @@ const CentralKitchenRawMaterials: React.FC = () => {
   }
 
   const loadInventory = async (outletId?: string) => {
-    const currentOutletId = outletId || outlet?.id || 'central-kitchen-001'
+    const currentOutletId = outletId || outlet?.id
+    
+    if (!currentOutletId) {
+      console.log('No outlet ID available for loading inventory')
+      return
+    }
     
     try {
       console.log('Loading raw materials inventory for Central Kitchen:', currentOutletId)
       
-      // For Central Kitchen, we'll use sample data since it's a central hub
-      // In a real application, this would load from a central kitchen inventory API
-      const sampleInventoryItems: OutletInventoryItem[] = [
-        {
-          id: 'ck-rm-001',
-          outletId: 'central-kitchen-001',
-          outletCode: 'CK001',
-          outletName: 'Central Kitchen',
-          materialId: '10001',
-          materialCode: '10001',
-          materialName: 'Bhujia',
-          category: 'Bakery',
-          unitOfMeasure: 'kg',
-          unitPrice: 0,
-          currentStock: 0,
-          reservedStock: 0,
-          availableStock: 0,
-          minimumStock: 0,
-          maximumStock: 0,
-          reorderPoint: 0,
-          totalValue: 0,
-          location: 'Main Storage',
-          batchNumber: '',
-          supplier: '',
-          lastUpdated: new Date().toISOString(),
-          status: 'In Stock',
-          notes: '',
-          isActive: true
-        },
-        {
-          id: 'ck-rm-002',
-          outletId: 'central-kitchen-001',
-          outletCode: 'CK001',
-          outletName: 'Central Kitchen',
-          materialId: '10002',
-          materialCode: '10002',
-          materialName: 'Bran Flakes',
-          category: 'Bakery',
-          unitOfMeasure: 'kg',
-          unitPrice: 0,
-          currentStock: 0,
-          reservedStock: 0,
-          availableStock: 0,
-          minimumStock: 0,
-          maximumStock: 0,
-          reorderPoint: 0,
-          totalValue: 0,
-          location: 'Main Storage',
-          batchNumber: '',
-          supplier: '',
-          lastUpdated: new Date().toISOString(),
-          status: 'In Stock',
-          notes: '',
-          isActive: true
-        },
-        {
-          id: 'ck-rm-003',
-          outletId: 'central-kitchen-001',
-          outletCode: 'CK001',
-          outletName: 'Central Kitchen',
-          materialId: '10003',
-          materialCode: '10003',
-          materialName: 'Bread Improver',
-          category: 'Bakery',
-          unitOfMeasure: 'kg',
-          unitPrice: 0,
-          currentStock: 0,
-          reservedStock: 0,
-          availableStock: 0,
-          minimumStock: 0,
-          maximumStock: 0,
-          reorderPoint: 0,
-          totalValue: 0,
-          location: 'Main Storage',
-          batchNumber: '',
-          supplier: '',
-          lastUpdated: new Date().toISOString(),
-          status: 'In Stock',
-          notes: '',
-          isActive: true
-        },
-        {
-          id: 'ck-rm-004',
-          outletId: 'central-kitchen-001',
-          outletCode: 'CK001',
-          outletName: 'Central Kitchen',
-          materialId: '10004',
-          materialCode: '10004',
-          materialName: 'Caramel Syrup',
-          category: 'Bakery',
-          unitOfMeasure: 'kg',
-          unitPrice: 0,
-          currentStock: 0,
-          reservedStock: 0,
-          availableStock: 0,
-          minimumStock: 0,
-          maximumStock: 0,
-          reorderPoint: 0,
-          totalValue: 0,
-          location: 'Main Storage',
-          batchNumber: '',
-          supplier: '',
-          lastUpdated: new Date().toISOString(),
-          status: 'In Stock',
-          notes: '',
-          isActive: true
-        },
-        {
-          id: 'ck-rm-005',
-          outletId: 'central-kitchen-001',
-          outletCode: 'CK001',
-          outletName: 'Central Kitchen',
-          materialId: '10005',
-          materialCode: '10005',
-          materialName: 'Cocoa Powder',
-          category: 'Bakery',
-          unitOfMeasure: 'kg',
-          unitPrice: 0,
-          currentStock: 0,
-          reservedStock: 0,
-          availableStock: 0,
-          minimumStock: 0,
-          maximumStock: 0,
-          reorderPoint: 0,
-          totalValue: 0,
-          location: 'Main Storage',
-          batchNumber: '',
-          supplier: '',
-          lastUpdated: new Date().toISOString(),
-          status: 'In Stock',
-          notes: '',
-          isActive: true
-        }
-      ]
+      // Load raw materials inventory from Central Kitchen Inventory API
+      const inventoryResponse = await apiService.getCentralKitchenInventoryByKitchen(currentOutletId, {
+        limit: 1000,
+        itemType: 'RawMaterial',
+        search: searchTerm,
+        category: filterCategory,
+        status: filterStatus,
+        sortBy: sortBy === 'materialName' ? 'itemName' : sortBy,
+        sortOrder
+      })
 
-      console.log('Loaded Central Kitchen Raw Materials Inventory:', sampleInventoryItems)
-      setInventoryItems(sampleInventoryItems)
+      if (inventoryResponse.success) {
+        console.log('Loaded Central Kitchen Raw Materials Inventory:', inventoryResponse.data)
+        
+        if (inventoryResponse.data && inventoryResponse.data.length > 0) {
+          // Transform the data to match the expected interface
+          const transformedItems: OutletInventoryItem[] = inventoryResponse.data.map((item: any) => ({
+            id: item._id || item.id,
+            outletId: item.centralKitchenId,
+            outletCode: item.centralKitchenCode || 'CK001',
+            outletName: item.centralKitchenName || 'Central Kitchen',
+            materialId: item.itemId,
+            materialCode: item.itemCode,
+            materialName: item.itemName,
+            category: item.category,
+            unitOfMeasure: item.unitOfMeasure,
+            unitPrice: item.unitPrice,
+            currentStock: item.currentStock,
+            reservedStock: item.reservedStock,
+            availableStock: item.availableStock,
+            minimumStock: item.minimumStock,
+            maximumStock: item.maximumStock,
+            reorderPoint: item.reorderPoint,
+            totalValue: item.totalValue,
+            location: 'Main Storage',
+            batchNumber: '',
+            supplier: '',
+            lastUpdated: item.lastStockUpdate || item.updatedAt,
+            status: item.status,
+            notes: item.notes || '',
+            isActive: true
+          }))
+          
+          setInventoryItems(transformedItems)
+        } else {
+          console.log('No raw materials inventory found for this central kitchen')
+          setInventoryItems([])
+          setError('No raw materials inventory found. Please add some raw materials to the central kitchen.')
+        }
+      } else {
+        console.error('Failed to load raw materials inventory:', inventoryResponse.message || 'API Error')
+        setError(`Failed to load inventory from server: ${inventoryResponse.message || 'Unknown error'}`)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load inventory')
       console.error('Error loading inventory:', err)
@@ -241,6 +176,68 @@ const CentralKitchenRawMaterials: React.FC = () => {
     setFilterStatus('')
     setSortBy('materialName')
     setSortOrder('asc')
+  }
+
+  const handleEditItem = (item: OutletInventoryItem) => {
+    setEditingItem(item)
+    setEditFormData({
+      currentStock: item.currentStock.toString(),
+      minimumStock: item.minimumStock.toString(),
+      maximumStock: item.maximumStock.toString(),
+      reorderPoint: item.reorderPoint.toString(),
+      unitPrice: item.unitPrice.toString(),
+      notes: item.notes || ''
+    })
+    setShowEditModal(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingItem) return
+
+    try {
+      setLoading(true)
+      
+      // Update the inventory item
+      const updateData = {
+        currentStock: parseFloat(editFormData.currentStock) || 0,
+        minimumStock: parseFloat(editFormData.minimumStock) || 0,
+        maximumStock: parseFloat(editFormData.maximumStock) || 0,
+        reorderPoint: parseFloat(editFormData.reorderPoint) || 0,
+        unitPrice: parseFloat(editFormData.unitPrice) || 0,
+        notes: editFormData.notes,
+        updatedBy: 'user'
+      }
+
+      const response = await apiService.updateCentralKitchenInventoryItem(editingItem.id, updateData)
+      
+      if (response.success) {
+        alert('Raw material updated successfully!')
+        setShowEditModal(false)
+        setEditingItem(null)
+        // Reload the inventory data
+        await loadInventory()
+      } else {
+        throw new Error(response.message || 'Failed to update raw material')
+      }
+    } catch (err) {
+      console.error('Error updating raw material:', err)
+      alert(`Failed to update raw material: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setShowEditModal(false)
+    setEditingItem(null)
+    setEditFormData({
+      currentStock: '',
+      minimumStock: '',
+      maximumStock: '',
+      reorderPoint: '',
+      unitPrice: '',
+      notes: ''
+    })
   }
 
   const getStatusColor = (status: string) => {
@@ -720,7 +717,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                     <button
-                      onClick={() => navigate(`/outlet-inventory/edit/${item.id}`)}
+                      onClick={() => handleEditItem(item)}
                       className="text-blue-600 hover:text-blue-900"
                       title="Edit"
                     >
@@ -742,6 +739,128 @@ const CentralKitchenRawMaterials: React.FC = () => {
         onChange={handleFileUpload}
         style={{ display: 'none' }}
       />
+
+      {/* Edit Modal */}
+      {showEditModal && editingItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Edit Raw Material: {editingItem.materialName}
+              </h3>
+              <button
+                onClick={handleCancelEdit}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Current Stock ({editingItem.unitOfMeasure})
+                </label>
+                <input
+                  type="number"
+                  value={editFormData.currentStock}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, currentStock: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Minimum Stock ({editingItem.unitOfMeasure})
+                </label>
+                <input
+                  type="number"
+                  value={editFormData.minimumStock}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, minimumStock: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Maximum Stock ({editingItem.unitOfMeasure})
+                </label>
+                <input
+                  type="number"
+                  value={editFormData.maximumStock}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, maximumStock: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reorder Point ({editingItem.unitOfMeasure})
+                </label>
+                <input
+                  type="number"
+                  value={editFormData.reorderPoint}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, reorderPoint: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unit Price (KWD)
+                </label>
+                <input
+                  type="number"
+                  value={editFormData.unitPrice}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, unitPrice: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  value={editFormData.notes}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Optional notes..."
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={handleCancelEdit}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {loading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
