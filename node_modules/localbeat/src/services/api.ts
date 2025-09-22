@@ -819,6 +819,135 @@ class ApiService {
       body: JSON.stringify(data),
     });
   }
+
+  // Central Kitchen API methods
+  async getCentralKitchens() {
+    return this.request<{
+      success: boolean;
+      data: any[];
+    }>('/central-kitchen');
+  }
+
+  async getCentralKitchen(id: string) {
+    return this.request<{
+      success: boolean;
+      data: any;
+    }>(`/central-kitchen/${id}`);
+  }
+
+  async createCentralKitchen(data: any) {
+    return this.request<{
+      success: boolean;
+      data: any;
+      message: string;
+    }>('/central-kitchen', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCentralKitchen(id: string, data: any) {
+    return this.request<{
+      success: boolean;
+      data: any;
+      message: string;
+    }>(`/central-kitchen/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCentralKitchen(id: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+    }>(`/central-kitchen/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Central Kitchen Inventory API methods
+  async getCentralKitchenInventoryByKitchen(centralKitchenId: string, params?: {
+    page?: number;
+    limit?: number;
+    category?: string;
+    status?: string;
+    sortBy?: string;
+    sortOrder?: string;
+    search?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.category) queryParams.append('category', params.category);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+    if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+    if (params?.search) queryParams.append('search', params.search);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/central-kitchen-inventory/kitchen/${centralKitchenId}${queryString ? `?${queryString}` : ''}`;
+    
+    return this.request<{
+      success: boolean;
+      data: any[];
+      pagination: {
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        itemsPerPage: number;
+      };
+    }>(endpoint);
+  }
+
+  async getCentralKitchenInventoryItem(id: string) {
+    return this.request<{
+      success: boolean;
+      data: any;
+    }>(`/central-kitchen-inventory/${id}`);
+  }
+
+  async createCentralKitchenInventoryItem(data: any) {
+    return this.request<{
+      success: boolean;
+      data: any;
+      message: string;
+    }>('/central-kitchen-inventory', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCentralKitchenInventoryItem(id: string, data: any) {
+    return this.request<{
+      success: boolean;
+      data: any;
+      message: string;
+    }>(`/central-kitchen-inventory/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCentralKitchenInventoryItem(id: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+    }>(`/central-kitchen-inventory/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async adjustCentralKitchenInventoryStock(id: string, adjustment: number, reason?: string, notes?: string) {
+    return this.request<{
+      success: boolean;
+      data: any;
+      message: string;
+    }>(`/central-kitchen-inventory/${id}/adjust-stock`, {
+      method: 'PUT',
+      body: JSON.stringify({ adjustment, reason, notes }),
+    });
+  }
 }
 
 export const apiService = new ApiService();
