@@ -28,17 +28,10 @@ const CentralKitchenCreateTransfer: React.FC = () => {
   const [outlet, setOutlet] = useState<Outlet | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [transferItems, setTransferItems] = useState<TransferItem[]>([])
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [newItem, setNewItem] = useState<Partial<TransferItem>>({
-    itemCode: '',
-    itemName: '',
-    category: '',
-    unitOfMeasure: 'pcs',
-    quantity: 1,
-    unitPrice: 0,
-    notes: ''
-  })
+  const [itemForms, setItemForms] = useState<Array<{id: string, data: Partial<TransferItem>}>>([])
+  const [rawMaterials, setRawMaterials] = useState<any[]>([])
+  const [finishedGoods, setFinishedGoods] = useState<any[]>([])
+  const [loadingMaterials, setLoadingMaterials] = useState(false)
   const [transferData, setTransferData] = useState({
     toOutlet: '',
     transferDate: new Date().toISOString().split('T')[0],
@@ -48,6 +41,7 @@ const CentralKitchenCreateTransfer: React.FC = () => {
 
   useEffect(() => {
     loadCentralKitchenData()
+    loadMaterialsData()
   }, [])
 
   const loadCentralKitchenData = async () => {
@@ -71,58 +65,109 @@ const CentralKitchenCreateTransfer: React.FC = () => {
     }
   }
 
-  const handleAddItem = () => {
-    if (!newItem.itemCode || !newItem.itemName || !newItem.category) {
-      alert('Please fill in all required fields (Item Code, Item Name, Category)')
-      return
-    }
-
-    const item: TransferItem = {
-      id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      itemCode: newItem.itemCode!,
-      itemName: newItem.itemName!,
-      category: newItem.category!,
-      unitOfMeasure: newItem.unitOfMeasure || 'pcs',
-      quantity: newItem.quantity || 1,
-      unitPrice: newItem.unitPrice || 0,
-      totalValue: (newItem.quantity || 1) * (newItem.unitPrice || 0),
-      notes: newItem.notes || ''
-    }
-
-    setTransferItems(prev => [...prev, item])
-    
-    // Reset form
-    setNewItem({
-      itemCode: '',
-      itemName: '',
-      category: '',
-      unitOfMeasure: 'pcs',
-      quantity: 1,
-      unitPrice: 0,
-      notes: ''
-    })
-    setShowAddForm(false)
-  }
-
-  const handleRemoveItem = (id: string) => {
-    setTransferItems(prev => prev.filter(item => item.id !== id))
-  }
-
-  const handleUpdateItem = (id: string, field: keyof TransferItem, value: any) => {
-    setTransferItems(prev => prev.map(item => {
-      if (item.id === id) {
-        const updatedItem = { ...item, [field]: value }
-        if (field === 'quantity' || field === 'unitPrice') {
-          updatedItem.totalValue = updatedItem.quantity * updatedItem.unitPrice
-        }
-        return updatedItem
+  const loadMaterialsData = async () => {
+    try {
+      setLoadingMaterials(true)
+      console.log('Loading raw materials and finished goods data...')
+      
+      // Load raw materials from Central Kitchen dedicated database
+      const rawMaterialsResponse = await apiService.getCentralKitchenRawMaterials({ limit: 1000 })
+      if (rawMaterialsResponse.success) {
+        setRawMaterials(rawMaterialsResponse.data)
+        console.log('Loaded raw materials:', rawMaterialsResponse.data.length)
+      } else {
+        console.error('Failed to load raw materials:', rawMaterialsResponse.message)
       }
-      return item
+
+      // Load finished goods from Central Kitchen dedicated database
+      const finishedGoodsResponse = await apiService.getCentralKitchenFinishedProducts({ limit: 1000 })
+      if (finishedGoodsResponse.success) {
+        setFinishedGoods(finishedGoodsResponse.data)
+        console.log('Loaded finished goods:', finishedGoodsResponse.data.length)
+      } else {
+        console.error('Failed to load finished goods:', finishedGoodsResponse.message)
+      }
+    } catch (err) {
+      console.error('Error loading materials data:', err)
+    } finally {
+      setLoadingMaterials(false)
+    }
+  }
+
+  const handleAddItem = () => {
+    console.log('Add Item button clicked!')
+    // Add a new empty form
+    const newFormId = `form-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    console.log('Creating new form with ID:', newFormId)
+    setItemForms(prev => {
+      const newForms = [...prev, {
+        id: newFormId,
+        data: {
+          itemType: '',
+          itemCode: '',
+          itemName: '',
+          category: '',
+          unitOfMeasure: 'pcs',
+          quantity: 1,
+          unitPrice: 0,
+          notes: ''
+        }
+      }]
+      console.log('Updated forms array:', newForms)
+      return newForms
+    })
+  }
+
+  const handleUpdateForm = (formId: string, field: string, value: any) => {
+    setItemForms(prev => prev.map(form => {
+      if (form.id === formId) {
+        const updatedForm = {
+          ...form,
+          data: {
+            ...form.data,
+            [field]: value
+          }
+        }
+        
+        // If itemType changes, reset itemCode and itemName
+        if (field === 'itemType') {
+          updatedForm.data.itemCode = ''
+          updatedForm.data.itemName = ''
+          updatedForm.data.category = ''
+        }
+        
+        // If itemCode changes, update itemName and category based on selected item
+        if (field === 'itemCode' && value) {
+          const selectedItem = getSelectedItem(updatedForm.data.itemType, value)
+          if (selectedItem) {
+            updatedForm.data.itemName = selectedItem.materialName || selectedItem.productName || ''
+            updatedForm.data.category = selectedItem.category || selectedItem.subCategory || ''
+            updatedForm.data.unitOfMeasure = selectedItem.unitOfMeasure || 'pcs'
+            updatedForm.data.unitPrice = selectedItem.unitPrice || 0
+          }
+        }
+        
+        return updatedForm
+      }
+      return form
     }))
   }
 
+  const getSelectedItem = (itemType: string, itemCode: string) => {
+    if (itemType === 'Raw Material') {
+      return rawMaterials.find(item => item.materialCode === itemCode)
+    } else if (itemType === 'Finished Goods') {
+      return finishedGoods.find(item => item.productCode === itemCode)
+    }
+    return null
+  }
+
+  const handleRemoveForm = (formId: string) => {
+    setItemForms(prev => prev.filter(form => form.id !== formId))
+  }
+
   const handleCreateTransfer = async () => {
-    if (transferItems.length === 0) {
+    if (itemForms.length === 0) {
       alert('Please add at least one item to transfer')
       return
     }
@@ -132,45 +177,83 @@ const CentralKitchenCreateTransfer: React.FC = () => {
       return
     }
 
+    // Validate all forms have required fields
+    const invalidForms = itemForms.filter(form => 
+      !form.data.itemType || !form.data.itemCode || !form.data.itemName
+    )
+
+    if (invalidForms.length > 0) {
+      alert(`Please fill in all required fields (Item Type, Item Code) for all items`)
+      return
+    }
+
+    // Validate quantities are positive
+    const invalidQuantities = itemForms.filter(form => 
+      !form.data.quantity || form.data.quantity <= 0
+    )
+
+    if (invalidQuantities.length > 0) {
+      alert(`Please enter valid quantities (greater than 0) for all items`)
+      return
+    }
+
     try {
       setLoading(true)
       
-      const transferOrder = {
-        fromOutletId: outlet?.id,
-        fromOutletCode: outlet?.outletCode,
-        fromOutletName: outlet?.outletName,
+      // Convert forms to transfer items for API
+      const transferItems = itemForms.map(form => ({
+        itemType: form.data.itemType!,
+        itemCode: form.data.itemCode!,
+        itemName: form.data.itemName || form.data.itemCode!, // Include item name
+        category: form.data.category || '',
+        subCategory: form.data.subCategory || '',
+        unitOfMeasure: form.data.unitOfMeasure || 'pcs',
+        quantity: form.data.quantity || 1,
+        unitPrice: form.data.unitPrice || 0,
+        notes: form.data.notes || ''
+      }))
+      
+      const transferPayload = {
+        fromOutlet: outlet?.outletName || 'Central Kitchen',
         toOutlet: transferData.toOutlet,
         transferDate: transferData.transferDate,
         priority: transferData.priority,
-        status: 'Pending',
         items: transferItems,
-        totalValue: transferItems.reduce((sum, item) => sum + item.totalValue, 0),
-        notes: transferData.notes,
-        createdDate: new Date().toISOString(),
-        createdBy: 'Central Kitchen User'
+        totalValue: transferItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0),
+        notes: transferData.notes
       }
 
-      // Here you would typically call an API to create the transfer order
-      console.log('Creating transfer order:', transferOrder)
+      console.log('Creating transfer with data:', transferPayload)
 
-      alert(`Transfer order created successfully!\n\nTransfer Details:\nFrom: ${outlet?.outletName}\nTo: ${transferData.toOutlet}\nItems: ${transferItems.length}\nTotal Value: ${transferOrder.totalValue.toFixed(2)} KWD\n\nTransfer ID: TR-${Date.now()}`)
-      
-      // Clear transfer data after successful creation
-      setTransferItems([])
-      setTransferData({
-        toOutlet: '',
-        transferDate: new Date().toISOString().split('T')[0],
-        priority: 'Normal',
-        notes: ''
-      })
+      // Call the transfer API
+      const response = await apiService.createTransfer(transferPayload)
+
+      if (response.success) {
+        alert(`Transfer created successfully!\n\nTransfer Details:\nFrom: ${outlet?.outletName}\nTo: ${transferPayload.toOutlet}\nItems: ${transferItems.length}\nTotal Value: ${transferPayload.totalValue.toFixed(2)} KWD\n\nTransfer ID: ${response.data.transferId}\n\nStock has been updated in both Central Kitchen and destination outlet.`)
+        
+        // Clear all forms and data after successful creation
+        setItemForms([])
+        setTransferData({
+          toOutlet: '',
+          transferDate: new Date().toISOString().split('T')[0],
+          priority: 'Normal',
+          notes: ''
+        })
+
+        // Refresh materials data to show updated stock levels
+        await loadMaterialsData()
+      } else {
+        alert(`Transfer failed: ${response.message}`)
+      }
       
     } catch (err) {
       console.error('Error creating transfer:', err)
-      alert('Failed to create transfer order. Please try again.')
+      alert(`Failed to create transfer order: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
       setLoading(false)
     }
   }
+
 
   const categories = [
     'Raw Materials',
@@ -199,7 +282,7 @@ const CentralKitchenCreateTransfer: React.FC = () => {
   const destinationOutlets = [
     'Kuwait City',
     '360 Mall',
-    'Vibes Complex',
+    'Vibe Complex',
     'Taiba Hospital'
   ]
 
@@ -338,59 +421,101 @@ const CentralKitchenCreateTransfer: React.FC = () => {
       <div className="card p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Transfer Items</h2>
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="btn-primary flex items-center"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Item
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={loadMaterialsData}
+              disabled={loadingMaterials}
+              className="btn-secondary flex items-center text-sm"
+              title="Refresh materials data"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loadingMaterials ? 'animate-spin' : ''}`} />
+              {loadingMaterials ? 'Loading...' : 'Refresh Items'}
+            </button>
+            <button
+              onClick={handleAddItem}
+              className="btn-primary flex items-center"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Item
+            </button>
+          </div>
         </div>
 
-        {/* Add Item Form */}
-        {showAddForm && (
-          <div className="bg-gray-50 p-4 rounded-lg mb-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Add Transfer Item</h3>
+        {/* Multiple Item Forms */}
+        {itemForms.map((form, index) => (
+          <div key={form.id} className="bg-gray-50 p-4 rounded-lg mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Item #{index + 1}</h3>
+              <button
+                onClick={() => handleRemoveForm(form.id)}
+                className="text-red-600 hover:text-red-900 text-sm"
+              >
+                Remove Item
+              </button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Item Code *</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={newItem.itemCode || ''}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, itemCode: e.target.value }))}
-                  placeholder="e.g., RM001 or FG001"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Item Name *</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={newItem.itemName || ''}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, itemName: e.target.value }))}
-                  placeholder="e.g., Flour or Espresso"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Item Type *</label>
                 <select
                   className="input-field"
-                  value={newItem.category || ''}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, category: e.target.value }))}
+                  value={form.data.itemType || ''}
+                  onChange={(e) => handleUpdateForm(form.id, 'itemType', e.target.value)}
                 >
-                  <option value="">Select Category</option>
-                  {categories.map(category => (
-                    <option key={category} value={category}>{category}</option>
+                  <option value="">Select Item Type</option>
+                  <option value="Raw Material">Raw Material</option>
+                  <option value="Finished Goods">Finished Goods</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Item Code *</label>
+                <select
+                  className="input-field"
+                  value={form.data.itemCode || ''}
+                  onChange={(e) => handleUpdateForm(form.id, 'itemCode', e.target.value)}
+                  disabled={!form.data.itemType || loadingMaterials}
+                >
+                  <option value="">Select Item</option>
+                  {form.data.itemType === 'Raw Material' && rawMaterials.map(item => (
+                    <option key={item._id} value={item.materialCode}>
+                      {item.materialCode} - {item.materialName}
+                    </option>
+                  ))}
+                  {form.data.itemType === 'Finished Goods' && finishedGoods.map(item => (
+                    <option key={item._id} value={item.productCode}>
+                      {item.productCode} - {item.productName}
+                    </option>
                   ))}
                 </select>
+                {loadingMaterials && (
+                  <p className="text-xs text-gray-500 mt-1">Loading items...</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={form.data.itemName || ''}
+                  readOnly
+                  placeholder="Auto-filled from selection"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={form.data.category || ''}
+                  readOnly
+                  placeholder="Auto-filled from selection"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Unit of Measure</label>
                 <select
                   className="input-field"
-                  value={newItem.unitOfMeasure || 'pcs'}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, unitOfMeasure: e.target.value }))}
+                  value={form.data.unitOfMeasure || 'pcs'}
+                  onChange={(e) => handleUpdateForm(form.id, 'unitOfMeasure', e.target.value)}
                 >
                   {unitOfMeasures.map(unit => (
                     <option key={unit} value={unit}>{unit}</option>
@@ -402,8 +527,8 @@ const CentralKitchenCreateTransfer: React.FC = () => {
                 <input
                   type="number"
                   className="input-field"
-                  value={newItem.quantity || 1}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                  value={form.data.quantity || 1}
+                  onChange={(e) => handleUpdateForm(form.id, 'quantity', parseInt(e.target.value) || 1)}
                   min="1"
                 />
               </div>
@@ -413,9 +538,10 @@ const CentralKitchenCreateTransfer: React.FC = () => {
                   type="number"
                   step="0.01"
                   className="input-field"
-                  value={newItem.unitPrice || 0}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, unitPrice: parseFloat(e.target.value) || 0 }))}
+                  value={form.data.unitPrice || 0}
+                  onChange={(e) => handleUpdateForm(form.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                   min="0"
+                  placeholder="Auto-filled from selection"
                 />
               </div>
               <div className="md:col-span-2 lg:col-span-3">
@@ -423,121 +549,36 @@ const CentralKitchenCreateTransfer: React.FC = () => {
                 <textarea
                   className="input-field"
                   rows={2}
-                  value={newItem.notes || ''}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, notes: e.target.value }))}
+                  value={form.data.notes || ''}
+                  onChange={(e) => handleUpdateForm(form.id, 'notes', e.target.value)}
                   placeholder="Additional notes about this item..."
                 />
               </div>
             </div>
-            <div className="flex gap-3 mt-4">
-              <button
-                onClick={handleAddItem}
-                className="btn-primary flex items-center"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add to Transfer
-              </button>
-              <button
-                onClick={() => setShowAddForm(false)}
-                className="btn-secondary"
-              >
-                Cancel
-              </button>
-            </div>
           </div>
-        )}
+        ))}
 
-        {/* Transfer Items List */}
-        {transferItems.length > 0 && (
+        {/* Transfer Summary and Create Button */}
+        {itemForms.length > 0 && (
           <div className="space-y-4">
-            <h3 className="text-lg font-medium text-gray-900">Transfer Items ({transferItems.length})</h3>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Value</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {transferItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{item.itemName}</div>
-                          <div className="text-sm text-gray-500">{item.itemCode} • {item.category}</div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <input
-                          type="number"
-                          className="input-field w-20"
-                          value={item.quantity}
-                          onChange={(e) => handleUpdateItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
-                          min="1"
-                        />
-                        <span className="ml-2 text-sm text-gray-500">{item.unitOfMeasure}</span>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="input-field w-24"
-                          value={item.unitPrice}
-                          onChange={(e) => handleUpdateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                          min="0"
-                        />
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className="text-sm font-medium text-gray-900">
-                          {item.totalValue.toFixed(2)} KWD
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <input
-                          type="text"
-                          className="input-field w-full"
-                          value={item.notes}
-                          onChange={(e) => handleUpdateItem(item.id, 'notes', e.target.value)}
-                          placeholder="Item notes..."
-                        />
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <button
-                          onClick={() => handleRemoveItem(item.id)}
-                          className="text-red-600 hover:text-red-900 text-sm"
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
             {/* Transfer Summary */}
             <div className="bg-blue-50 p-4 rounded-lg">
               <h4 className="text-lg font-medium text-gray-900 mb-2">Transfer Summary</h4>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Total Items</p>
-                  <p className="text-xl font-semibold text-gray-900">{transferItems.length}</p>
+                  <p className="text-xl font-semibold text-gray-900">{itemForms.length}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Total Quantity</p>
                   <p className="text-xl font-semibold text-gray-900">
-                    {transferItems.reduce((sum, item) => sum + item.quantity, 0)}
+                    {itemForms.reduce((sum, form) => sum + (form.data.quantity || 1), 0)}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Total Value</p>
                   <p className="text-xl font-semibold text-gray-900">
-                    {transferItems.reduce((sum, item) => sum + item.totalValue, 0).toFixed(2)} KWD
+                    {itemForms.reduce((sum, form) => sum + ((form.data.quantity || 1) * (form.data.unitPrice || 0)), 0).toFixed(2)} KWD
                   </p>
                 </div>
                 <div>
@@ -555,24 +596,17 @@ const CentralKitchenCreateTransfer: React.FC = () => {
                 className="btn-primary flex items-center"
               >
                 <Save className="h-4 w-4 mr-2" />
-                {loading ? 'Creating...' : 'Create Transfer'}
+                {loading ? 'Creating Transfer Order...' : 'Create Transfer Order'}
               </button>
             </div>
           </div>
         )}
 
-        {transferItems.length === 0 && (
+        {itemForms.length === 0 && (
           <div className="text-center py-8">
             <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Transfer Items</h3>
-            <p className="text-gray-600 mb-4">Add items to create a transfer order</p>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="btn-primary flex items-center mx-auto"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add First Item
-            </button>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Items Added</h3>
+            <p className="text-gray-600 mb-4">Click "Add Item" to start adding items to your transfer order</p>
           </div>
         )}
       </div>

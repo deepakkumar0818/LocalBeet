@@ -36,8 +36,30 @@ app.use('/api/finished-goods', require('./routes/finishedGoods'));
 app.use('/api/finished-good-inventory', require('./routes/finishedGoodInventory'));
 app.use('/api/sales-orders', require('./routes/salesOrders'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+// Central Kitchen dedicated database routes (must come before general central-kitchen routes)
+app.use('/api/central-kitchen/raw-materials', require('./routes/centralKitchenRawMaterials'));
+app.use('/api/central-kitchen/finished-products', require('./routes/centralKitchenFinishedProducts'));
+
+// Kuwait City dedicated database routes (must come before general outlet routes)
+app.use('/api/kuwait-city/raw-materials', require('./routes/kuwaitCityRawMaterials'));
+app.use('/api/kuwait-city/finished-products', require('./routes/kuwaitCityFinishedProducts'));
+
+// 360 Mall dedicated database routes (must come before general outlet routes)
+app.use('/api/360-mall/raw-materials', require('./routes/mall360RawMaterials'));
+app.use('/api/360-mall/finished-products', require('./routes/mall360FinishedProducts'));
+
+// Vibe Complex dedicated database routes (must come before general outlet routes)
+app.use('/api/vibe-complex/raw-materials', require('./routes/vibeComplexRawMaterials'));
+app.use('/api/vibe-complex/finished-products', require('./routes/vibeComplexFinishedProducts'));
+
+// Taiba Kitchen dedicated database routes (must come before general outlet routes)
+app.use('/api/taiba-kitchen/raw-materials', require('./routes/taibaKitchenRawMaterials'));
+app.use('/api/taiba-kitchen/finished-products', require('./routes/taibaKitchenFinishedProducts'));
+
 app.use('/api/central-kitchen', require('./routes/centralKitchen'));
 app.use('/api/central-kitchen-inventory', require('./routes/centralKitchenInventory'));
+app.use('/api/transfers', require('./routes/transfers'));
+app.use('/api/transfer-orders', require('./routes/transferOrders'));
 
 // Health check
 app.get('/api/health', (req, res) => {
