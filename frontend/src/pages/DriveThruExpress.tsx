@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Package, TrendingUp, TrendingDown, AlertTriangle, BarChart3, Truck, Users, Clock, RefreshCw, Car, ShoppingCart, Search, Download, Upload } from 'lucide-react'
+import { Package, TrendingUp, TrendingDown, AlertTriangle, BarChart3, Truck, Users, Clock, RefreshCw, Car, ShoppingCart, Search } from 'lucide-react'
 import { apiService } from '../services/api'
 
 interface OutletInventoryItem {
@@ -38,11 +38,45 @@ interface Outlet {
   isCentralKitchen: boolean
 }
 
+interface FinishedGoodInventoryItem {
+  id: string
+  outletId: string
+  outletCode: string
+  outletName: string
+  productId: string
+  productCode: string
+  productName: string
+  category: string
+  unitOfMeasure: string
+  unitPrice: number
+  costPrice: number
+  currentStock: number
+  reservedStock: number
+  availableStock: number
+  minimumStock: number
+  maximumStock: number
+  reorderPoint: number
+  totalValue: number
+  productionDate: string
+  expiryDate: string
+  batchNumber: string
+  storageLocation: string
+  storageTemperature: string
+  qualityStatus: string
+  qualityNotes: string
+  status: string
+  transferSource: string
+  lastUpdated: string
+  notes: string
+  isActive: boolean
+}
+
 const DriveThruExpress: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const [outlet, setOutlet] = useState<Outlet | null>(null)
   const [inventoryItems, setInventoryItems] = useState<OutletInventoryItem[]>([])
+  const [finishedGoodInventoryItems, setFinishedGoodInventoryItems] = useState<FinishedGoodInventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -52,6 +86,31 @@ const DriveThruExpress: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [importing, setImporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [editingItem, setEditingItem] = useState<OutletInventoryItem | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    currentStock: '',
+    minimumStock: '',
+    maximumStock: '',
+    reorderPoint: '',
+    unitPrice: '',
+    notes: ''
+  })
+  const [editingFinishedGood, setEditingFinishedGood] = useState<FinishedGoodInventoryItem | null>(null)
+  const [showFinishedGoodEditModal, setShowFinishedGoodEditModal] = useState(false)
+  const [finishedGoodEditFormData, setFinishedGoodEditFormData] = useState({
+    currentStock: '',
+    unitPrice: '',
+    costPrice: '',
+    minimumStock: '',
+    maximumStock: '',
+    reorderPoint: '',
+    storageLocation: '',
+    storageTemperature: '',
+    qualityStatus: '',
+    qualityNotes: '',
+    notes: ''
+  })
 
   // Determine current section based on URL
   const getCurrentSection = () => {
@@ -86,7 +145,7 @@ const DriveThruExpress: React.FC = () => {
         const driveThru = outletsResponse.data.find(outlet => outlet.outletCode === 'OUT-004')
         if (driveThru) {
           setOutlet(driveThru)
-          await loadInventory(driveThru._id)
+          await loadInventory()
         } else {
           setError('Taiba Hospital not found')
         }
@@ -101,68 +160,120 @@ const DriveThruExpress: React.FC = () => {
     }
   }
 
-  const loadInventory = async (outletId?: string) => {
-    const currentOutletId = outletId || outlet?._id || 'drive-thru-express-001'
-    
+  const loadInventory = async () => {
     try {
-      // Use sample data for faster loading
-      const sampleRawMaterials: OutletInventoryItem[] = [
-        {
-          id: 'dte-rm-001',
-          outletId: currentOutletId,
-          outletCode: 'DTE001',
-          outletName: 'Taiba Hospital',
-          materialId: '10001',
-          materialCode: '10001',
-          materialName: 'Bhujia',
-          category: 'Bakery',
-          unitOfMeasure: 'kg',
-          unitPrice: 0,
-          currentStock: 0,
-          reservedStock: 0,
-          availableStock: 0,
-          minimumStock: 0,
-          maximumStock: 0,
-          reorderPoint: 0,
-          totalValue: 0,
-          location: 'Main Storage',
-          batchNumber: '',
-          supplier: '',
-          lastUpdated: new Date().toISOString(),
-          status: 'In Stock',
-          notes: '',
-          isActive: true
-        },
-        {
-          id: 'dte-rm-002',
-          outletId: currentOutletId,
-          outletCode: 'DTE001',
-          outletName: 'Taiba Hospital',
-          materialId: '10002',
-          materialCode: '10002',
-          materialName: 'Bran Flakes',
-          category: 'Bakery',
-          unitOfMeasure: 'kg',
-          unitPrice: 0,
-          currentStock: 0,
-          reservedStock: 0,
-          availableStock: 0,
-          minimumStock: 0,
-          maximumStock: 0,
-          reorderPoint: 0,
-          totalValue: 0,
-          location: 'Main Storage',
-          batchNumber: '',
-          supplier: '',
-          lastUpdated: new Date().toISOString(),
-          status: 'In Stock',
-          notes: '',
-          isActive: true
-        }
-      ]
+      console.log('Loading Taiba Kitchen inventory...')
+      
+      // Load raw materials inventory from Taiba Kitchen dedicated API
+      const rawMaterialsResponse = await apiService.getTaibaKitchenRawMaterials({
+        limit: 1000,
+        search: searchTerm,
+        category: filterCategory,
+        status: filterStatus,
+        sortBy: sortBy === 'materialName' ? 'materialName' : sortBy,
+        sortOrder
+      })
 
-      console.log('Loaded Taiba Hospital Inventory:', sampleRawMaterials)
-      setInventoryItems(sampleRawMaterials)
+      if (rawMaterialsResponse.success) {
+        console.log('Loaded outlet raw materials inventory:', rawMaterialsResponse.data)
+        
+        if (rawMaterialsResponse.data && rawMaterialsResponse.data.length > 0) {
+          // Transform the data to match the expected interface
+          const transformedRawMaterials: OutletInventoryItem[] = rawMaterialsResponse.data.map((item: any) => ({
+            id: item._id || item.id,
+            outletId: 'taiba-kitchen',
+            outletCode: 'OUT-004',
+            outletName: 'Taiba Hospital',
+            materialId: item._id || item.id,
+            materialCode: item.materialCode,
+            materialName: item.materialName,
+            category: item.category,
+            unitOfMeasure: item.unitOfMeasure,
+            unitPrice: item.unitPrice,
+            currentStock: item.currentStock,
+            reservedStock: 0,
+            availableStock: item.currentStock,
+            minimumStock: item.minimumStock,
+            maximumStock: item.maximumStock,
+            reorderPoint: item.reorderPoint,
+            totalValue: item.currentStock * item.unitPrice,
+            location: item.storageRequirements?.location || 'Main Storage',
+            batchNumber: item.batchNumber || '',
+            supplier: item.supplierName || '',
+            lastUpdated: item.updatedAt || new Date().toISOString(),
+            status: item.status,
+            notes: item.notes || '',
+            isActive: item.isActive
+          }))
+          
+          setInventoryItems(transformedRawMaterials)
+        } else {
+          console.log('No raw materials inventory found for Taiba Kitchen')
+          setInventoryItems([])
+          setError('No raw materials inventory found. Please add some raw materials to Taiba Kitchen.')
+        }
+      } else {
+        console.error('Failed to load raw materials inventory:', rawMaterialsResponse.message || 'API Error')
+        setError(`Failed to load inventory from server: ${rawMaterialsResponse.message || 'Unknown error'}`)
+      }
+
+      // Load finished goods inventory from Taiba Kitchen dedicated API
+      const finishedGoodsResponse = await apiService.getTaibaKitchenFinishedProducts({
+        limit: 1000,
+        search: searchTerm,
+        category: filterCategory,
+        status: filterStatus,
+        sortBy: sortBy === 'productName' ? 'productName' : sortBy,
+        sortOrder
+      })
+
+      if (finishedGoodsResponse.success) {
+        console.log('Loaded outlet finished goods inventory:', finishedGoodsResponse.data)
+        
+        if (finishedGoodsResponse.data && finishedGoodsResponse.data.length > 0) {
+          // Transform the data to match the expected interface
+          const transformedFinishedGoods: FinishedGoodInventoryItem[] = finishedGoodsResponse.data.map((item: any) => ({
+            id: item._id || item.id,
+            outletId: 'taiba-kitchen',
+            outletCode: 'OUT-004',
+            outletName: 'Taiba Hospital',
+            productId: item._id || item.id,
+            productCode: item.productCode,
+            productName: item.productName,
+            category: item.category,
+            unitOfMeasure: item.unitOfMeasure,
+            unitPrice: item.unitPrice,
+            costPrice: item.costPrice || 0,
+            currentStock: item.currentStock,
+            reservedStock: 0,
+            availableStock: item.currentStock,
+            minimumStock: item.minimumStock,
+            maximumStock: item.maximumStock,
+            reorderPoint: item.reorderPoint,
+            totalValue: item.currentStock * item.unitPrice,
+            productionDate: item.productionDate || new Date().toISOString(),
+            expiryDate: item.expiryDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            batchNumber: item.batchNumber || '',
+            storageLocation: item.storageLocation || 'Cold Storage',
+            storageTemperature: item.storageTemperature || 'Cold',
+            qualityStatus: item.qualityStatus || 'Good',
+            qualityNotes: item.qualityNotes || '',
+            status: item.status,
+            transferSource: 'Transfer',
+            lastUpdated: item.lastUpdated || item.updatedAt,
+            notes: item.notes || '',
+            isActive: item.isActive
+          }))
+          
+          setFinishedGoodInventoryItems(transformedFinishedGoods)
+        } else {
+          console.log('No finished goods inventory found for this outlet')
+          setFinishedGoodInventoryItems([])
+        }
+      } else {
+        console.error('Failed to load finished goods inventory:', finishedGoodsResponse.message || 'API Error')
+        // Don't set error for finished goods as it's optional
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load inventory')
       console.error('Error loading inventory:', err)
@@ -175,6 +286,139 @@ const DriveThruExpress: React.FC = () => {
     setFilterStatus('')
     setSortBy('materialName')
     setSortOrder('asc')
+  }
+
+  const handleEditItem = (item: OutletInventoryItem) => {
+    setEditingItem(item)
+    setEditFormData({
+      currentStock: item.currentStock.toString(),
+      minimumStock: item.minimumStock.toString(),
+      maximumStock: item.maximumStock.toString(),
+      reorderPoint: item.reorderPoint.toString(),
+      unitPrice: item.unitPrice.toString(),
+      notes: item.notes || ''
+    })
+    setShowEditModal(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingItem) return
+
+    try {
+      const updateData = {
+        currentStock: parseFloat(editFormData.currentStock),
+        minimumStock: parseFloat(editFormData.minimumStock),
+        maximumStock: parseFloat(editFormData.maximumStock),
+        reorderPoint: parseFloat(editFormData.reorderPoint),
+        unitPrice: parseFloat(editFormData.unitPrice),
+        notes: editFormData.notes
+      }
+
+      const response = await apiService.updateTaibaKitchenRawMaterial(editingItem.id, updateData)
+      
+      if (response.success) {
+        // Update local state
+        setInventoryItems(prev => prev.map(item => 
+          item.id === editingItem.id 
+            ? { ...item, ...updateData, totalValue: updateData.currentStock * updateData.unitPrice }
+            : item
+        ))
+        setShowEditModal(false)
+        setEditingItem(null)
+      } else {
+        alert(`Failed to update inventory item: ${response.message}`)
+      }
+    } catch (error) {
+      console.error('Error updating inventory item:', error)
+      alert('Failed to update inventory item')
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setShowEditModal(false)
+    setEditingItem(null)
+    setEditFormData({
+      currentStock: '',
+      minimumStock: '',
+      maximumStock: '',
+      reorderPoint: '',
+      unitPrice: '',
+      notes: ''
+    })
+  }
+
+  const handleEditFinishedGood = (item: FinishedGoodInventoryItem) => {
+    setEditingFinishedGood(item)
+    setFinishedGoodEditFormData({
+      currentStock: item.currentStock.toString(),
+      unitPrice: item.unitPrice.toString(),
+      costPrice: item.costPrice.toString(),
+      minimumStock: item.minimumStock.toString(),
+      maximumStock: item.maximumStock.toString(),
+      reorderPoint: item.reorderPoint.toString(),
+      storageLocation: item.storageLocation || '',
+      storageTemperature: item.storageTemperature || '',
+      qualityStatus: item.qualityStatus || '',
+      qualityNotes: item.qualityNotes || '',
+      notes: item.notes || ''
+    })
+    setShowFinishedGoodEditModal(true)
+  }
+
+  const handleSaveFinishedGoodEdit = async () => {
+    if (!editingFinishedGood) return
+
+    try {
+      const updateData = {
+        currentStock: parseFloat(finishedGoodEditFormData.currentStock),
+        unitPrice: parseFloat(finishedGoodEditFormData.unitPrice),
+        costPrice: parseFloat(finishedGoodEditFormData.costPrice),
+        minimumStock: parseFloat(finishedGoodEditFormData.minimumStock),
+        maximumStock: parseFloat(finishedGoodEditFormData.maximumStock),
+        reorderPoint: parseFloat(finishedGoodEditFormData.reorderPoint),
+        storageLocation: finishedGoodEditFormData.storageLocation,
+        storageTemperature: finishedGoodEditFormData.storageTemperature,
+        qualityStatus: finishedGoodEditFormData.qualityStatus,
+        qualityNotes: finishedGoodEditFormData.qualityNotes,
+        notes: finishedGoodEditFormData.notes
+      }
+
+      const response = await apiService.updateTaibaKitchenFinishedProduct(editingFinishedGood.id, updateData)
+      
+      if (response.success) {
+        // Update local state
+        setFinishedGoodInventoryItems(prev => prev.map(item => 
+          item.id === editingFinishedGood.id 
+            ? { ...item, ...updateData, totalValue: updateData.currentStock * updateData.unitPrice }
+            : item
+        ))
+        setShowFinishedGoodEditModal(false)
+        setEditingFinishedGood(null)
+      } else {
+        alert(`Failed to update finished good inventory item: ${response.message}`)
+      }
+    } catch (error) {
+      console.error('Error updating finished good inventory item:', error)
+      alert('Failed to update finished good inventory item')
+    }
+  }
+
+  const handleCancelFinishedGoodEdit = () => {
+    setShowFinishedGoodEditModal(false)
+    setEditingFinishedGood(null)
+    setFinishedGoodEditFormData({
+      currentStock: '',
+      unitPrice: '',
+      costPrice: '',
+      minimumStock: '',
+      maximumStock: '',
+      reorderPoint: '',
+      storageLocation: '',
+      storageTemperature: '',
+      qualityStatus: '',
+      qualityNotes: '',
+      notes: ''
+    })
   }
 
   const getStatusColor = (status: string) => {
@@ -243,70 +487,7 @@ const DriveThruExpress: React.FC = () => {
     }
   }
 
-  const handleExport = () => {
-    if (inventoryItems.length === 0) {
-      alert('No raw materials to export')
-      return
-    }
 
-    const csvContent = [
-      // Header row
-      [
-        'SKU',
-        'Item Name',
-        'Parent Category',
-        'SubCategory Name',
-        'Unit',
-        'Unit Name',
-        'Default Purchase Unit Name'
-      ].join(','),
-      // Data rows
-      ...inventoryItems.map(item => [
-        item.materialCode,
-        item.materialName,
-        'Raw Materials',
-        item.category,
-        item.unitOfMeasure,
-        item.unitOfMeasure,
-        item.unitOfMeasure
-      ].map(field => `"${field}"`).join(','))
-    ].join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `taiba-hospital-raw-materials-${new Date().toISOString().split('T')[0]}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
-  const downloadSampleCSV = () => {
-    const sampleData = [
-      ['SKU', 'Item Name', 'Parent Category', 'SubCategory Name', 'Unit', 'Unit Name', 'Default Purchase Unit Name'],
-      ['10001', 'Bhujia', 'Raw Materials', 'Bakery', 'kg', 'kg', 'kg'],
-      ['10002', 'Bran Flakes', 'Raw Materials', 'Bakery', 'kg', 'kg', 'kg'],
-      ['10003', 'Bread Improver', 'Raw Materials', 'Bakery', 'kg', 'kg', 'kg'],
-      ['10004', 'Caramel Syrup', 'Raw Materials', 'Bakery', 'kg', 'kg', 'kg'],
-      ['10005', 'Cocoa Powder', 'Raw Materials', 'Bakery', 'kg', 'kg', 'kg']
-    ]
-
-    const csvContent = sampleData.map(row => 
-      row.map(field => `"${field}"`).join(',')
-    ).join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', 'taiba-hospital-raw-materials-sample.csv')
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
 
   const handleImport = () => {
     fileInputRef.current?.click()
@@ -424,33 +605,6 @@ const DriveThruExpress: React.FC = () => {
                 />
               </div>
             </div>
-            <div className="flex gap-3">
-              <button
-                onClick={downloadSampleCSV}
-                className="btn-secondary flex items-center"
-                title="Download sample CSV template"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Sample CSV
-              </button>
-              <button
-                onClick={handleImport}
-                className="btn-secondary flex items-center"
-                disabled={importing}
-                title="Import CSV file"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                {importing ? 'Importing...' : 'Import CSV'}
-              </button>
-              <button
-                onClick={handleExport}
-                className="btn-primary flex items-center"
-                title="Export to CSV"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export CSV
-              </button>
-            </div>
           </div>
         </div>
 
@@ -470,11 +624,9 @@ const DriveThruExpress: React.FC = () => {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SubCategory Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Default Purchase Unit Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Quantity</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -491,14 +643,12 @@ const DriveThruExpress: React.FC = () => {
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.materialCode}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.materialName}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Raw Materials</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.category}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.unitOfMeasure}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.unitOfMeasure}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.unitOfMeasure}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.currentStock}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button
-                      onClick={() => navigate(`/outlet-inventory/edit/${item.id}`)}
+                      onClick={() => handleEditItem(item)}
                       className="text-blue-600 hover:text-blue-900"
                       title="Edit"
                     >
@@ -516,9 +666,68 @@ const DriveThruExpress: React.FC = () => {
 
   const renderFinishedGoodsSection = () => (
     <div className="space-y-6">
-      <div className="card p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Finished Goods Inventory</h2>
-        <p className="text-gray-600">Finished goods inventory functionality will be implemented here.</p>
+      {/* Finished Goods Section */}
+      <div className="card">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Package className="h-6 w-6 text-green-600" />
+              <h2 className="text-xl font-semibold text-gray-900">Finished Goods Inventory</h2>
+            </div>
+          </div>
+        </div>
+        
+        {/* Finished Goods Table */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product Code</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Stock</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {finishedGoodInventoryItems
+                .filter(item => item.productId && item.productCode && item.productName)
+                .filter(item => 
+                  searchTerm === '' || 
+                  item.productCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  item.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  item.category.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                .map((item) => (
+                <tr key={item.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.productCode}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.productName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.category}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.unitOfMeasure}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.currentStock}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.unitPrice.toFixed(2)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(item.status)}`}>
+                      {item.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button
+                      onClick={() => handleEditFinishedGood(item)}
+                      className="text-blue-600 hover:text-blue-900"
+                      title="Edit"
+                    >
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )
@@ -635,6 +844,291 @@ const DriveThruExpress: React.FC = () => {
 
       {/* Section Content */}
       {renderSectionContent()}
+
+      {/* Edit Modal */}
+      {showEditModal && editingItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              Edit Inventory Item
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              {editingItem.materialCode} - {editingItem.materialName}
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Current Stock
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editFormData.currentStock}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, currentStock: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unit Price
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editFormData.unitPrice}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, unitPrice: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Minimum Stock
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editFormData.minimumStock}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, minimumStock: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Maximum Stock
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editFormData.maximumStock}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, maximumStock: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reorder Point
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editFormData.reorderPoint}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, reorderPoint: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  value={editFormData.notes}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={handleCancelEdit}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Finished Goods Edit Modal */}
+      {showFinishedGoodEditModal && editingFinishedGood && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              Edit Finished Good Inventory Item
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              {editingFinishedGood.productCode} - {editingFinishedGood.productName}
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Current Stock
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={finishedGoodEditFormData.currentStock}
+                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, currentStock: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unit Price
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={finishedGoodEditFormData.unitPrice}
+                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, unitPrice: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cost Price
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={finishedGoodEditFormData.costPrice}
+                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, costPrice: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Minimum Stock
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={finishedGoodEditFormData.minimumStock}
+                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, minimumStock: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Maximum Stock
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={finishedGoodEditFormData.maximumStock}
+                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, maximumStock: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reorder Point
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={finishedGoodEditFormData.reorderPoint}
+                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, reorderPoint: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Storage Location
+                </label>
+                <input
+                  type="text"
+                  value={finishedGoodEditFormData.storageLocation}
+                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, storageLocation: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Storage Temperature
+                </label>
+                <select
+                  value={finishedGoodEditFormData.storageTemperature}
+                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, storageTemperature: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="Cold">Cold</option>
+                  <option value="Frozen">Frozen</option>
+                  <option value="Hot">Hot</option>
+                  <option value="Room Temperature">Room Temperature</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quality Status
+                </label>
+                <select
+                  value={finishedGoodEditFormData.qualityStatus}
+                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, qualityStatus: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="Good">Good</option>
+                  <option value="Damaged">Damaged</option>
+                  <option value="Expired">Expired</option>
+                  <option value="Under Review">Under Review</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quality Notes
+                </label>
+                <textarea
+                  value={finishedGoodEditFormData.qualityNotes}
+                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, qualityNotes: e.target.value }))}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  value={finishedGoodEditFormData.notes}
+                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={handleCancelFinishedGoodEdit}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveFinishedGoodEdit}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

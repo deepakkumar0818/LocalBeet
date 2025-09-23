@@ -181,6 +181,7 @@ export interface TransferOrderItem {
   materialId: string;
   materialCode: string;
   materialName: string;
+  itemType?: 'raw-material' | 'finished-good';
   quantity: number;
   unitOfMeasure: string;
   unitPrice: number;

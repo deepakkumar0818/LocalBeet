@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft, Save, X, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Save, X, Plus, Trash2, Package } from 'lucide-react'
 import { TransferOrder, TransferOrderItem } from '../types'
 import { apiService } from '../services/api'
 
@@ -8,8 +8,12 @@ const AddTransferOrder: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const [isFromCentralKitchen, setIsFromCentralKitchen] = useState(false)
+  const [isFromKuwaitCity, setIsFromKuwaitCity] = useState(false)
+  const [kuwaitCitySection, setKuwaitCitySection] = useState<'raw-materials' | 'finished-goods' | 'both'>('both')
   const [outlets, setOutlets] = useState<any[]>([])
   const [centralKitchen, setCentralKitchen] = useState<any>(null)
+  const [rawMaterials, setRawMaterials] = useState<any[]>([])
+  const [finishedGoods, setFinishedGoods] = useState<any[]>([])
   const [formData, setFormData] = useState({
     transferNumber: '',
     fromWarehouseId: '',
@@ -28,14 +32,26 @@ const AddTransferOrder: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Check if coming from Central Kitchen
+  // Check if coming from Central Kitchen or Kuwait City
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search)
     const fromParam = urlParams.get('from')
+    const sectionParam = urlParams.get('section')
     
     if (fromParam === 'central-kitchen') {
       setIsFromCentralKitchen(true)
       loadCentralKitchenData()
+    } else if (fromParam === 'kuwait-city') {
+      setIsFromKuwaitCity(true)
+      
+      // Determine which section to show
+      if (sectionParam === 'raw-materials' || sectionParam === 'finished-goods') {
+        setKuwaitCitySection(sectionParam as 'raw-materials' | 'finished-goods')
+      } else {
+        setKuwaitCitySection('both')
+      }
+      
+      loadKuwaitCityData()
     }
   }, [location.search])
 
@@ -71,6 +87,53 @@ const AddTransferOrder: React.FC = () => {
     }
   }
 
+  const loadKuwaitCityData = async () => {
+    try {
+      console.log('Loading Kuwait City data for section:', kuwaitCitySection)
+      
+      // Only load data for the specific section
+      if (kuwaitCitySection === 'raw-materials' || kuwaitCitySection === 'both') {
+        const rawMaterialsResponse = await fetch('/api/kuwait-city/raw-materials?limit=1000')
+        const rawMaterialsData = await rawMaterialsResponse.json()
+        
+        console.log('Raw Materials API Response:', rawMaterialsData)
+        
+        if (rawMaterialsData.success && rawMaterialsData.data) {
+          const rawMaterials = Array.isArray(rawMaterialsData.data) ? rawMaterialsData.data : []
+          setRawMaterials(rawMaterials)
+          console.log('Raw Materials loaded for Kuwait City:', rawMaterials.length, 'items')
+        } else {
+          console.error('Failed to load Raw Materials:', rawMaterialsData)
+          setRawMaterials([])
+        }
+      } else {
+        setRawMaterials([])
+      }
+
+      if (kuwaitCitySection === 'finished-goods' || kuwaitCitySection === 'both') {
+        const finishedGoodsResponse = await fetch('/api/kuwait-city/finished-products?limit=1000')
+        const finishedGoodsData = await finishedGoodsResponse.json()
+        
+        console.log('Finished Goods API Response:', finishedGoodsData)
+        
+        if (finishedGoodsData.success && finishedGoodsData.data) {
+          const finishedGoods = Array.isArray(finishedGoodsData.data) ? finishedGoodsData.data : []
+          setFinishedGoods(finishedGoods)
+          console.log('Finished Goods loaded for Kuwait City:', finishedGoods.length, 'items')
+        } else {
+          console.error('Failed to load Finished Goods:', finishedGoodsData)
+          setFinishedGoods([])
+        }
+      } else {
+        setFinishedGoods([])
+      }
+    } catch (error) {
+      console.error('Error loading Kuwait City data:', error)
+      setRawMaterials([])
+      setFinishedGoods([])
+    }
+  }
+
   const statusOptions = ['Draft', 'Approved', 'In Transit', 'Delivered', 'Cancelled']
   const priorityOptions = ['Low', 'Medium', 'High', 'Urgent']
   const transferTypeOptions = ['Internal', 'External', 'Emergency']
@@ -89,11 +152,13 @@ const AddTransferOrder: React.FC = () => {
     if (!formData.transferNumber.trim()) {
       newErrors.transferNumber = 'Transfer number is required'
     }
-    if (!formData.fromWarehouseId) {
-      newErrors.fromWarehouseId = 'From warehouse is required'
-    }
-    if (!formData.toWarehouseId) {
-      newErrors.toWarehouseId = 'To warehouse is required'
+    if (!isFromKuwaitCity) {
+      if (!formData.fromWarehouseId) {
+        newErrors.fromWarehouseId = 'From warehouse is required'
+      }
+      if (!formData.toWarehouseId) {
+        newErrors.toWarehouseId = 'To warehouse is required'
+      }
     }
     if (!formData.transferDate) {
       newErrors.transferDate = 'Transfer date is required'
@@ -181,11 +246,12 @@ const AddTransferOrder: React.FC = () => {
     }
   }
 
-  const addTransferOrderItem = () => {
+  const addTransferOrderItem = (itemType: 'raw-material' | 'finished-good') => {
     const newItem: TransferOrderItem = {
       materialId: '',
       materialCode: '',
       materialName: '',
+      itemType: itemType,
       quantity: 0,
       unitOfMeasure: '',
       unitPrice: 0,
@@ -209,6 +275,37 @@ const AddTransferOrder: React.FC = () => {
         return item
       })
     }))
+  }
+
+  const handleMaterialCodeChange = (index: number, materialCode: string) => {
+    const item = formData.items[index]
+    if (!item || !isFromKuwaitCity) return
+
+    let selectedMaterial = null
+    
+    // Search in appropriate collection based on item type
+    if (item.itemType === 'raw-material') {
+      selectedMaterial = rawMaterials.find(rm => rm.materialCode === materialCode)
+    } else if (item.itemType === 'finished-good') {
+      selectedMaterial = finishedGoods.find(fg => fg.productCode === materialCode)
+    }
+
+    if (selectedMaterial) {
+      updateTransferOrderItem(index, 'materialId', selectedMaterial.id || selectedMaterial._id)
+      updateTransferOrderItem(index, 'materialCode', materialCode)
+      updateTransferOrderItem(index, 'materialName', 
+        item.itemType === 'raw-material' ? selectedMaterial.materialName : selectedMaterial.productName
+      )
+      updateTransferOrderItem(index, 'unitOfMeasure', selectedMaterial.unitOfMeasure)
+      updateTransferOrderItem(index, 'unitPrice', selectedMaterial.unitPrice)
+    } else {
+      // Clear fields if no material found
+      updateTransferOrderItem(index, 'materialId', '')
+      updateTransferOrderItem(index, 'materialCode', materialCode)
+      updateTransferOrderItem(index, 'materialName', '')
+      updateTransferOrderItem(index, 'unitOfMeasure', '')
+      updateTransferOrderItem(index, 'unitPrice', 0)
+    }
   }
 
   const removeTransferOrderItem = (index: number) => {
@@ -306,6 +403,7 @@ const AddTransferOrder: React.FC = () => {
           </div>
 
           {/* Location Information */}
+          {!isFromKuwaitCity && (
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">
               {isFromCentralKitchen ? 'Transfer Information' : 'Warehouse Information'}
@@ -403,107 +501,347 @@ const AddTransferOrder: React.FC = () => {
               </div>
             </div>
           </div>
-
+          )}
 
           {/* Transfer Order Items */}
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Transfer Items</h3>
-              <button
-                type="button"
-                onClick={addTransferOrderItem}
-                className="btn-secondary flex items-center text-sm"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Item
-              </button>
-            </div>
-
-            {errors.items && (
-              <p className="mb-4 text-sm text-red-600">{errors.items}</p>
-            )}
-
-            <div className="space-y-4">
-              {formData.items.map((item, index) => (
-                <div key={index} className="grid grid-cols-7 gap-3 p-4 border border-gray-200 rounded-lg bg-gray-50">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Material Code</label>
-                    <input
-                      type="text"
-                      className="input-field text-sm"
-                      value={item.materialCode}
-                      onChange={(e) => updateTransferOrderItem(index, 'materialCode', e.target.value)}
-                      placeholder="RM-001"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Material Name</label>
-                    <input
-                      type="text"
-                      className="input-field text-sm"
-                      value={item.materialName}
-                      onChange={(e) => updateTransferOrderItem(index, 'materialName', e.target.value)}
-                      placeholder="Steel Rod"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
-                    <input
-                      type="number"
-                      className="input-field text-sm"
-                      value={item.quantity}
-                      onChange={(e) => updateTransferOrderItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Unit</label>
-                    <input
-                      type="text"
-                      className="input-field text-sm"
-                      value={item.unitOfMeasure}
-                      onChange={(e) => updateTransferOrderItem(index, 'unitOfMeasure', e.target.value)}
-                      placeholder="KG"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Unit Price</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="input-field text-sm"
-                      value={item.unitPrice}
-                      onChange={(e) => updateTransferOrderItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Remarks</label>
-                    <input
-                      type="text"
-                      className="input-field text-sm"
-                      value={item.remarks}
-                      onChange={(e) => updateTransferOrderItem(index, 'remarks', e.target.value)}
-                      placeholder="Notes"
-                    />
-                  </div>
-                  <div className="flex items-end">
+            {isFromKuwaitCity ? (
+              <>
+                {/* Raw Materials Section - Only show if section is raw-materials or both */}
+                {(kuwaitCitySection === 'raw-materials' || kuwaitCitySection === 'both') && (
+                <div className="mb-8">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Raw Materials ({rawMaterials.length} available)
+                    </h3>
                     <button
                       type="button"
-                      onClick={() => removeTransferOrderItem(index)}
-                      className="text-red-600 hover:text-red-900 p-1"
+                      onClick={() => addTransferOrderItem('raw-material')}
+                      className="btn-secondary flex items-center text-sm"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Raw Material
                     </button>
                   </div>
-                  <div className="col-span-7">
-                    <div className="text-sm text-gray-600">
-                      Total Price: {item.totalPrice.toFixed(2)} KWD
+                  
+                  {formData.items.filter(item => item.itemType === 'raw-material').length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                      <p>No raw materials added yet</p>
+                      <p className="text-sm">Click "Add Raw Material" to get started</p>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {formData.items
+                        .map((item, originalIndex) => ({ item, originalIndex }))
+                        .filter(({ item }) => item.itemType === 'raw-material')
+                        .map(({ item, originalIndex }) => (
+                        <div key={originalIndex} className="grid grid-cols-7 gap-3 p-4 border border-gray-200 rounded-lg bg-blue-50">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Material Code</label>
+                            <select
+                              className="input-field text-sm"
+                              value={item.materialCode}
+                              onChange={(e) => handleMaterialCodeChange(originalIndex, e.target.value)}
+                            >
+                              <option value="">Select Raw Material</option>
+                              {rawMaterials.map(rm => (
+                                <option key={rm.id || rm._id} value={rm.materialCode}>
+                                  {rm.materialCode} - {rm.materialName}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Material Name</label>
+                            <input
+                              type="text"
+                              className="input-field text-sm bg-gray-100"
+                              value={item.materialName}
+                              placeholder="Material Name"
+                              readOnly
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
+                            <input
+                              type="number"
+                              className="input-field text-sm"
+                              value={item.quantity}
+                              onChange={(e) => updateTransferOrderItem(originalIndex, 'quantity', parseFloat(e.target.value) || 0)}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Unit</label>
+                            <input
+                              type="text"
+                              className="input-field text-sm bg-gray-100"
+                              value={item.unitOfMeasure}
+                              placeholder="Unit"
+                              readOnly
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Unit Price</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="input-field text-sm bg-gray-100"
+                              value={item.unitPrice}
+                              placeholder="0.00"
+                              readOnly
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Remarks</label>
+                            <input
+                              type="text"
+                              className="input-field text-sm"
+                              value={item.remarks || ''}
+                              onChange={(e) => updateTransferOrderItem(originalIndex, 'remarks', e.target.value)}
+                              placeholder="Notes"
+                            />
+                          </div>
+                          <div className="flex items-end">
+                            <button
+                              type="button"
+                              onClick={() => removeTransferOrderItem(originalIndex)}
+                              className="text-red-600 hover:text-red-900 p-1"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <div className="col-span-7">
+                            <div className="text-sm text-gray-600">
+                              Total Price: {item.totalPrice.toFixed(2)} KWD
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
+                )}
+
+                {/* Finished Goods Section - Only show if section is finished-goods or both */}
+                {(kuwaitCitySection === 'finished-goods' || kuwaitCitySection === 'both') && (
+                <div className="mb-8">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Finished Goods ({finishedGoods.length} available)
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => addTransferOrderItem('finished-good')}
+                      className="btn-secondary flex items-center text-sm"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Finished Good
+                    </button>
+                  </div>
+                  
+                  {formData.items.filter(item => item.itemType === 'finished-good').length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                      <p>No finished goods added yet</p>
+                      <p className="text-sm">Click "Add Finished Good" to get started</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {formData.items
+                        .map((item, originalIndex) => ({ item, originalIndex }))
+                        .filter(({ item }) => item.itemType === 'finished-good')
+                        .map(({ item, originalIndex }) => (
+                        <div key={originalIndex} className="grid grid-cols-7 gap-3 p-4 border border-gray-200 rounded-lg bg-green-50">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Product Code</label>
+                            <select
+                              className="input-field text-sm"
+                              value={item.materialCode}
+                              onChange={(e) => handleMaterialCodeChange(originalIndex, e.target.value)}
+                            >
+                              <option value="">Select Finished Good</option>
+                              {finishedGoods.map(fg => (
+                                <option key={fg.id || fg._id} value={fg.productCode}>
+                                  {fg.productCode} - {fg.productName}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Product Name</label>
+                            <input
+                              type="text"
+                              className="input-field text-sm bg-gray-100"
+                              value={item.materialName}
+                              placeholder="Product Name"
+                              readOnly
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
+                            <input
+                              type="number"
+                              className="input-field text-sm"
+                              value={item.quantity}
+                              onChange={(e) => updateTransferOrderItem(originalIndex, 'quantity', parseFloat(e.target.value) || 0)}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Unit</label>
+                            <input
+                              type="text"
+                              className="input-field text-sm bg-gray-100"
+                              value={item.unitOfMeasure}
+                              placeholder="Unit"
+                              readOnly
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Unit Price</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="input-field text-sm bg-gray-100"
+                              value={item.unitPrice}
+                              placeholder="0.00"
+                              readOnly
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Remarks</label>
+                            <input
+                              type="text"
+                              className="input-field text-sm"
+                              value={item.remarks || ''}
+                              onChange={(e) => updateTransferOrderItem(originalIndex, 'remarks', e.target.value)}
+                              placeholder="Notes"
+                            />
+                          </div>
+                          <div className="flex items-end">
+                            <button
+                              type="button"
+                              onClick={() => removeTransferOrderItem(originalIndex)}
+                              className="text-red-600 hover:text-red-900 p-1"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <div className="col-span-7">
+                            <div className="text-sm text-gray-600">
+                              Total Price: {item.totalPrice.toFixed(2)} KWD
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Transfer Items</h3>
+                  <button
+                    type="button"
+                    onClick={() => addTransferOrderItem('raw-material')}
+                    className="btn-secondary flex items-center text-sm"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Item
+                  </button>
+                </div>
+
+                {errors.items && (
+                  <p className="mb-4 text-sm text-red-600">{errors.items}</p>
+                )}
+
+                <div className="space-y-4">
+                  {formData.items.map((item, index) => (
+                    <div key={index} className="grid grid-cols-7 gap-3 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Material Code</label>
+                        <input
+                          type="text"
+                          className="input-field text-sm"
+                          value={item.materialCode}
+                          onChange={(e) => updateTransferOrderItem(index, 'materialCode', e.target.value)}
+                          placeholder="RM-001"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Material Name</label>
+                        <input
+                          type="text"
+                          className="input-field text-sm"
+                          value={item.materialName}
+                          onChange={(e) => updateTransferOrderItem(index, 'materialName', e.target.value)}
+                          placeholder="Steel Rod"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
+                        <input
+                          type="number"
+                          className="input-field text-sm"
+                          value={item.quantity}
+                          onChange={(e) => updateTransferOrderItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Unit</label>
+                        <input
+                          type="text"
+                          className="input-field text-sm"
+                          value={item.unitOfMeasure}
+                          onChange={(e) => updateTransferOrderItem(index, 'unitOfMeasure', e.target.value)}
+                          placeholder="KG"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Unit Price</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="input-field text-sm"
+                          value={item.unitPrice}
+                          onChange={(e) => updateTransferOrderItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Remarks</label>
+                        <input
+                          type="text"
+                          className="input-field text-sm"
+                          value={item.remarks || ''}
+                          onChange={(e) => updateTransferOrderItem(index, 'remarks', e.target.value)}
+                          placeholder="Notes"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          onClick={() => removeTransferOrderItem(index)}
+                          className="text-red-600 hover:text-red-900 p-1"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="col-span-7">
+                        <div className="text-sm text-gray-600">
+                          Total Price: {item.totalPrice.toFixed(2)} KWD
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
 
             {formData.items.length > 0 && (
               <div className="mt-4 p-4 bg-blue-50 rounded-lg">

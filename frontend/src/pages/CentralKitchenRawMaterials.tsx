@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Package, TrendingUp, TrendingDown, AlertTriangle, Store, RefreshCw, Download, Upload, Plus } from 'lucide-react'
+import { Package, TrendingUp, TrendingDown, AlertTriangle, Store, RefreshCw, Upload, Plus, Bell } from 'lucide-react'
 import { apiService } from '../services/api'
+import { useConfirmation } from '../hooks/useConfirmation'
+import ConfirmationModal from '../components/ConfirmationModal'
 
 interface OutletInventoryItem {
   id: string
@@ -41,6 +43,7 @@ interface Outlet {
 const CentralKitchenRawMaterials: React.FC = () => {
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { confirmation, showAlert, closeConfirmation } = useConfirmation()
   const [outlet, setOutlet] = useState<Outlet | null>(null)
   const [inventoryItems, setInventoryItems] = useState<OutletInventoryItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -67,7 +70,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
 
   // Reload inventory when filters change
   useEffect(() => {
-    if (outlet && !loading) {
+    if (!loading) {
       loadInventory()
     }
   }, [searchTerm, filterCategory, filterStatus, sortBy, sortOrder])
@@ -88,7 +91,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
           outletType: 'Central Kitchen',
           isCentralKitchen: true
         })
-        await loadInventory(centralKitchen._id)
+        await loadInventory()
       } else {
         setError('Central Kitchen not found')
       }
@@ -100,51 +103,43 @@ const CentralKitchenRawMaterials: React.FC = () => {
     }
   }
 
-  const loadInventory = async (outletId?: string) => {
-    const currentOutletId = outletId || outlet?.id
-    
-    if (!currentOutletId) {
-      console.log('No outlet ID available for loading inventory')
-      return
-    }
-    
+  const loadInventory = async () => {
     try {
-      console.log('Loading raw materials inventory for Central Kitchen:', currentOutletId)
+      console.log('Loading raw materials from Central Kitchen dedicated database')
       
-      // Load raw materials inventory from Central Kitchen Inventory API
-      const inventoryResponse = await apiService.getCentralKitchenInventoryByKitchen(currentOutletId, {
+      // Load raw materials from Central Kitchen dedicated database
+      const inventoryResponse = await apiService.getCentralKitchenRawMaterials({
         limit: 1000,
-        itemType: 'RawMaterial',
         search: searchTerm,
-        category: filterCategory,
+        subCategory: filterCategory,
         status: filterStatus,
-        sortBy: sortBy === 'materialName' ? 'itemName' : sortBy,
+        sortBy: sortBy === 'materialName' ? 'materialName' : sortBy,
         sortOrder
       })
 
       if (inventoryResponse.success) {
-        console.log('Loaded Central Kitchen Raw Materials Inventory:', inventoryResponse.data)
+        console.log('Loaded Central Kitchen Raw Materials:', inventoryResponse.data)
         
         if (inventoryResponse.data && inventoryResponse.data.length > 0) {
           // Transform the data to match the expected interface
           const transformedItems: OutletInventoryItem[] = inventoryResponse.data.map((item: any) => ({
             id: item._id || item.id,
-            outletId: item.centralKitchenId,
-            outletCode: item.centralKitchenCode || 'CK001',
-            outletName: item.centralKitchenName || 'Central Kitchen',
-            materialId: item.itemId,
-            materialCode: item.itemCode,
-            materialName: item.itemName,
-            category: item.category,
+            outletId: 'central-kitchen',
+            outletCode: 'CK001',
+            outletName: 'Central Kitchen',
+            materialId: item._id,
+            materialCode: item.materialCode,
+            materialName: item.materialName,
+            category: item.subCategory,
             unitOfMeasure: item.unitOfMeasure,
             unitPrice: item.unitPrice,
             currentStock: item.currentStock,
-            reservedStock: item.reservedStock,
-            availableStock: item.availableStock,
+            reservedStock: 0,
+            availableStock: item.currentStock,
             minimumStock: item.minimumStock,
             maximumStock: item.maximumStock,
             reorderPoint: item.reorderPoint,
-            totalValue: item.totalValue,
+            totalValue: item.currentStock * item.unitPrice,
             location: 'Main Storage',
             batchNumber: '',
             supplier: '',
@@ -260,70 +255,6 @@ const CentralKitchenRawMaterials: React.FC = () => {
     }
   }
 
-  const handleExport = () => {
-    if (inventoryItems.length === 0) {
-      alert('No raw materials to export')
-      return
-    }
-
-    const csvContent = [
-      // Header row
-      [
-        'SKU',
-        'Item Name',
-        'Parent Category',
-        'SubCategory Name',
-        'Unit',
-        'Unit Name',
-        'Default Purchase Unit Name'
-      ].join(','),
-      // Data rows
-      ...inventoryItems.map(item => [
-        item.materialCode,
-        item.materialName,
-        'Raw Materials',
-        item.category,
-        item.unitOfMeasure,
-        item.unitOfMeasure,
-        item.unitOfMeasure
-      ].map(field => `"${field}"`).join(','))
-    ].join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `central-kitchen-raw-materials-${new Date().toISOString().split('T')[0]}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
-  const downloadSampleCSV = () => {
-    const sampleData = [
-      ['SKU', 'Item Name', 'Parent Category', 'SubCategory Name', 'Unit', 'Unit Name', 'Default Purchase Unit Name'],
-      ['10001', 'Bhujia', 'Raw Materials', 'Bakery', 'kg', 'kg', 'kg'],
-      ['10002', 'Bran Flakes', 'Raw Materials', 'Bakery', 'kg', 'kg', 'kg'],
-      ['10003', 'Bread Improver', 'Raw Materials', 'Bakery', 'kg', 'kg', 'kg'],
-      ['10004', 'Caramel Syrup', 'Raw Materials', 'Bakery', 'kg', 'kg', 'kg'],
-      ['10005', 'Cocoa Powder', 'Raw Materials', 'Bakery', 'kg', 'kg', 'kg']
-    ]
-
-    const csvContent = sampleData.map(row => 
-      row.map(field => `"${field}"`).join(',')
-    ).join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', 'central-kitchen-raw-materials-sample.csv')
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
 
   const handleImport = () => {
     fileInputRef.current?.click()
@@ -413,6 +344,44 @@ const CentralKitchenRawMaterials: React.FC = () => {
     }
   }
 
+  const handleMakeRequestedItemNotification = async () => {
+    // Get items with low stock or out of stock
+    const requestedItems = inventoryItems.filter(item => 
+      item.status === 'Low Stock' || item.status === 'Out of Stock'
+    )
+
+    if (requestedItems.length === 0) {
+      await showAlert(
+        'All Items In Stock',
+        'No items need to be requested at this time. All items are in stock.',
+        'info'
+      )
+      return
+    }
+
+    // Create notification message
+    const notificationMessage = `Requested Items Notification:\n\n` +
+      `Total items needing restock: ${requestedItems.length}\n\n` +
+      `Items to request:\n` +
+      requestedItems.map(item => 
+        `• ${item.materialName} (${item.materialCode}) - Current Stock: ${item.currentStock} ${item.unitOfMeasure}`
+      ).join('\n') +
+      `\n\nPlease contact suppliers to restock these items.`
+
+    // Show notification
+    await showAlert(
+      'Requested Items Notification',
+      notificationMessage,
+      'warning'
+    )
+    
+    // Here you could also implement additional notification logic like:
+    // - Send email notifications
+    // - Create notification records in database
+    // - Integrate with external notification services
+    console.log('Requested items notification generated:', requestedItems)
+  }
+
   // Calculate summary statistics
   const totalItems = inventoryItems.length
   const totalValue = inventoryItems.reduce((sum, item) => sum + item.totalValue, 0)
@@ -483,6 +452,14 @@ const CentralKitchenRawMaterials: React.FC = () => {
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Raw Material
+          </button>
+          <button
+            onClick={handleMakeRequestedItemNotification}
+            className="btn-secondary flex items-center"
+            title="Requested Item"
+          >
+            <Bell className="h-4 w-4 mr-2" />
+            Requested Item
           </button>
         </div>
       </div>
@@ -563,29 +540,12 @@ const CentralKitchenRawMaterials: React.FC = () => {
               Clear Filters
             </button>
             <button 
-              onClick={handleExport}
-              className="btn-secondary flex items-center"
-              title="Export inventory to CSV"
-              disabled={inventoryItems.length === 0}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </button>
-            <button 
               onClick={handleImport}
               className="btn-secondary flex items-center"
               title="Import inventory from CSV"
             >
               <Upload className="h-4 w-4 mr-2" />
               Import
-            </button>
-            <button 
-              onClick={downloadSampleCSV}
-              className="btn-secondary flex items-center"
-              title="Download sample CSV template"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Sample CSV
             </button>
           </div>
         </div>
@@ -683,11 +643,9 @@ const CentralKitchenRawMaterials: React.FC = () => {
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Category</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SubCategory Name</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Name</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Default Purchase Unit Name</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Quantity</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -701,19 +659,13 @@ const CentralKitchenRawMaterials: React.FC = () => {
                     {item.materialName}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                    Raw Materials
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                     {item.category}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                     {item.unitOfMeasure}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {item.unitOfMeasure}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {item.unitOfMeasure}
+                    {item.currentStock}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                     <button
@@ -861,6 +813,20 @@ const CentralKitchenRawMaterials: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmation.isOpen}
+        onClose={closeConfirmation}
+        onConfirm={confirmation.onConfirm}
+        onCancel={confirmation.onCancel}
+        title={confirmation.title}
+        message={confirmation.message}
+        type={confirmation.type}
+        confirmText={confirmation.confirmText}
+        cancelText={confirmation.cancelText}
+        showCancel={confirmation.showCancel}
+      />
     </div>
   )
 }
