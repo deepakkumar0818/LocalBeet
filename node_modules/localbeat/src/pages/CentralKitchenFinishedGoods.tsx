@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Package, TrendingUp, TrendingDown, AlertTriangle, Store, RefreshCw, Download, Upload, Plus } from 'lucide-react'
+import { Package, TrendingUp, TrendingDown, AlertTriangle, Store, RefreshCw, Upload, Plus, Bell } from 'lucide-react'
 import { apiService } from '../services/api'
+import { useConfirmation } from '../hooks/useConfirmation'
+import ConfirmationModal from '../components/ConfirmationModal'
 
 interface FinishedGoodInventoryItem {
   id: string
@@ -12,6 +14,7 @@ interface FinishedGoodInventoryItem {
   productCode: string
   productName: string
   category: string
+  subCategory?: string
   unitOfMeasure: string
   unitPrice: number
   costPrice: number
@@ -47,6 +50,7 @@ interface Outlet {
 const CentralKitchenFinishedGoods: React.FC = () => {
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { confirmation, showAlert, closeConfirmation } = useConfirmation()
   const [outlet, setOutlet] = useState<Outlet | null>(null)
   const [finishedGoodInventoryItems, setFinishedGoodInventoryItems] = useState<FinishedGoodInventoryItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -59,14 +63,15 @@ const CentralKitchenFinishedGoods: React.FC = () => {
 
   useEffect(() => {
     loadCentralKitchenData()
+    loadInventory()
   }, [])
 
-  // Reload inventory when filters change
+  // Reload inventory when filters change or when loading completes
   useEffect(() => {
-    if (outlet && !loading) {
+    if (!loading) {
       loadInventory()
     }
-  }, [searchTerm, filterCategory, filterStatus, sortBy, sortOrder])
+  }, [loading, searchTerm, filterCategory, filterStatus, sortBy, sortOrder])
 
   const loadCentralKitchenData = async () => {
     try {
@@ -77,8 +82,15 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       const outletsResponse = await apiService.getCentralKitchens()
       if (outletsResponse.success && outletsResponse.data.length > 0) {
         const centralKitchen = outletsResponse.data[0]
-        setOutlet(centralKitchen)
-        await loadInventory(centralKitchen.id)
+        
+        // Transform the data to match the expected interface
+        setOutlet({
+          id: centralKitchen._id,
+          outletCode: centralKitchen.outletCode || centralKitchen.kitchenCode,
+          outletName: centralKitchen.outletName || centralKitchen.kitchenName,
+          outletType: 'Central Kitchen',
+          isCentralKitchen: true
+        })
       } else {
         setError('Central Kitchen not found')
       }
@@ -90,30 +102,62 @@ const CentralKitchenFinishedGoods: React.FC = () => {
     }
   }
 
-  const loadInventory = async (outletId?: string) => {
-    const currentOutletId = outletId || outlet?.id
-    if (!currentOutletId) {
-      console.log('No outlet ID available for loading inventory')
-      return
-    }
-    
+  const loadInventory = async () => {
     try {
-      console.log('Loading finished goods inventory for outlet:', currentOutletId)
-      // Load finished goods inventory
-      const finishedGoodsResponse = await apiService.getFinishedGoodInventoryByOutlet(currentOutletId, {
+      console.log('Loading finished goods from Central Kitchen dedicated database')
+      
+      // Load finished goods from Central Kitchen dedicated database
+      const finishedGoodsResponse = await apiService.getCentralKitchenFinishedProducts({
         limit: 1000,
         search: searchTerm,
-        category: filterCategory,
+        subCategory: filterCategory,
         status: filterStatus,
         sortBy: sortBy === 'productName' ? 'productName' : sortBy,
         sortOrder
       })
 
       if (finishedGoodsResponse.success) {
-        console.log('Loaded Central Kitchen Finished Goods Inventory:', finishedGoodsResponse.data)
-        setFinishedGoodInventoryItems(finishedGoodsResponse.data)
+        console.log('Loaded Central Kitchen Finished Goods:', finishedGoodsResponse.data)
+        
+        if (finishedGoodsResponse.data && finishedGoodsResponse.data.length > 0) {
+          // Transform the data to match the expected interface
+          const transformedItems: FinishedGoodInventoryItem[] = finishedGoodsResponse.data.map((item: any) => ({
+            id: item._id || item.id,
+            outletId: 'central-kitchen',
+            outletCode: 'CK001',
+            outletName: 'Central Kitchen',
+            productId: item._id,
+            productCode: item.productCode,
+            productName: item.productName,
+            category: item.category, // Parent Category
+            subCategory: item.subCategory, // Sub Category
+            unitOfMeasure: item.unitOfMeasure,
+            unitPrice: item.unitPrice,
+            costPrice: item.costPrice,
+            currentStock: item.currentStock,
+            availableStock: item.currentStock,
+            minimumStock: item.minimumStock,
+            maximumStock: item.maximumStock,
+            totalValue: item.currentStock * item.unitPrice,
+            productionDate: new Date(),
+            expiryDate: item.shelfLife ? new Date(Date.now() + item.shelfLife * 24 * 60 * 60 * 1000) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            qualityStatus: 'Good',
+            batchNumber: `FG-${item.productCode}-${Date.now()}`,
+            location: 'Main Storage',
+            status: item.status,
+            notes: item.notes || '',
+            isActive: item.isActive
+          }))
+          
+          setFinishedGoodInventoryItems(transformedItems)
+        } else {
+          console.log('No finished goods inventory found for this central kitchen')
+          setFinishedGoodInventoryItems([])
+          setError('No finished goods inventory found. Please add some finished goods to the central kitchen.')
+        }
       } else {
-        console.error('Failed to load finished goods inventory:', 'API Error')
+        console.error('Failed to load finished goods inventory:', finishedGoodsResponse.message || 'API Error')
+        setError(`Failed to load inventory from server: ${finishedGoodsResponse.message || 'Unknown error'}`)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load inventory')
@@ -151,93 +195,6 @@ const CentralKitchenFinishedGoods: React.FC = () => {
     }
   }
 
-  const handleExport = () => {
-    if (finishedGoodInventoryItems.length === 0) {
-      alert('No finished goods to export')
-      return
-    }
-
-    const csvContent = [
-      // Header row
-      [
-        'Product Code',
-        'Product Name',
-        'Category',
-        'Unit of Measure',
-        'Unit Price',
-        'Cost Price',
-        'Current Stock',
-        'Available Stock',
-        'Minimum Stock',
-        'Maximum Stock',
-        'Total Value',
-        'Status',
-        'Production Date',
-        'Expiry Date',
-        'Batch Number',
-        'Storage Location',
-        'Storage Temperature',
-        'Quality Status',
-        'Last Updated',
-        'Notes'
-      ].join(','),
-      // Data rows
-      ...finishedGoodInventoryItems.map(item => [
-        item.productCode,
-        item.productName,
-        item.category,
-        item.unitOfMeasure,
-        item.unitPrice.toFixed(2),
-        item.costPrice.toFixed(2),
-        item.currentStock.toString(),
-        item.availableStock.toString(),
-        item.minimumStock.toString(),
-        item.maximumStock.toString(),
-        item.totalValue.toFixed(2),
-        item.status,
-        new Date(item.productionDate).toLocaleDateString(),
-        new Date(item.expiryDate).toLocaleDateString(),
-        item.batchNumber,
-        item.storageLocation,
-        item.storageTemperature,
-        item.qualityStatus,
-        new Date(item.lastUpdated).toLocaleDateString(),
-        item.notes || ''
-      ].map(field => `"${field}"`).join(','))
-    ].join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `central-kitchen-finished-goods-${new Date().toISOString().split('T')[0]}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
-  const downloadSampleCSV = () => {
-    const sampleData = [
-      ['Product Code', 'Product Name', 'Category', 'Unit of Measure', 'Unit Price', 'Cost Price', 'Current Stock', 'Available Stock', 'Minimum Stock', 'Maximum Stock', 'Total Value', 'Status', 'Production Date', 'Expiry Date', 'Batch Number', 'Storage Location', 'Storage Temperature', 'Quality Status', 'Last Updated', 'Notes'],
-      ['FG001', 'Espresso', 'Beverages', 'pcs', '3.50', '1.75', '150', '135', '30', '300', '525.00', 'In Stock', new Date().toLocaleDateString(), new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleDateString(), 'BATCH-ES-001', 'Service Counter', 'Hot', 'Good', new Date().toLocaleDateString(), 'Freshly brewed espresso'],
-      ['FG002', 'Latte', 'Beverages', 'pcs', '4.25', '2.10', '120', '108', '25', '250', '510.00', 'In Stock', new Date().toLocaleDateString(), new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleDateString(), 'BATCH-LT-001', 'Service Counter', 'Hot', 'Good', new Date().toLocaleDateString(), 'Creamy latte with steamed milk']
-    ]
-
-    const csvContent = sampleData.map(row => 
-      row.map(field => `"${field}"`).join(',')
-    ).join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', 'central-kitchen-finished-goods-sample.csv')
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
 
   const handleImport = () => {
     fileInputRef.current?.click()
@@ -339,6 +296,44 @@ const CentralKitchenFinishedGoods: React.FC = () => {
     }
   }
 
+  const handleMakeRequestedItemNotification = async () => {
+    // Get items with low stock or out of stock
+    const requestedItems = finishedGoodInventoryItems.filter(item => 
+      item.status === 'Low Stock' || item.status === 'Out of Stock'
+    )
+
+    if (requestedItems.length === 0) {
+      await showAlert(
+        'All Items In Stock',
+        'No finished goods need to be produced at this time. All items are in stock.',
+        'info'
+      )
+      return
+    }
+
+    // Create notification message
+    const notificationMessage = `Requested Finished Goods Notification:\n\n` +
+      `Total items needing production: ${requestedItems.length}\n\n` +
+      `Items to produce:\n` +
+      requestedItems.map(item => 
+        `• ${item.productName} (${item.productCode}) - Current Stock: ${item.currentStock} ${item.unitOfMeasure}`
+      ).join('\n') +
+      `\n\nPlease schedule production for these finished goods.`
+
+    // Show notification
+    await showAlert(
+      'Requested Finished Goods Notification',
+      notificationMessage,
+      'warning'
+    )
+    
+    // Here you could also implement additional notification logic like:
+    // - Send email notifications to production team
+    // - Create production request records in database
+    // - Integrate with production scheduling systems
+    console.log('Requested finished goods notification generated:', requestedItems)
+  }
+
   // Calculate summary statistics
   const totalItems = finishedGoodInventoryItems.length
   const totalValue = finishedGoodInventoryItems.reduce((sum, item) => sum + item.totalValue, 0)
@@ -410,6 +405,14 @@ const CentralKitchenFinishedGoods: React.FC = () => {
           >
             <Plus className="h-4 w-4 mr-2" />
             Make Finished Good
+          </button>
+          <button
+            onClick={handleMakeRequestedItemNotification}
+            className="btn-secondary flex items-center"
+            title="Requested Item"
+          >
+            <Bell className="h-4 w-4 mr-2" />
+            Requested Item
           </button>
         </div>
       </div>
@@ -502,29 +505,12 @@ const CentralKitchenFinishedGoods: React.FC = () => {
               Clear Filters
             </button>
             <button 
-              onClick={handleExport}
-              className="btn-secondary flex items-center"
-              title="Export inventory to CSV"
-              disabled={finishedGoodInventoryItems.length === 0}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </button>
-            <button 
               onClick={handleImport}
               className="btn-secondary flex items-center"
               title="Import inventory from CSV"
             >
               <Upload className="h-4 w-4 mr-2" />
               Import
-            </button>
-            <button 
-              onClick={downloadSampleCSV}
-              className="btn-secondary flex items-center"
-              title="Download sample CSV template"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Sample CSV
             </button>
           </div>
         </div>
@@ -622,69 +608,32 @@ const CentralKitchenFinishedGoods: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="table-header">Finished Good</th>
-                <th className="table-header">Current Stock</th>
-                <th className="table-header">Available</th>
-                <th className="table-header">Min/Max</th>
-                <th className="table-header">Status</th>
+                <th className="table-header">SKU</th>
+                <th className="table-header">Name of Finished Good</th>
+                <th className="table-header">Sub Category</th>
+                <th className="table-header">Current Stock Quantity</th>
                 <th className="table-header">Value</th>
-                <th className="table-header">Production/Expiry</th>
-                <th className="table-header">Quality</th>
-                <th className="table-header">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {finishedGoodInventoryItems.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="table-cell">
-                    <div>
-                      <div className="text-gray-900 font-medium">{item.productName}</div>
-                      <div className="text-gray-500 text-sm">{item.productCode}</div>
-                      <div className="text-gray-500 text-sm">{item.category}</div>
-                    </div>
+                    <div className="text-gray-900 font-medium">{item.productCode}</div>
+                  </td>
+                  <td className="table-cell">
+                    <div className="text-gray-900 font-medium">{item.productName}</div>
+                  </td>
+                  <td className="table-cell">
+                    <div className="text-gray-900">{item.subCategory || '-'}</div>
                   </td>
                   <td className="table-cell">
                     <div className="text-gray-900 font-medium">{item.currentStock}</div>
                     <div className="text-gray-500 text-sm">{item.unitOfMeasure}</div>
                   </td>
                   <td className="table-cell">
-                    <div className="text-gray-900 font-medium">{item.availableStock}</div>
-                    <div className="text-gray-500 text-sm">{item.unitOfMeasure}</div>
-                  </td>
-                  <td className="table-cell">
-                    <div className="text-gray-900 text-sm">{item.minimumStock}/{item.maximumStock}</div>
-                    <div className="text-gray-500 text-sm">{item.unitOfMeasure}</div>
-                  </td>
-                  <td className="table-cell">
-                    <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(item.status)}`}>
-                      {getStatusIcon(item.status)}
-                      <span className="ml-1">{item.status}</span>
-                    </span>
-                  </td>
-                  <td className="table-cell">
                     <div className="text-gray-900 font-medium">{item.totalValue.toFixed(2)} KWD</div>
-                    <div className="text-gray-500 text-sm">{item.costPrice.toFixed(2)} cost / {item.unitPrice.toFixed(2)} sell</div>
-                  </td>
-                  <td className="table-cell">
-                    <div className="text-gray-900 text-sm">Prod: {new Date(item.productionDate).toLocaleDateString()}</div>
-                    <div className="text-gray-500 text-sm">Exp: {new Date(item.expiryDate).toLocaleDateString()}</div>
-                    <div className="text-gray-500 text-sm">{item.batchNumber}</div>
-                  </td>
-                  <td className="table-cell">
-                    <div className="text-gray-900 text-sm">{item.qualityStatus}</div>
-                    <div className="text-gray-500 text-sm">{item.storageTemperature}</div>
-                    <div className="text-gray-500 text-sm">{item.storageLocation}</div>
-                  </td>
-                  <td className="table-cell">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => navigate(`/finished-good-inventory/edit/${item.id}`)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Edit"
-                      >
-                        Edit
-                      </button>
-                    </div>
+                    <div className="text-gray-500 text-sm">{item.unitPrice.toFixed(2)} per {item.unitOfMeasure}</div>
                   </td>
                 </tr>
               ))}
@@ -700,6 +649,20 @@ const CentralKitchenFinishedGoods: React.FC = () => {
         accept=".csv"
         onChange={handleFileUpload}
         style={{ display: 'none' }}
+      />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmation.isOpen}
+        onClose={closeConfirmation}
+        onConfirm={confirmation.onConfirm}
+        onCancel={confirmation.onCancel}
+        title={confirmation.title}
+        message={confirmation.message}
+        type={confirmation.type}
+        confirmText={confirmation.confirmText}
+        cancelText={confirmation.cancelText}
+        showCancel={confirmation.showCancel}
       />
     </div>
   )

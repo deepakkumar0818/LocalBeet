@@ -1,21 +1,10 @@
 const mongoose = require('mongoose');
-require('dotenv').config();
+const connectDB = require('../config/database');
 
 // Import models
 const FinishedGood = require('../models/FinishedGood');
 const FinishedGoodInventory = require('../models/FinishedGoodInventory');
 const Outlet = require('../models/Outlet');
-
-// Connect to MongoDB
-const connectDB = async () => {
-  try {
-    await mongoose.connect(process.env.MONGODB_URI);
-    console.log('✅ MongoDB Connected for Finished Goods Distribution');
-  } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
-    process.exit(1);
-  }
-};
 
 // Sample finished goods inventory data for all outlets
 const outletInventoryData = [

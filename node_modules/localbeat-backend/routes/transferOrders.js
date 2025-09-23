@@ -1,370 +1,411 @@
 const express = require('express');
 const router = express.Router();
+const connectDB = require('../config/database');
+const TransferOrder = require('../models/TransferOrder');
 
-// Mock data for demonstration
-let transferOrders = [
-  {
-    id: '1',
-    transferNumber: 'TO-2024-001',
-    fromWarehouseId: 'WH-001',
-    fromWarehouseName: 'Main Warehouse',
-    toWarehouseId: 'WH-002',
-    toWarehouseName: 'Secondary Warehouse',
-    transferDate: new Date('2024-01-20'),
-    expectedDeliveryDate: new Date('2024-01-22'),
-    status: 'In Transit',
-    priority: 'High',
-    totalAmount: 1250.75,
-    items: [
-      {
-        materialId: 'RM-001',
-        materialCode: 'RM-001',
-        materialName: 'Steel Rod 12mm',
-        quantity: 25,
-        unitOfMeasure: 'KG',
-        unitPrice: 45.50,
-        totalPrice: 1137.50,
-        remarks: 'Urgent transfer for production'
-      },
-      {
-        materialId: 'RM-002',
-        materialCode: 'RM-002',
-        materialName: 'Aluminum Sheet 2mm',
-        quantity: 5,
-        unitOfMeasure: 'SQM',
-        unitPrice: 125.00,
-        totalPrice: 625.00,
-        remarks: 'Standard transfer'
-      }
-    ],
-    requestedBy: 'John Smith',
-    approvedBy: 'Jane Doe',
-    transferType: 'Internal',
-    reason: 'Production requirement',
-    notes: 'Urgent transfer for ongoing production',
-    createdAt: new Date('2024-01-20'),
-    updatedAt: new Date('2024-01-20'),
-    createdBy: 'admin',
-    updatedBy: 'admin'
-  },
-  {
-    id: '2',
-    transferNumber: 'TO-2024-002',
-    fromWarehouseId: 'WH-002',
-    fromWarehouseName: 'Secondary Warehouse',
-    toWarehouseId: 'WH-001',
-    toWarehouseName: 'Main Warehouse',
-    transferDate: new Date('2024-01-21'),
-    status: 'Approved',
-    priority: 'Medium',
-    totalAmount: 850.25,
-    items: [
-      {
-        materialId: 'RM-003',
-        materialCode: 'RM-003',
-        materialName: 'Plastic Granules',
-        quantity: 20,
-        unitOfMeasure: 'KG',
-        unitPrice: 25.75,
-        totalPrice: 515.00,
-        remarks: 'Consolidation transfer'
-      }
-    ],
-    requestedBy: 'Mike Johnson',
-    transferType: 'Internal',
-    reason: 'Stock consolidation',
-    notes: 'Consolidating stock for better management',
-    createdAt: new Date('2024-01-21'),
-    updatedAt: new Date('2024-01-21'),
-    createdBy: 'admin',
-    updatedBy: 'admin'
-  }
-];
+// Helper functions to get outlet details
+const getOutletCode = (outletName) => {
+  const outletCodes = {
+    'Central Kitchen': 'CK-001',
+    'Kuwait City': 'OUT-001',
+    '360 Mall': 'OUT-003',
+    'Vibe Complex': 'OUT-002',
+    'Taiba Hospital': 'OUT-004'
+  };
+  return outletCodes[outletName] || 'N/A';
+};
 
-// GET /api/transfer-orders - Get all transfer orders
-router.get('/', (req, res) => {
+const getOutletType = (outletName) => {
+  const outletTypes = {
+    'Central Kitchen': 'Central Kitchen',
+    'Kuwait City': 'Restaurant',
+    '360 Mall': 'Food Court',
+    'Vibe Complex': 'Cafe',
+    'Taiba Hospital': 'Drive-Thru'
+  };
+  return outletTypes[outletName] || 'Outlet';
+};
+
+const getOutletLocation = (outletName) => {
+  const outletLocations = {
+    'Central Kitchen': 'Kuwait City, Kuwait',
+    'Kuwait City': 'Downtown Kuwait City',
+    '360 Mall': '360 Mall, Kuwait',
+    'Vibe Complex': 'Vibe Complex, Kuwait',
+    'Taiba Hospital': 'Taiba Hospital, Kuwait'
+  };
+  return outletLocations[outletName] || 'Kuwait';
+};
+
+// GET all transfer orders with pagination, search, and filtering
+router.get('/', async (req, res) => {
   try {
-    const { page = 1, limit = 10, search, status, priority } = req.query;
-    let filteredTransfers = transferOrders;
+    const { 
+      page = 1, 
+      limit = 10, 
+      search, 
+      status,
+      fromOutlet,
+      toOutlet,
+      sortBy = 'transferDate',
+      sortOrder = 'desc'
+    } = req.query;
 
-    // Apply search filter
+    const query = {};
+    
+    // Add search filter
     if (search) {
-      filteredTransfers = filteredTransfers.filter(transfer =>
-        transfer.transferNumber.toLowerCase().includes(search.toLowerCase()) ||
-        transfer.fromWarehouseName.toLowerCase().includes(search.toLowerCase()) ||
-        transfer.toWarehouseName.toLowerCase().includes(search.toLowerCase()) ||
-        transfer.requestedBy.toLowerCase().includes(search.toLowerCase())
-      );
+      query.$or = [
+        { transferNumber: { $regex: search, $options: 'i' } },
+        { fromOutlet: { $regex: search, $options: 'i' } },
+        { toOutlet: { $regex: search, $options: 'i' } },
+        { requestedBy: { $regex: search, $options: 'i' } }
+      ];
     }
 
-    // Apply status filter
+    // Add status filter
     if (status) {
-      filteredTransfers = filteredTransfers.filter(transfer => transfer.status === status);
+      query.status = status;
     }
 
-    // Apply priority filter
-    if (priority) {
-      filteredTransfers = filteredTransfers.filter(transfer => transfer.priority === priority);
+    // Add from outlet filter
+    if (fromOutlet) {
+      query.fromOutlet = fromOutlet;
     }
 
-    // Pagination
-    const startIndex = (page - 1) * limit;
-    const endIndex = page * limit;
-    const paginatedTransfers = filteredTransfers.slice(startIndex, endIndex);
+    // Add to outlet filter
+    if (toOutlet) {
+      query.toOutlet = toOutlet;
+    }
+
+    // Only show active transfer orders
+    query.isActive = true;
+
+    const options = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      sort: { [sortBy]: sortOrder === 'desc' ? -1 : 1 },
+      populate: []
+    };
+
+    const result = await TransferOrder.paginate(query, options);
+
+    // Transform data for frontend table
+    const transformedData = result.docs.map(order => ({
+      _id: order._id,
+      transferNumber: order.transferNumber,
+      fromOutlet: {
+        name: order.fromOutlet,
+        code: getOutletCode(order.fromOutlet),
+        type: getOutletType(order.fromOutlet),
+        location: getOutletLocation(order.fromOutlet)
+      },
+      toOutlet: {
+        name: order.toOutlet,
+        code: getOutletCode(order.toOutlet),
+        type: getOutletType(order.toOutlet),
+        location: getOutletLocation(order.toOutlet)
+      },
+      fromTo: `${order.fromOutlet} → ${order.toOutlet}`,
+      transferDate: order.transferDate.toISOString().split('T')[0],
+      status: order.status,
+      requestedBy: order.requestedBy,
+      totalAmount: order.totalAmount,
+      itemsCount: order.items.length,
+      priority: order.priority,
+      items: order.items, // Include the full items array for the modal
+      notes: order.notes,
+      approvedBy: order.approvedBy,
+      transferStartedAt: order.transferStartedAt,
+      transferCompletedAt: order.transferCompletedAt,
+      transferResults: order.transferResults,
+      isActive: order.isActive,
+      createdBy: order.createdBy,
+      updatedBy: order.updatedBy,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt
+    }));
 
     res.json({
       success: true,
-      data: paginatedTransfers,
+      data: transformedData,
       pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(filteredTransfers.length / limit),
-        totalItems: filteredTransfers.length,
-        itemsPerPage: parseInt(limit)
+        page: result.page,
+        pages: result.totalPages,
+        total: result.totalDocs,
+        limit: result.limit
       }
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching transfer orders',
-      error: error.message
+    console.error('Error fetching transfer orders:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server Error', 
+      error: error.message 
     });
   }
 });
 
-// GET /api/transfer-orders/:id - Get single transfer order
-router.get('/:id', (req, res) => {
+// GET a single transfer order by ID
+router.get('/:id', async (req, res) => {
   try {
-    const transfer = transferOrders.find(t => t.id === req.params.id);
-    if (!transfer) {
-      return res.status(404).json({
-        success: false,
-        message: 'Transfer order not found'
+    const transferOrder = await TransferOrder.findById(req.params.id);
+    
+    if (!transferOrder) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Transfer Order not found' 
       });
     }
 
-    res.json({
-      success: true,
-      data: transfer
+    // Transform data to match the list endpoint structure
+    const transformedData = {
+      _id: transferOrder._id,
+      transferNumber: transferOrder.transferNumber,
+      fromOutlet: {
+        name: transferOrder.fromOutlet,
+        code: getOutletCode(transferOrder.fromOutlet),
+        type: getOutletType(transferOrder.fromOutlet),
+        location: getOutletLocation(transferOrder.fromOutlet)
+      },
+      toOutlet: {
+        name: transferOrder.toOutlet,
+        code: getOutletCode(transferOrder.toOutlet),
+        type: getOutletType(transferOrder.toOutlet),
+        location: getOutletLocation(transferOrder.toOutlet)
+      },
+      fromTo: `${transferOrder.fromOutlet} → ${transferOrder.toOutlet}`,
+      transferDate: transferOrder.transferDate.toISOString().split('T')[0],
+      status: transferOrder.status,
+      requestedBy: transferOrder.requestedBy,
+      totalAmount: transferOrder.totalAmount,
+      itemsCount: transferOrder.items.length,
+      priority: transferOrder.priority,
+      items: transferOrder.items, // Include the full items array
+      notes: transferOrder.notes,
+      approvedBy: transferOrder.approvedBy,
+      transferStartedAt: transferOrder.transferStartedAt,
+      transferCompletedAt: transferOrder.transferCompletedAt,
+      transferResults: transferOrder.transferResults,
+      isActive: transferOrder.isActive,
+      createdBy: transferOrder.createdBy,
+      updatedBy: transferOrder.updatedBy,
+      createdAt: transferOrder.createdAt,
+      updatedAt: transferOrder.updatedAt
+    };
+
+    res.json({ 
+      success: true, 
+      data: transformedData 
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching transfer order',
-      error: error.message
+    console.error('Error fetching transfer order:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server Error', 
+      error: error.message 
     });
   }
 });
 
-// POST /api/transfer-orders - Create new transfer order
-router.post('/', (req, res) => {
+// POST create a new transfer order
+router.post('/', async (req, res) => {
   try {
     const {
-      transferNumber,
-      fromWarehouseId,
-      fromWarehouseName,
-      toWarehouseId,
-      toWarehouseName,
+      fromOutlet,
+      toOutlet,
       transferDate,
-      expectedDeliveryDate,
-      status = 'Draft',
-      priority = 'Medium',
-      items = [],
-      requestedBy,
-      transferType = 'Internal',
-      reason,
-      notes
+      priority,
+      items,
+      notes,
+      requestedBy = 'System User'
     } = req.body;
 
-    // Validation
-    if (!transferNumber || !fromWarehouseId || !toWarehouseId || !transferDate || !requestedBy || !reason) {
+    // Validate required fields
+    if (!fromOutlet || !toOutlet || !items || items.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Required fields missing'
-      });
-    }
-
-    // Check if transfer number already exists
-    const existingTransfer = transferOrders.find(t => t.transferNumber === transferNumber);
-    if (existingTransfer) {
-      return res.status(400).json({
-        success: false,
-        message: 'Transfer number already exists'
+        message: 'Missing required fields: fromOutlet, toOutlet, and items are required'
       });
     }
 
     // Calculate total amount
-    const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    const totalAmount = items.reduce((total, item) => {
+      return total + (item.quantity * item.unitPrice);
+    }, 0);
 
-    const newTransfer = {
-      id: Date.now().toString(),
-      transferNumber,
-      fromWarehouseId,
-      fromWarehouseName: fromWarehouseName || '',
-      toWarehouseId,
-      toWarehouseName: toWarehouseName || '',
-      transferDate: new Date(transferDate),
-      expectedDeliveryDate: expectedDeliveryDate ? new Date(expectedDeliveryDate) : null,
-      status,
-      priority,
-      totalAmount,
+    // Create transfer order data
+    const transferOrderData = {
+      fromOutlet,
+      toOutlet,
+      transferDate: transferDate ? new Date(transferDate) : new Date(),
+      priority: priority || 'Normal',
       items: items.map(item => ({
-        ...item,
-        totalPrice: item.quantity * item.unitPrice
+        itemType: item.itemType,
+        itemCode: item.itemCode,
+        itemName: item.itemName || item.itemCode,
+        category: item.category || '',
+        subCategory: item.subCategory || '',
+        unitOfMeasure: item.unitOfMeasure || 'pcs',
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalValue: item.quantity * item.unitPrice,
+        notes: item.notes || ''
       })),
+      totalAmount,
+      status: 'Pending',
       requestedBy,
-      approvedBy: null,
-      receivedBy: null,
-      transferType,
-      reason,
       notes: notes || '',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      createdBy: 'admin', // In real app, get from JWT token
-      updatedBy: 'admin'
+      createdBy: requestedBy,
+      updatedBy: requestedBy
     };
 
-    transferOrders.push(newTransfer);
+    const transferOrder = await TransferOrder.create(transferOrderData);
 
     res.status(201).json({
       success: true,
-      data: newTransfer,
-      message: 'Transfer order created successfully'
+      message: 'Transfer Order created successfully',
+      data: transferOrder
     });
   } catch (error) {
+    console.error('Error creating transfer order:', error);
     res.status(500).json({
       success: false,
-      message: 'Error creating transfer order',
+      message: 'Failed to create transfer order',
       error: error.message
     });
   }
 });
 
-// PUT /api/transfer-orders/:id - Update transfer order
-router.put('/:id', (req, res) => {
+// PUT update transfer order status
+router.put('/:id/status', async (req, res) => {
   try {
-    const transferIndex = transferOrders.findIndex(t => t.id === req.params.id);
-    if (transferIndex === -1) {
-      return res.status(404).json({
+    const { status, approvedBy, notes } = req.body;
+
+    if (!status) {
+      return res.status(400).json({
         success: false,
-        message: 'Transfer order not found'
+        message: 'Status is required'
       });
     }
 
-    const { items = [] } = req.body;
-    const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-
-    const updatedTransfer = {
-      ...transferOrders[transferIndex],
-      ...req.body,
-      id: req.params.id,
-      totalAmount,
-      items: items.map(item => ({
-        ...item,
-        totalPrice: item.quantity * item.unitPrice
-      })),
-      updatedAt: new Date(),
-      updatedBy: 'admin' // In real app, get from JWT token
+    const updateData = {
+      status,
+      updatedBy: approvedBy || 'System'
     };
 
-    transferOrders[transferIndex] = updatedTransfer;
+    // Add timestamps based on status
+    if (status === 'In Transit') {
+      updateData.transferStartedAt = new Date();
+    } else if (status === 'Completed') {
+      updateData.transferCompletedAt = new Date();
+    }
+
+    if (approvedBy) {
+      updateData.approvedBy = approvedBy;
+    }
+
+    if (notes) {
+      updateData.notes = notes;
+    }
+
+    const transferOrder = await TransferOrder.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!transferOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transfer Order not found'
+      });
+    }
 
     res.json({
       success: true,
-      data: updatedTransfer,
-      message: 'Transfer order updated successfully'
+      message: 'Transfer Order status updated successfully',
+      data: transferOrder
     });
   } catch (error) {
+    console.error('Error updating transfer order status:', error);
     res.status(500).json({
       success: false,
-      message: 'Error updating transfer order',
+      message: 'Failed to update transfer order status',
       error: error.message
     });
   }
 });
 
-// DELETE /api/transfer-orders/:id - Delete transfer order
-router.delete('/:id', (req, res) => {
+// DELETE transfer order (soft delete)
+router.delete('/:id', async (req, res) => {
   try {
-    const transferIndex = transferOrders.findIndex(t => t.id === req.params.id);
-    if (transferIndex === -1) {
+    const transferOrder = await TransferOrder.findByIdAndUpdate(
+      req.params.id,
+      { 
+        isActive: false,
+        status: 'Cancelled',
+        updatedBy: req.body.updatedBy || 'System'
+      },
+      { new: true }
+    );
+
+    if (!transferOrder) {
       return res.status(404).json({
         success: false,
-        message: 'Transfer order not found'
+        message: 'Transfer Order not found'
       });
     }
 
-    transferOrders.splice(transferIndex, 1);
-
     res.json({
       success: true,
-      message: 'Transfer order deleted successfully'
+      message: 'Transfer Order deleted successfully'
     });
   } catch (error) {
+    console.error('Error deleting transfer order:', error);
     res.status(500).json({
       success: false,
-      message: 'Error deleting transfer order',
+      message: 'Failed to delete transfer order',
       error: error.message
     });
   }
 });
 
-// PUT /api/transfer-orders/:id/approve - Approve transfer order
-router.put('/:id/approve', (req, res) => {
+// GET transfer order statistics
+router.get('/stats/summary', async (req, res) => {
   try {
-    const transferIndex = transferOrders.findIndex(t => t.id === req.params.id);
-    if (transferIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Transfer order not found'
-      });
-    }
+    const stats = await TransferOrder.aggregate([
+      {
+        $match: { isActive: true }
+      },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          totalAmount: { $sum: '$totalAmount' }
+        }
+      }
+    ]);
 
-    const { approvedBy } = req.body;
-    transferOrders[transferIndex].status = 'Approved';
-    transferOrders[transferIndex].approvedBy = approvedBy || 'admin';
-    transferOrders[transferIndex].updatedAt = new Date();
-    transferOrders[transferIndex].updatedBy = 'admin';
+    const totalOrders = await TransferOrder.countDocuments({ isActive: true });
+    const totalAmount = await TransferOrder.aggregate([
+      { $match: { isActive: true } },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+    ]);
 
     res.json({
       success: true,
-      data: transferOrders[transferIndex],
-      message: 'Transfer order approved successfully'
+      data: {
+        totalOrders,
+        totalAmount: totalAmount[0]?.total || 0,
+        statusBreakdown: stats
+      }
     });
   } catch (error) {
+    console.error('Error fetching transfer order statistics:', error);
     res.status(500).json({
       success: false,
-      message: 'Error approving transfer order',
-      error: error.message
-    });
-  }
-});
-
-// PUT /api/transfer-orders/:id/deliver - Mark transfer as delivered
-router.put('/:id/deliver', (req, res) => {
-  try {
-    const transferIndex = transferOrders.findIndex(t => t.id === req.params.id);
-    if (transferIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Transfer order not found'
-      });
-    }
-
-    const { receivedBy } = req.body;
-    transferOrders[transferIndex].status = 'Delivered';
-    transferOrders[transferIndex].receivedBy = receivedBy || 'admin';
-    transferOrders[transferIndex].updatedAt = new Date();
-    transferOrders[transferIndex].updatedBy = 'admin';
-
-    res.json({
-      success: true,
-      data: transferOrders[transferIndex],
-      message: 'Transfer order marked as delivered'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error updating transfer order delivery',
+      message: 'Failed to fetch statistics',
       error: error.message
     });
   }

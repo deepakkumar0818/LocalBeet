@@ -1,139 +1,168 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit, Trash2, Eye, Filter, Download, X, ArrowRight } from 'lucide-react'
-import { TransferOrder } from '../types'
+import { Plus, Search, Trash2, Eye, Filter, Download, X, ArrowRight } from 'lucide-react'
+import { apiService } from '../services/api'
+
+interface TransferOrder {
+  _id: string
+  transferNumber: string
+  fromOutlet: {
+    name: string
+    code: string
+    type: string
+    location: string
+  }
+  toOutlet: {
+    name: string
+    code: string
+    type: string
+    location: string
+  }
+  fromTo: string
+  transferDate: string
+  priority: string
+  items: Array<{
+    itemType: string
+    itemCode: string
+    itemName: string
+    category?: string
+    subCategory?: string
+    unitOfMeasure: string
+    quantity: number
+    unitPrice: number
+    totalValue: number
+    notes?: string
+  }>
+  totalAmount: number
+  status: string
+  requestedBy: string
+  approvedBy?: string
+  transferStartedAt?: string
+  transferCompletedAt?: string
+  notes?: string
+  transferResults?: Array<{
+    itemCode: string
+    itemType: string
+    quantity: number
+    status: string
+    error?: string
+  }>
+  isActive: boolean
+  createdBy: string
+  updatedBy: string
+  createdAt: string
+  updatedAt: string
+}
 
 const TransferOrders: React.FC = () => {
   const navigate = useNavigate()
-  const [transferOrders, setTransferOrders] = useState<TransferOrder[]>([
-    {
-      id: '1',
-      transferNumber: 'TO-2024-001',
-      fromWarehouseId: 'WH-001',
-      fromWarehouseName: 'Main Warehouse',
-      toWarehouseId: 'WH-002',
-      toWarehouseName: 'Secondary Warehouse',
-      transferDate: new Date('2024-01-20'),
-      expectedDeliveryDate: new Date('2024-01-22'),
-      status: 'In Transit',
-      priority: 'High',
-      totalAmount: 1250.75,
-      items: [
-        {
-          materialId: 'RM-001',
-          materialCode: 'RM-001',
-          materialName: 'Steel Rod 12mm',
-          quantity: 25,
-          unitOfMeasure: 'KG',
-          unitPrice: 45.50,
-          totalPrice: 1137.50,
-          remarks: 'Urgent transfer for production'
-        },
-        {
-          materialId: 'RM-002',
-          materialCode: 'RM-002',
-          materialName: 'Aluminum Sheet 2mm',
-          quantity: 5,
-          unitOfMeasure: 'SQM',
-          unitPrice: 125.00,
-          totalPrice: 625.00,
-          remarks: 'Standard transfer'
-        }
-      ],
-      requestedBy: 'John Smith',
-      approvedBy: 'Jane Doe',
-      transferType: 'Internal',
-      reason: 'Production requirement',
-      notes: 'Urgent transfer for ongoing production',
-      createdAt: new Date('2024-01-20'),
-      updatedAt: new Date('2024-01-20'),
-      createdBy: 'admin',
-      updatedBy: 'admin'
-    },
-    {
-      id: '2',
-      transferNumber: 'TO-2024-002',
-      fromWarehouseId: 'WH-002',
-      fromWarehouseName: 'Secondary Warehouse',
-      toWarehouseId: 'WH-001',
-      toWarehouseName: 'Main Warehouse',
-      transferDate: new Date('2024-01-21'),
-      status: 'Approved',
-      priority: 'Medium',
-      totalAmount: 850.25,
-      items: [
-        {
-          materialId: 'RM-003',
-          materialCode: 'RM-003',
-          materialName: 'Plastic Granules',
-          quantity: 20,
-          unitOfMeasure: 'KG',
-          unitPrice: 25.75,
-          totalPrice: 515.00,
-          remarks: 'Consolidation transfer'
-        }
-      ],
-      requestedBy: 'Mike Johnson',
-      transferType: 'Internal',
-      reason: 'Stock consolidation',
-      notes: 'Consolidating stock for better management',
-      createdAt: new Date('2024-01-21'),
-      updatedAt: new Date('2024-01-21'),
-      createdBy: 'admin',
-      updatedBy: 'admin'
-    }
-  ])
+  const [transferOrders, setTransferOrders] = useState<TransferOrder[]>([])
+  const [loading, setLoading] = useState(true)
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0
+  })
 
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTransfer, setSelectedTransfer] = useState<TransferOrder | null>(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [statusFilter, setStatusFilter] = useState('')
-  const [priorityFilter, setPriorityFilter] = useState('')
-  // Unused state variables removed
 
-  const filteredTransfers = transferOrders.filter(transfer => {
-    const matchesSearch = transfer.transferNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transfer.fromWarehouseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transfer.toWarehouseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transfer.requestedBy.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === '' || transfer.status === statusFilter
-    const matchesPriority = priorityFilter === '' || transfer.priority === priorityFilter
-    return matchesSearch && matchesStatus && matchesPriority
-  })
+  // Load transfer orders from API
+  const loadTransferOrders = async () => {
+    try {
+      setLoading(true)
+      const response = await apiService.getTransferOrders({
+        page: pagination.page,
+        limit: pagination.limit,
+        search: searchTerm || undefined,
+        status: statusFilter || undefined,
+        sortBy: 'transferDate',
+        sortOrder: 'desc'
+      })
+
+      if (response.success) {
+        setTransferOrders(response.data)
+        setPagination(response.pagination)
+      }
+    } catch (error) {
+      console.error('Error loading transfer orders:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Load data on component mount and when filters change
+  useEffect(() => {
+    loadTransferOrders()
+  }, [pagination.page, searchTerm, statusFilter])
+
+  // Auto-refresh every 30 seconds to catch new transfers
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadTransferOrders()
+    }, 30000) // 30 seconds
+
+    return () => clearInterval(interval)
+  }, [])
+
+  const filteredTransfers = transferOrders // Data is already filtered by API
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Delivered': return 'bg-green-100 text-green-800'
+      case 'Completed': return 'bg-green-100 text-green-800'
       case 'In Transit': return 'bg-blue-100 text-blue-800'
-      case 'Approved': return 'bg-yellow-100 text-yellow-800'
-      case 'Draft': return 'bg-gray-100 text-gray-800'
-      case 'Cancelled': return 'bg-red-100 text-red-800'
+      case 'Pending': return 'bg-yellow-100 text-yellow-800'
+      case 'Failed': return 'bg-red-100 text-red-800'
+      case 'Cancelled': return 'bg-gray-100 text-gray-800'
       default: return 'bg-gray-100 text-gray-800'
     }
   }
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'Urgent': return 'bg-red-100 text-red-800'
-      case 'High': return 'bg-orange-100 text-orange-800'
+      case 'High': return 'bg-red-100 text-red-800'
       case 'Medium': return 'bg-yellow-100 text-yellow-800'
       case 'Low': return 'bg-green-100 text-green-800'
+      case 'Normal': return 'bg-blue-100 text-blue-800'
       default: return 'bg-gray-100 text-gray-800'
     }
   }
 
-  const getTransferTypeColor = (type: string) => {
-    switch (type) {
+  const getTransferTypeColor = (transferType: string) => {
+    switch (transferType) {
       case 'Emergency': return 'bg-red-100 text-red-800'
-      case 'External': return 'bg-purple-100 text-purple-800'
-      case 'Internal': return 'bg-blue-100 text-blue-800'
+      case 'Regular': return 'bg-blue-100 text-blue-800'
+      case 'Scheduled': return 'bg-green-100 text-green-800'
       default: return 'bg-gray-100 text-gray-800'
     }
   }
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this transfer order?')) {
-      setTransferOrders(transferOrders.filter(t => t.id !== id))
+
+
+  const handleDelete = async (id: string) => {
+    const transfer = transferOrders.find(t => t._id === id)
+    const transferNumber = transfer?.transferNumber || 'this transfer order'
+    
+    if (window.confirm(`Are you sure you want to delete ${transferNumber}?\n\nThis action cannot be undone.`)) {
+      try {
+        setLoading(true)
+        const response = await apiService.deleteTransferOrder(id, { updatedBy: 'Admin User' })
+        if (response.success) {
+          alert(`Transfer order ${transferNumber} has been deleted successfully.`)
+          // Reload the data
+          await loadTransferOrders()
+        } else {
+          alert(`Failed to delete transfer order: ${response.message || 'Unknown error'}`)
+        }
+      } catch (error) {
+        console.error('Error deleting transfer order:', error)
+        alert(`Error deleting transfer order: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      } finally {
+        setLoading(false)
+      }
     }
   }
 
@@ -161,46 +190,52 @@ const TransferOrders: React.FC = () => {
                   <p className="text-sm text-gray-900">{selectedTransfer.transferNumber}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Transfer Type</label>
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTransferTypeColor(selectedTransfer.transferType)}`}>
-                    {selectedTransfer.transferType}
-                  </span>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">From Warehouse</label>
-                  <p className="text-sm text-gray-900">{selectedTransfer.fromWarehouseName}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">To Warehouse</label>
-                  <p className="text-sm text-gray-900">{selectedTransfer.toWarehouseName}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Transfer Date</label>
-                  <p className="text-sm text-gray-900">{selectedTransfer.transferDate.toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Expected Delivery</label>
-                  <p className="text-sm text-gray-900">{selectedTransfer.expectedDeliveryDate?.toLocaleDateString() || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Status</label>
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedTransfer.status)}`}>
-                    {selectedTransfer.status}
-                  </span>
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-gray-700">Priority</label>
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(selectedTransfer.priority)}`}>
                     {selectedTransfer.priority}
                   </span>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Requested By</label>
-                  <p className="text-sm text-gray-900">{selectedTransfer.requestedBy}</p>
+                  <label className="block text-sm font-medium text-gray-700">From Outlet</label>
+                  <div className="text-sm text-gray-900">
+                    <div className="font-medium">{selectedTransfer.fromOutlet?.name || selectedTransfer.fromOutlet || 'N/A'}</div>
+                    {selectedTransfer.fromOutlet?.code && (
+                      <>
+                        <div className="text-xs text-gray-500">{selectedTransfer.fromOutlet.code} • {selectedTransfer.fromOutlet.type || 'Outlet'}</div>
+                        <div className="text-xs text-gray-400">{selectedTransfer.fromOutlet.location || 'Location not specified'}</div>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Reason</label>
-                  <p className="text-sm text-gray-900">{selectedTransfer.reason}</p>
+                  <label className="block text-sm font-medium text-gray-700">To Outlet</label>
+                  <div className="text-sm text-gray-900">
+                    <div className="font-medium">{selectedTransfer.toOutlet?.name || selectedTransfer.toOutlet || 'N/A'}</div>
+                    {selectedTransfer.toOutlet?.code && (
+                      <>
+                        <div className="text-xs text-gray-500">{selectedTransfer.toOutlet.code} • {selectedTransfer.toOutlet.type || 'Outlet'}</div>
+                        <div className="text-xs text-gray-400">{selectedTransfer.toOutlet.location || 'Location not specified'}</div>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Transfer Date</label>
+                  <p className="text-sm text-gray-900">{selectedTransfer.transferDate ? new Date(selectedTransfer.transferDate).toLocaleDateString() : 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Status</label>
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedTransfer.status || 'Unknown')}`}>
+                    {selectedTransfer.status || 'Unknown'}
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Requested By</label>
+                  <p className="text-sm text-gray-900">{selectedTransfer.requestedBy || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Total Amount</label>
+                  <p className="text-sm text-gray-900 font-medium">{selectedTransfer.totalAmount ? selectedTransfer.totalAmount.toFixed(2) : '0.00'} KWD</p>
                 </div>
               </div>
 
@@ -210,8 +245,9 @@ const TransferOrders: React.FC = () => {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="table-header">Material Code</th>
-                        <th className="table-header">Material Name</th>
+                        <th className="table-header">Item Code</th>
+                        <th className="table-header">Item Name</th>
+                        <th className="table-header">Item Type</th>
                         <th className="table-header">Quantity</th>
                         <th className="table-header">Unit</th>
                         <th className="table-header">Unit Price</th>
@@ -219,22 +255,31 @@ const TransferOrders: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {selectedTransfer.items.map((item, index) => (
-                        <tr key={index}>
-                          <td className="table-cell">{item.materialCode}</td>
-                          <td className="table-cell">{item.materialName}</td>
-                          <td className="table-cell">{item.quantity}</td>
-                          <td className="table-cell">{item.unitOfMeasure}</td>
-                          <td className="table-cell">{item.unitPrice.toFixed(2)} KWD</td>
-                          <td className="table-cell font-medium">{item.totalPrice.toFixed(2)} KWD</td>
+                      {selectedTransfer.items && selectedTransfer.items.length > 0 ? (
+                        selectedTransfer.items.map((item, index) => (
+                          <tr key={index}>
+                            <td className="table-cell">{item.itemCode}</td>
+                            <td className="table-cell">{item.itemName}</td>
+                            <td className="table-cell">{item.itemType}</td>
+                            <td className="table-cell">{item.quantity}</td>
+                            <td className="table-cell">{item.unitOfMeasure}</td>
+                            <td className="table-cell">{item.unitPrice ? item.unitPrice.toFixed(2) : '0.00'} KWD</td>
+                            <td className="table-cell font-medium">{item.totalValue ? item.totalValue.toFixed(2) : '0.00'} KWD</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={7} className="table-cell text-center text-gray-500">
+                            No items found
+                          </td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
                 <div className="mt-4 text-right">
                   <span className="text-lg font-semibold text-gray-900">
-                    Total Amount: {selectedTransfer.totalAmount.toFixed(2)} KWD
+                    Total Amount: {selectedTransfer.totalAmount ? selectedTransfer.totalAmount.toFixed(2) : '0.00'} KWD
                   </span>
                 </div>
               </div>
@@ -291,26 +336,23 @@ const TransferOrders: React.FC = () => {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="">All Status</option>
-              <option value="Draft">Draft</option>
-              <option value="Approved">Approved</option>
+              <option value="Pending">Pending</option>
               <option value="In Transit">In Transit</option>
-              <option value="Delivered">Delivered</option>
+              <option value="Completed">Completed</option>
+              <option value="Failed">Failed</option>
               <option value="Cancelled">Cancelled</option>
-            </select>
-            <select
-              className="input-field"
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-            >
-              <option value="">All Priority</option>
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-              <option value="Urgent">Urgent</option>
             </select>
             <button className="btn-secondary flex items-center">
               <Filter className="h-4 w-4 mr-2" />
               Filter
+            </button>
+            <button 
+              onClick={loadTransferOrders}
+              className="btn-secondary flex items-center"
+              disabled={loading}
+            >
+              <Search className="h-4 w-4 mr-2" />
+              {loading ? 'Refreshing...' : 'Refresh'}
             </button>
             <button className="btn-secondary flex items-center">
               <Download className="h-4 w-4 mr-2" />
@@ -330,38 +372,46 @@ const TransferOrders: React.FC = () => {
                 <th className="table-header">From → To</th>
                 <th className="table-header">Transfer Date</th>
                 <th className="table-header">Status</th>
-                <th className="table-header">Priority</th>
-                <th className="table-header">Type</th>
                 <th className="table-header">Requested By</th>
                 <th className="table-header">Total Amount</th>
                 <th className="table-header">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredTransfers.map((transfer) => (
-                <tr key={transfer.id} className="hover:bg-gray-50">
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="table-cell text-center py-8">
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                      <span className="ml-2 text-gray-600">Loading transfer orders...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredTransfers.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="table-cell text-center py-8 text-gray-500">
+                    No transfer orders found
+                  </td>
+                </tr>
+              ) : (
+                filteredTransfers.map((transfer) => (
+                <tr key={transfer._id} className="hover:bg-gray-50">
                   <td className="table-cell font-medium">{transfer.transferNumber}</td>
                   <td className="table-cell">
                     <div className="flex items-center">
-                      <span className="text-sm">{transfer.fromWarehouseName}</span>
-                      <ArrowRight className="h-4 w-4 mx-2 text-gray-400" />
-                      <span className="text-sm">{transfer.toWarehouseName}</span>
+                      <div className="text-sm font-medium text-gray-900">
+                        {transfer.fromOutlet.name}
+                      </div>
+                      <ArrowRight className="h-4 w-4 mx-3 text-gray-400 flex-shrink-0" />
+                      <div className="text-sm font-medium text-gray-900">
+                        {transfer.toOutlet.name}
+                      </div>
                     </div>
                   </td>
-                  <td className="table-cell">{transfer.transferDate.toLocaleDateString()}</td>
+                  <td className="table-cell">{new Date(transfer.transferDate).toLocaleDateString()}</td>
                   <td className="table-cell">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(transfer.status)}`}>
                       {transfer.status}
-                    </span>
-                  </td>
-                  <td className="table-cell">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(transfer.priority)}`}>
-                      {transfer.priority}
-                    </span>
-                  </td>
-                  <td className="table-cell">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTransferTypeColor(transfer.transferType)}`}>
-                      {transfer.transferType}
                     </span>
                   </td>
                   <td className="table-cell">{transfer.requestedBy}</td>
@@ -379,14 +429,7 @@ const TransferOrders: React.FC = () => {
                         <Eye className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => navigate(`/transfer-orders/edit/${transfer.id}`)}
-                        className="text-green-600 hover:text-green-900"
-                        title="Edit"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(transfer.id)}
+                        onClick={() => handleDelete(transfer._id)}
                         className="text-red-600 hover:text-red-900"
                         title="Delete"
                       >
@@ -395,7 +438,8 @@ const TransferOrders: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
