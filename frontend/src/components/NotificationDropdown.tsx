@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Bell, X, AlertTriangle, CheckCircle, Info, Clock } from 'lucide-react'
+import { Bell, X, AlertTriangle, CheckCircle, Info, Clock, Eye, RefreshCw } from 'lucide-react'
 
 interface Notification {
   id: string
@@ -9,6 +9,8 @@ interface Notification {
   timestamp: Date
   read: boolean
   outlet?: string
+  transferOrderId?: string
+  isTransferOrder?: boolean
 }
 
 interface NotificationDropdownProps {
@@ -16,13 +18,17 @@ interface NotificationDropdownProps {
   onMarkAsRead: (id: string) => void
   onMarkAllAsRead: () => void
   onClearAll: () => void
+  onViewTransferOrder?: (transferOrderId: string) => void
+  onRefresh?: () => void
 }
 
 const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   notifications,
   onMarkAsRead,
   onMarkAllAsRead,
-  onClearAll
+  onClearAll,
+  onViewTransferOrder,
+  onRefresh
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -103,6 +109,15 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
             <div className="flex items-center space-x-2">
+              {onRefresh && (
+                <button
+                  onClick={onRefresh}
+                  className="text-sm text-gray-600 hover:text-gray-800 p-1 rounded"
+                  title="Refresh notifications"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </button>
+              )}
               {unreadCount > 0 && (
                 <button
                   onClick={onMarkAllAsRead}
@@ -111,6 +126,12 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                   Mark all read
                 </button>
               )}
+              <button
+                onClick={onClearAll}
+                className="text-sm text-red-600 hover:text-red-800"
+              >
+                Clear all
+              </button>
               <button
                 onClick={() => setIsOpen(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -131,10 +152,9 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
               notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${
+                  className={`p-4 border-b border-gray-100 hover:bg-gray-50 ${
                     !notification.read ? 'bg-blue-50' : ''
                   }`}
-                  onClick={() => onMarkAsRead(notification.id)}
                 >
                   <div className="flex items-start space-x-3">
                     <div className="flex-shrink-0 mt-0.5">
@@ -161,11 +181,31 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                         </p>
                       )}
                     </div>
-                    {!notification.read && (
-                      <div className="flex-shrink-0">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      </div>
-                    )}
+                    <div className="flex-shrink-0 flex items-center space-x-2">
+                      {notification.isTransferOrder && notification.transferOrderId && onViewTransferOrder && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            console.log('NotificationDropdown: Clicking View button')
+                            console.log('NotificationDropdown: notification.transferOrderId =', notification.transferOrderId)
+                            onViewTransferOrder(notification.transferOrderId!)
+                          }}
+                          className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
+                          title="View Transfer Order"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onMarkAsRead(notification.id)}
+                        className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                        title="Mark as read"
+                      >
+                        <div className={`w-2 h-2 rounded-full ${
+                          !notification.read ? 'bg-blue-500' : 'bg-gray-300'
+                        }`}></div>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))

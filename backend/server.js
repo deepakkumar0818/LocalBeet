@@ -60,6 +60,8 @@ app.use('/api/central-kitchen', require('./routes/centralKitchen'));
 app.use('/api/central-kitchen-inventory', require('./routes/centralKitchenInventory'));
 app.use('/api/transfers', require('./routes/transfers'));
 app.use('/api/transfer-orders', require('./routes/transferOrders'));
+app.use('/api/transfer-order-inventory', require('./routes/transferOrderInventory'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 // Health check
 app.get('/api/health', (req, res) => {

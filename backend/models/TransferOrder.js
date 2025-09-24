@@ -5,7 +5,7 @@ const TransferOrderSchema = new mongoose.Schema({
   // Transfer Order Identification
   transferNumber: {
     type: String,
-    required: true,
+    required: false,
     unique: true,
     trim: true,
     index: true
@@ -99,7 +99,7 @@ const TransferOrderSchema = new mongoose.Schema({
   status: {
     type: String,
     required: true,
-    enum: ['Pending', 'In Transit', 'Completed', 'Cancelled', 'Failed'],
+    enum: ['Pending', 'Approved', 'Rejected', 'In Transit', 'Completed', 'Cancelled', 'Failed'],
     default: 'Pending'
   },
   

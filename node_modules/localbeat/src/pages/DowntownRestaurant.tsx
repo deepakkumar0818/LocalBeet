@@ -87,7 +87,29 @@ const DowntownRestaurant: React.FC = () => {
   const [sortBy] = useState('materialName')
   const [sortOrder] = useState<'asc' | 'desc'>('asc')
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications('Kuwait City')
+  const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Kuwait City')
+  
+  // Filter notifications based on current section
+  const getFilteredNotifications = () => {
+    const currentSection = getCurrentSection()
+    
+    if (currentSection === 'raw-materials') {
+      // Show only Raw Material notifications
+      return notifications.filter(notification => 
+        notification.isTransferOrder && 
+        (notification.itemType === 'Raw Material' || notification.itemType === 'Mixed')
+      )
+    } else if (currentSection === 'finished-goods') {
+      // Show only Finished Goods notifications
+      return notifications.filter(notification => 
+        notification.isTransferOrder && 
+        (notification.itemType === 'Finished Goods' || notification.itemType === 'Mixed')
+      )
+    } else {
+      // Show all notifications for other sections
+      return notifications
+    }
+  }
 
   // Determine current section based on URL
   const getCurrentSection = () => {
@@ -111,6 +133,21 @@ const DowntownRestaurant: React.FC = () => {
       loadInventory()
     }
   }, [loading, searchTerm, filterCategory, filterStatus, sortBy, sortOrder])
+
+  // Refresh inventory when notifications change (e.g., when transfer orders are accepted)
+  useEffect(() => {
+    if (notifications.length > 0) {
+      // Check if there are any new transfer acceptance notifications
+      const hasNewAcceptanceNotifications = notifications.some(notif => 
+        !notif.read && notif.type === 'success' && notif.title?.includes('Transfer Order Accepted')
+      )
+      
+      if (hasNewAcceptanceNotifications) {
+        console.log('New transfer acceptance notification detected, refreshing inventory...')
+        loadInventory()
+      }
+    }
+  }, [notifications])
 
   const loadOutletData = async () => {
     try {
@@ -757,7 +794,10 @@ const DowntownRestaurant: React.FC = () => {
                         </div>
         <div className="flex gap-3">
           <button
-            onClick={loadOutletData}
+            onClick={() => {
+              loadOutletData()
+              loadInventory()
+            }}
             className="btn-secondary flex items-center"
             title="Refresh data"
           >
@@ -791,12 +831,13 @@ const DowntownRestaurant: React.FC = () => {
               Request Transfer
             </button>
           )}
-          <NotificationDropdown
-            notifications={notifications}
-            onMarkAsRead={markAsRead}
-            onMarkAllAsRead={markAllAsRead}
-            onClearAll={clearAll}
-          />
+        <NotificationDropdown
+          notifications={getFilteredNotifications()}
+          onMarkAsRead={markAsRead}
+          onMarkAllAsRead={markAllAsRead}
+          onClearAll={clearAll}
+          onRefresh={refreshNotifications}
+        />
             </div>
           </div>
 
