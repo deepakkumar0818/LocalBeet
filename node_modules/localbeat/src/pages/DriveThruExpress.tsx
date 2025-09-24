@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Package, TrendingUp, TrendingDown, AlertTriangle, BarChart3, Truck, Users, Clock, RefreshCw, Car, ShoppingCart, Search } from 'lucide-react'
 import { apiService } from '../services/api'
+import NotificationDropdown from '../components/NotificationDropdown'
+import { useNotifications } from '../hooks/useNotifications'
 
 interface OutletInventoryItem {
   id: string
@@ -86,6 +88,7 @@ const DriveThruExpress: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [importing, setImporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications('Taiba Hospital')
   const [editingItem, setEditingItem] = useState<OutletInventoryItem | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editFormData, setEditFormData] = useState({
@@ -627,7 +630,6 @@ const DriveThruExpress: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Quantity</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -646,15 +648,6 @@ const DriveThruExpress: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.category}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.unitOfMeasure}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.currentStock}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => handleEditItem(item)}
-                      className="text-blue-600 hover:text-blue-900"
-                      title="Edit"
-                    >
-                      Edit
-                    </button>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -839,6 +832,12 @@ const DriveThruExpress: React.FC = () => {
               Request Transfer
             </button>
           )}
+          <NotificationDropdown
+            notifications={notifications}
+            onMarkAsRead={markAsRead}
+            onMarkAllAsRead={markAllAsRead}
+            onClearAll={clearAll}
+          />
         </div>
       </div>
 

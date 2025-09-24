@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Package, AlertTriangle, Store, Truck, RefreshCw, ShoppingCart } from 'lucide-react'
+import { Package, AlertTriangle, Store, Truck, RefreshCw, ShoppingCart, Receipt, CreditCard, Plus } from 'lucide-react'
 import { apiService } from '../services/api'
+import NotificationDropdown from '../components/NotificationDropdown'
+import { useNotifications } from '../hooks/useNotifications'
 
 interface OutletInventoryItem {
   id: string
@@ -85,31 +87,7 @@ const DowntownRestaurant: React.FC = () => {
   const [sortBy] = useState('materialName')
   const [sortOrder] = useState<'asc' | 'desc'>('asc')
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [editingItem, setEditingItem] = useState<OutletInventoryItem | null>(null)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [editFormData, setEditFormData] = useState({
-    currentStock: '',
-    minimumStock: '',
-    maximumStock: '',
-    reorderPoint: '',
-    unitPrice: '',
-    notes: ''
-  })
-  const [editingFinishedGood, setEditingFinishedGood] = useState<FinishedGoodInventoryItem | null>(null)
-  const [showFinishedGoodEditModal, setShowFinishedGoodEditModal] = useState(false)
-  const [finishedGoodEditFormData, setFinishedGoodEditFormData] = useState({
-    currentStock: '',
-    unitPrice: '',
-    costPrice: '',
-    minimumStock: '',
-    maximumStock: '',
-    reorderPoint: '',
-    storageLocation: '',
-    storageTemperature: '',
-    qualityStatus: '',
-    qualityNotes: '',
-    notes: ''
-  })
+  const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications('Kuwait City')
 
   // Determine current section based on URL
   const getCurrentSection = () => {
@@ -212,8 +190,8 @@ const DowntownRestaurant: React.FC = () => {
           setError('No raw materials inventory found. Please add some raw materials to Kuwait City.')
         }
       } else {
-        console.error('Failed to load raw materials inventory:', rawMaterialsResponse.message || 'API Error')
-        setError(`Failed to load inventory from server: ${rawMaterialsResponse.message || 'Unknown error'}`)
+        console.error('Failed to load raw materials inventory:', 'API Error')
+        setError(`Failed to load inventory from server: Unknown error`)
       }
 
       // Load finished goods from Kuwait City dedicated database
@@ -244,13 +222,14 @@ const DowntownRestaurant: React.FC = () => {
             unitPrice: item.unitPrice,
             costPrice: item.costPrice,
             currentStock: item.currentStock,
+            reservedStock: 0,
             availableStock: item.currentStock,
             minimumStock: item.minimumStock,
             maximumStock: item.maximumStock,
             reorderPoint: item.reorderPoint,
             totalValue: item.currentStock * item.unitPrice,
-            productionDate: new Date(),
-            expiryDate: item.shelfLife ? new Date(Date.now() + item.shelfLife * 24 * 60 * 60 * 1000) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            productionDate: new Date().toISOString(),
+            expiryDate: item.shelfLife ? new Date(Date.now() + item.shelfLife * 24 * 60 * 60 * 1000).toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
             batchNumber: `KCFG-${item.productCode}-${Date.now()}`,
             storageLocation: 'Main Storage',
             storageTemperature: item.storageRequirements?.temperature || 'Room Temperature',
@@ -269,7 +248,7 @@ const DowntownRestaurant: React.FC = () => {
           setFinishedGoodInventoryItems([])
         }
       } else {
-        console.error('Failed to load finished goods inventory:', finishedGoodsResponse.message || 'API Error')
+        console.error('Failed to load finished goods inventory:', 'API Error')
         // Don't set error for finished goods as it's optional
       }
     } catch (err) {
@@ -278,138 +257,6 @@ const DowntownRestaurant: React.FC = () => {
     }
   }
 
-  const handleEditItem = (item: OutletInventoryItem) => {
-    setEditingItem(item)
-    setEditFormData({
-      currentStock: item.currentStock.toString(),
-      minimumStock: item.minimumStock.toString(),
-      maximumStock: item.maximumStock.toString(),
-      reorderPoint: item.reorderPoint.toString(),
-      unitPrice: item.unitPrice.toString(),
-      notes: item.notes || ''
-    })
-    setShowEditModal(true)
-  }
-
-  const handleSaveEdit = async () => {
-    if (!editingItem) return
-
-    try {
-      const updateData = {
-        currentStock: parseFloat(editFormData.currentStock),
-        minimumStock: parseFloat(editFormData.minimumStock),
-        maximumStock: parseFloat(editFormData.maximumStock),
-        reorderPoint: parseFloat(editFormData.reorderPoint),
-        unitPrice: parseFloat(editFormData.unitPrice),
-        notes: editFormData.notes
-      }
-
-      const response = await apiService.updateOutletInventoryItem(editingItem.id, updateData)
-      
-      if (response.success) {
-        // Update local state
-        setInventoryItems(prev => prev.map(item => 
-          item.id === editingItem.id 
-            ? { ...item, ...updateData, totalValue: updateData.currentStock * updateData.unitPrice }
-            : item
-        ))
-        setShowEditModal(false)
-        setEditingItem(null)
-      } else {
-        alert(`Failed to update inventory item: ${response.message}`)
-      }
-    } catch (error) {
-      console.error('Error updating inventory item:', error)
-      alert('Failed to update inventory item')
-    }
-  }
-
-  const handleCancelEdit = () => {
-    setShowEditModal(false)
-    setEditingItem(null)
-    setEditFormData({
-      currentStock: '',
-      minimumStock: '',
-      maximumStock: '',
-      reorderPoint: '',
-      unitPrice: '',
-      notes: ''
-    })
-  }
-
-  const handleEditFinishedGood = (item: FinishedGoodInventoryItem) => {
-    setEditingFinishedGood(item)
-    setFinishedGoodEditFormData({
-      currentStock: item.currentStock.toString(),
-      unitPrice: item.unitPrice.toString(),
-      costPrice: item.costPrice.toString(),
-      minimumStock: item.minimumStock.toString(),
-      maximumStock: item.maximumStock.toString(),
-      reorderPoint: item.reorderPoint.toString(),
-      storageLocation: item.storageLocation || '',
-      storageTemperature: item.storageTemperature || '',
-      qualityStatus: item.qualityStatus || '',
-      qualityNotes: item.qualityNotes || '',
-      notes: item.notes || ''
-    })
-    setShowFinishedGoodEditModal(true)
-  }
-
-  const handleSaveFinishedGoodEdit = async () => {
-    if (!editingFinishedGood) return
-
-    try {
-      const updateData = {
-        currentStock: parseFloat(finishedGoodEditFormData.currentStock),
-        unitPrice: parseFloat(finishedGoodEditFormData.unitPrice),
-        costPrice: parseFloat(finishedGoodEditFormData.costPrice),
-        minimumStock: parseFloat(finishedGoodEditFormData.minimumStock),
-        maximumStock: parseFloat(finishedGoodEditFormData.maximumStock),
-        reorderPoint: parseFloat(finishedGoodEditFormData.reorderPoint),
-        storageLocation: finishedGoodEditFormData.storageLocation,
-        storageTemperature: finishedGoodEditFormData.storageTemperature,
-        qualityStatus: finishedGoodEditFormData.qualityStatus,
-        qualityNotes: finishedGoodEditFormData.qualityNotes,
-        notes: finishedGoodEditFormData.notes
-      }
-
-      const response = await apiService.updateFinishedGoodInventoryItem(editingFinishedGood.id, updateData)
-      
-      if (response.success) {
-        // Update local state
-        setFinishedGoodInventoryItems(prev => prev.map(item => 
-          item.id === editingFinishedGood.id 
-            ? { ...item, ...updateData, totalValue: updateData.currentStock * updateData.unitPrice }
-            : item
-        ))
-        setShowFinishedGoodEditModal(false)
-        setEditingFinishedGood(null)
-      } else {
-        alert(`Failed to update finished good inventory item: ${response.message}`)
-      }
-    } catch (error) {
-      console.error('Error updating finished good inventory item:', error)
-      alert('Failed to update finished good inventory item')
-    }
-  }
-
-  const handleCancelFinishedGoodEdit = () => {
-    setShowFinishedGoodEditModal(false)
-    setEditingFinishedGood(null)
-    setFinishedGoodEditFormData({
-      currentStock: '',
-      unitPrice: '',
-      costPrice: '',
-      minimumStock: '',
-      maximumStock: '',
-      reorderPoint: '',
-      storageLocation: '',
-      storageTemperature: '',
-      qualityStatus: '',
-      qualityNotes: '',
-      notes: ''
-    })
-  }
 
 
 
@@ -621,7 +468,6 @@ const DowntownRestaurant: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Quantity</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -634,15 +480,6 @@ const DowntownRestaurant: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.category}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.unitOfMeasure}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.currentStock}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => handleEditItem(item)}
-                      className="text-blue-600 hover:text-blue-900"
-                      title="Edit"
-                    >
-                      Edit
-                    </button>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -682,7 +519,6 @@ const DowntownRestaurant: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Updated</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -712,15 +548,6 @@ const DowntownRestaurant: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.lastUpdated}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">{item.notes}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => handleEditFinishedGood(item)}
-                      className="text-blue-600 hover:text-blue-900"
-                      title="Edit"
-                    >
-                      Edit
-                    </button>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -964,296 +791,18 @@ const DowntownRestaurant: React.FC = () => {
               Request Transfer
             </button>
           )}
+          <NotificationDropdown
+            notifications={notifications}
+            onMarkAsRead={markAsRead}
+            onMarkAllAsRead={markAllAsRead}
+            onClearAll={clearAll}
+          />
             </div>
           </div>
 
       {/* Section Content */}
       {renderSectionContent()}
 
-      {/* Edit Modal */}
-      {showEditModal && editingItem && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Edit Inventory Item
-            </h2>
-            <p className="text-sm text-gray-600 mb-4">
-              {editingItem.materialCode} - {editingItem.materialName}
-            </p>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Current Stock
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editFormData.currentStock}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, currentStock: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unit Price
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editFormData.unitPrice}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, unitPrice: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Minimum Stock
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editFormData.minimumStock}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, minimumStock: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Maximum Stock
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editFormData.maximumStock}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, maximumStock: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Reorder Point
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editFormData.reorderPoint}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, reorderPoint: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Notes
-                </label>
-                <textarea
-                  value={editFormData.notes}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, notes: e.target.value }))}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-            
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={handleCancelEdit}
-                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Finished Goods Edit Modal */}
-      {showFinishedGoodEditModal && editingFinishedGood && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Edit Finished Good Inventory Item
-            </h2>
-            <p className="text-sm text-gray-600 mb-4">
-              {editingFinishedGood.productCode} - {editingFinishedGood.productName}
-            </p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Current Stock
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={finishedGoodEditFormData.currentStock}
-                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, currentStock: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unit Price
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={finishedGoodEditFormData.unitPrice}
-                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, unitPrice: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cost Price
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={finishedGoodEditFormData.costPrice}
-                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, costPrice: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Minimum Stock
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={finishedGoodEditFormData.minimumStock}
-                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, minimumStock: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Maximum Stock
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={finishedGoodEditFormData.maximumStock}
-                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, maximumStock: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Reorder Point
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={finishedGoodEditFormData.reorderPoint}
-                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, reorderPoint: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Storage Location
-                </label>
-                <input
-                  type="text"
-                  value={finishedGoodEditFormData.storageLocation}
-                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, storageLocation: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Storage Temperature
-                </label>
-                <select
-                  value={finishedGoodEditFormData.storageTemperature}
-                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, storageTemperature: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="Cold">Cold</option>
-                  <option value="Frozen">Frozen</option>
-                  <option value="Hot">Hot</option>
-                  <option value="Room Temperature">Room Temperature</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quality Status
-                </label>
-                <select
-                  value={finishedGoodEditFormData.qualityStatus}
-                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, qualityStatus: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="Good">Good</option>
-                  <option value="Damaged">Damaged</option>
-                  <option value="Expired">Expired</option>
-                  <option value="Under Review">Under Review</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quality Notes
-                </label>
-                <textarea
-                  value={finishedGoodEditFormData.qualityNotes}
-                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, qualityNotes: e.target.value }))}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Notes
-                </label>
-                <textarea
-                  value={finishedGoodEditFormData.notes}
-                  onChange={(e) => setFinishedGoodEditFormData(prev => ({ ...prev, notes: e.target.value }))}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-            
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={handleCancelFinishedGoodEdit}
-                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveFinishedGoodEdit}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Hidden file input for import */}
       <input

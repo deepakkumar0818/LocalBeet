@@ -9,9 +9,12 @@ import {
   BarChart3
 } from 'lucide-react'
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
+import NotificationDropdown from '../components/NotificationDropdown'
+import { useNotifications } from '../hooks/useNotifications'
 
 const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overall')
+  const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications('System')
 
   // Tab configuration
   const tabs = [
@@ -342,9 +345,17 @@ const Dashboard: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Sales Dashboard</h1>
           <p className="text-gray-600">Monitor sales performance across all outlets</p>
         </div>
-        <div className="flex items-center space-x-2 text-sm text-gray-500">
-          <TrendingUp className="h-4 w-4" />
-          <span>Last updated: {new Date().toLocaleString()}</span>
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 text-sm text-gray-500">
+            <TrendingUp className="h-4 w-4" />
+            <span>Last updated: {new Date().toLocaleString()}</span>
+          </div>
+          <NotificationDropdown
+            notifications={notifications}
+            onMarkAsRead={markAsRead}
+            onMarkAllAsRead={markAllAsRead}
+            onClearAll={clearAll}
+          />
         </div>
       </div>
 

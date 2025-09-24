@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Package, Store, Truck, Users, Clock, RefreshCw, Utensils, Layers } from 'lucide-react'
 import { apiService } from '../services/api'
+import NotificationDropdown from '../components/NotificationDropdown'
+import { useNotifications } from '../hooks/useNotifications'
 
 interface Outlet {
   id: string
@@ -16,6 +18,7 @@ const CentralKitchen: React.FC = () => {
   const [outlet, setOutlet] = useState<Outlet | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications('Central Kitchen')
 
   useEffect(() => {
     loadCentralKitchenData()
@@ -96,6 +99,12 @@ const CentralKitchen: React.FC = () => {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </button>
+          <NotificationDropdown
+            notifications={notifications}
+            onMarkAsRead={markAsRead}
+            onMarkAllAsRead={markAllAsRead}
+            onClearAll={clearAll}
+          />
         </div>
       </div>
 

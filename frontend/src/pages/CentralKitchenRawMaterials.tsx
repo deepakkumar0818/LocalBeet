@@ -4,6 +4,8 @@ import { Package, TrendingUp, TrendingDown, AlertTriangle, Store, RefreshCw, Upl
 import { apiService } from '../services/api'
 import { useConfirmation } from '../hooks/useConfirmation'
 import ConfirmationModal from '../components/ConfirmationModal'
+import NotificationDropdown from '../components/NotificationDropdown'
+import { useNotifications } from '../hooks/useNotifications'
 
 interface OutletInventoryItem {
   id: string
@@ -63,6 +65,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
     unitPrice: '',
     notes: ''
   })
+  const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications('Central Kitchen')
 
   useEffect(() => {
     loadCentralKitchenData()
@@ -203,7 +206,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
         updatedBy: 'user'
       }
 
-      const response = await apiService.updateCentralKitchenInventoryItem(editingItem.id, updateData)
+      const response = await apiService.updateCentralKitchenRawMaterial(editingItem.id, updateData)
       
       if (response.success) {
         alert('Raw material updated successfully!')
@@ -461,6 +464,12 @@ const CentralKitchenRawMaterials: React.FC = () => {
             <Bell className="h-4 w-4 mr-2" />
             Requested Item
           </button>
+          <NotificationDropdown
+            notifications={notifications}
+            onMarkAsRead={markAsRead}
+            onMarkAllAsRead={markAllAsRead}
+            onClearAll={clearAll}
+          />
         </div>
       </div>
 

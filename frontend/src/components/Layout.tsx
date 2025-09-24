@@ -108,6 +108,7 @@ const navigation = [
     ]
   },
   { name: 'Inventory', href: '/inventory', icon: BarChart3 },
+  { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {

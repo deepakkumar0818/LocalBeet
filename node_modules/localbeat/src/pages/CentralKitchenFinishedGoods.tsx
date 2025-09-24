@@ -4,6 +4,8 @@ import { Package, TrendingUp, TrendingDown, AlertTriangle, Store, RefreshCw, Upl
 import { apiService } from '../services/api'
 import { useConfirmation } from '../hooks/useConfirmation'
 import ConfirmationModal from '../components/ConfirmationModal'
+import NotificationDropdown from '../components/NotificationDropdown'
+import { useNotifications } from '../hooks/useNotifications'
 
 interface FinishedGoodInventoryItem {
   id: string
@@ -60,6 +62,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('')
   const [sortBy, setSortBy] = useState('productName')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications('Central Kitchen')
 
   useEffect(() => {
     loadCentralKitchenData()
@@ -414,6 +417,12 @@ const CentralKitchenFinishedGoods: React.FC = () => {
             <Bell className="h-4 w-4 mr-2" />
             Requested Item
           </button>
+          <NotificationDropdown
+            notifications={notifications}
+            onMarkAsRead={markAsRead}
+            onMarkAllAsRead={markAllAsRead}
+            onClearAll={clearAll}
+          />
         </div>
       </div>
 

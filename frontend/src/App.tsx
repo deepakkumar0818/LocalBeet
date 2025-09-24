@@ -41,6 +41,7 @@ import AddForecast from './pages/AddForecast'
 import SalesOrders from './pages/SalesOrders'
 import AddSalesOrder from './pages/AddSalesOrder'
 import POSCreateOrder from './pages/POSCreateOrder'
+import Settings from './pages/Settings'
 
 function App() {
   return (
@@ -107,6 +108,7 @@ function App() {
         <Route path="/drive-thru-express/sales-orders" element={<SalesOrders />} />
         <Route path="/drive-thru-express/sales-orders/add" element={<AddSalesOrder />} />
         <Route path="/drive-thru-express/pos-sales/create-order" element={<POSCreateOrder />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </Layout>
   )
