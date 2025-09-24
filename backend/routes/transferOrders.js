@@ -262,6 +262,40 @@ router.post('/', async (req, res) => {
 
     const transferOrder = await TransferOrder.create(transferOrderData);
 
+    // Send notification to Central Kitchen
+    try {
+      // Create more detailed notification message
+      const itemDetails = items.map(item => `${item.itemName} (${item.quantity} ${item.unitOfMeasure || 'pcs'})`).join(', ')
+      const notificationData = {
+        title: 'New Transfer Order Request',
+        message: `Transfer order #${transferOrder.transferNumber} from ${fromOutlet} requesting: ${itemDetails}`,
+        type: 'transfer_request',
+        targetOutlet: 'Central Kitchen',
+        sourceOutlet: fromOutlet,
+        transferOrderId: transferOrder._id,
+        itemType: items[0]?.itemType || 'Mixed', // Use first item's type or 'Mixed'
+        priority: priority === 'Urgent' ? 'high' : 'normal'
+      };
+
+      // Make internal API call to create notification
+      const notificationResponse = await fetch('http://localhost:5000/api/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(notificationData)
+      });
+
+      if (notificationResponse.ok) {
+        console.log('Notification sent to Central Kitchen successfully');
+      } else {
+        console.error('Failed to send notification:', await notificationResponse.text());
+      }
+    } catch (notificationError) {
+      console.error('Error sending notification:', notificationError);
+      // Don't fail the transfer order creation if notification fails
+    }
+
     res.status(201).json({
       success: true,
       message: 'Transfer Order created successfully',

@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+import { apiService } from '../services/api'
 
 export interface Notification {
   id: string
@@ -8,81 +9,114 @@ export interface Notification {
   timestamp: Date
   read: boolean
   outlet?: string
+  transferOrderId?: string
+  isTransferOrder?: boolean
+  itemType?: string
+  priority?: string
 }
 
 export const useNotifications = (outletName?: string) => {
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      title: 'Low Stock Alert',
-      message: 'Chicken breast is running low. Current stock: 15 units',
-      type: 'warning',
-      timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-      read: false,
-      outlet: outletName
-    },
-    {
-      id: '2',
-      title: 'Transfer Order Completed',
-      message: 'Transfer order #TR-2024-001 has been successfully delivered',
-      type: 'success',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-      read: false,
-      outlet: outletName
-    },
-    {
-      id: '3',
-      title: 'New Sales Order',
-      message: 'New order #SO-2024-156 received for $125.50',
-      type: 'info',
-      timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-      read: true,
-      outlet: outletName
-    },
-    {
-      id: '4',
-      title: 'Inventory Update Required',
-      message: 'Please update the inventory count for fresh vegetables',
-      type: 'warning',
-      timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
-      read: true,
-      outlet: outletName
-    },
-    {
-      id: '5',
-      title: 'System Maintenance',
-      message: 'Scheduled maintenance will occur tonight from 2 AM to 4 AM',
-      type: 'info',
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-      read: true,
-      outlet: outletName
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Load notifications from API
+  const loadNotifications = useCallback(async () => {
+    if (!outletName) {
+      setLoading(false)
+      return
     }
-  ])
 
-  const markAsRead = useCallback((id: string) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id 
-          ? { ...notification, read: true }
-          : notification
+    try {
+      setLoading(true)
+      const response = await apiService.getNotifications(outletName, undefined, 20)
+      
+      if (response.success) {
+        console.log('Raw notification data from API:', response.data)
+        const apiNotifications: Notification[] = response.data.map((notif: any) => {
+          console.log('Processing notification:', notif)
+          console.log('transferOrderId:', notif.transferOrderId)
+          return {
+            id: notif.id,
+            title: notif.title,
+            message: notif.message,
+            type: notif.type === 'transfer_rejection' ? 'error' : 
+                  notif.type === 'transfer_acceptance' ? 'success' : 
+                  (notif.priority === 'high' ? 'warning' : 'info'),
+            timestamp: new Date(notif.timestamp),
+            read: notif.read,
+            outlet: outletName,
+            transferOrderId: notif.transferOrderId,
+            isTransferOrder: true,
+            itemType: notif.itemType,
+            priority: notif.priority
+          }
+        })
+        
+        console.log('Processed notifications:', apiNotifications)
+        setNotifications(apiNotifications)
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error)
+      // Fallback to empty array if API fails
+      setNotifications([])
+    } finally {
+      setLoading(false)
+    }
+  }, [outletName])
+
+  // Load notifications on mount and when outletName changes
+  useEffect(() => {
+    loadNotifications()
+    
+    // Set up auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      loadNotifications()
+    }, 30000)
+    
+    return () => clearInterval(interval)
+  }, [loadNotifications])
+
+  const markAsRead = useCallback(async (id: string) => {
+    try {
+      await apiService.markNotificationAsRead(id)
+      setNotifications(prev => 
+        prev.map(notif => 
+          notif.id === id ? { ...notif, read: true } : notif
+        )
       )
-    )
+    } catch (error) {
+      console.error('Error marking notification as read:', error)
+    }
   }, [])
 
-  const markAllAsRead = useCallback(() => {
-    setNotifications(prev => 
-      prev.map(notification => ({ ...notification, read: true }))
-    )
-  }, [])
+  const markAllAsRead = useCallback(async () => {
+    if (!outletName) return
+    
+    try {
+      await apiService.markAllNotificationsAsRead(outletName)
+      setNotifications(prev => 
+        prev.map(notif => ({ ...notif, read: true }))
+      )
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error)
+    }
+  }, [outletName])
 
-  const clearAll = useCallback(() => {
-    setNotifications([])
-  }, [])
+  const clearAll = useCallback(async () => {
+    if (!outletName) return
+    
+    try {
+      await apiService.clearAllNotifications(outletName)
+      setNotifications([])
+    } catch (error) {
+      console.error('Error clearing notifications:', error)
+    }
+  }, [outletName])
 
   const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
     const newNotification: Notification = {
       ...notification,
-      id: Date.now().toString(),
+      id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date(),
       read: false
     }
@@ -94,6 +128,8 @@ export const useNotifications = (outletName?: string) => {
     markAsRead,
     markAllAsRead,
     clearAll,
-    addNotification
+    addNotification,
+    loading,
+    refreshNotifications: loadNotifications
   }
 }

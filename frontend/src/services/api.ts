@@ -2029,6 +2029,13 @@ class ApiService {
     });
   }
 
+  async getTransferOrderById(id: string) {
+    return this.request<{
+      success: boolean;
+      data: any;
+    }>(`/transfer-orders/${id}`);
+  }
+
   async updateTransferOrderStatus(id: string, data: {
     status: string;
     approvedBy?: string;
@@ -2041,6 +2048,16 @@ class ApiService {
     }>(`/transfer-orders/${id}/status`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  }
+
+  async updateTransferOrderInventory(id: string, action: 'approve' | 'reject') {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: any;
+    }>(`/transfer-order-inventory/${id}/${action}`, {
+      method: 'PUT',
     });
   }
 
@@ -2067,6 +2084,82 @@ class ApiService {
         }>;
       };
     }>('/transfer-orders/stats/summary');
+  }
+
+  // Notification API methods
+  async getNotifications(outletName: string, type?: string, limit?: number) {
+    const params = new URLSearchParams();
+    if (type) params.append('type', type);
+    if (limit) params.append('limit', limit.toString());
+    
+    const queryString = params.toString();
+    const endpoint = queryString ? `/${outletName}?${queryString}` : `/${outletName}`;
+    
+    return this.request<{
+      success: boolean;
+      data: Array<{
+        id: string;
+        title: string;
+        message: string;
+        type: string;
+        targetOutlet: string;
+        sourceOutlet: string;
+        transferOrderId?: string;
+        itemType?: string;
+        priority: string;
+        timestamp: string;
+        read: boolean;
+        createdAt: string;
+      }>;
+    }>(`/notifications${endpoint}`);
+  }
+
+  async createNotification(data: {
+    title: string;
+    message: string;
+    type: string;
+    targetOutlet: string;
+    sourceOutlet?: string;
+    transferOrderId?: string;
+    itemType?: string;
+    priority?: string;
+  }) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: any;
+    }>('/notifications', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async markNotificationAsRead(notificationId: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: any;
+    }>(`/notifications/${notificationId}/read`, {
+      method: 'PUT',
+    });
+  }
+
+  async markAllNotificationsAsRead(outletName: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+    }>(`/notifications/mark-all-read/${outletName}`, {
+      method: 'PUT',
+    });
+  }
+
+  async clearAllNotifications(outletName: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+    }>(`/notifications/clear-all/${outletName}`, {
+      method: 'DELETE',
+    });
   }
 }
 

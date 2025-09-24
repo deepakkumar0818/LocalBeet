@@ -5,6 +5,7 @@ import { apiService } from '../services/api'
 import { useConfirmation } from '../hooks/useConfirmation'
 import ConfirmationModal from '../components/ConfirmationModal'
 import NotificationDropdown from '../components/NotificationDropdown'
+import TransferOrderModal, { TransferOrder } from '../components/TransferOrderModal'
 import { useNotifications } from '../hooks/useNotifications'
 
 interface OutletInventoryItem {
@@ -65,7 +66,16 @@ const CentralKitchenRawMaterials: React.FC = () => {
     unitPrice: '',
     notes: ''
   })
-  const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications('Central Kitchen')
+  const [showTransferOrderModal, setShowTransferOrderModal] = useState(false)
+  const [selectedTransferOrder, setSelectedTransferOrder] = useState<TransferOrder | null>(null)
+  const [transferOrderLoading, setTransferOrderLoading] = useState(false)
+  const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Central Kitchen')
+  
+  // Filter notifications to only show Raw Material transfer requests
+  const rawMaterialNotifications = notifications.filter(notification => 
+    notification.isTransferOrder && 
+    (notification.itemType === 'Raw Material' || notification.itemType === 'Mixed')
+  )
 
   useEffect(() => {
     loadCentralKitchenData()
@@ -385,6 +395,182 @@ const CentralKitchenRawMaterials: React.FC = () => {
     console.log('Requested items notification generated:', requestedItems)
   }
 
+  // Get transfer order details from API
+  const getTransferOrderDetails = async (transferOrderId: string): Promise<TransferOrder> => {
+    try {
+      const response = await apiService.getTransferOrderById(transferOrderId)
+      if (response.success) {
+        return response.data
+      } else {
+        throw new Error(response.message || 'Failed to fetch transfer order')
+      }
+    } catch (error) {
+      console.error('Error fetching transfer order:', error)
+      throw error
+    }
+  }
+
+  const handleViewTransferOrder = async (transferOrderId: string) => {
+    try {
+      console.log('handleViewTransferOrder called with transferOrderId:', transferOrderId)
+      setTransferOrderLoading(true)
+      const transferOrder = await getTransferOrderDetails(transferOrderId)
+      setSelectedTransferOrder(transferOrder)
+      setShowTransferOrderModal(true)
+    } catch (error) {
+      console.error('Error loading transfer order:', error)
+      alert('Failed to load transfer order details')
+    } finally {
+      setTransferOrderLoading(false)
+    }
+  }
+
+  const handleAcceptTransferOrder = async (transferOrderId: string) => {
+    try {
+      setTransferOrderLoading(true)
+      console.log('Starting acceptance process for transfer order:', transferOrderId)
+      
+      // Get transfer order details to determine item type and create notification
+      console.log('Fetching transfer order details...')
+      const transferOrder = await getTransferOrderDetails(transferOrderId)
+      console.log('Transfer order details:', transferOrder)
+      
+      // Update inventory first (requires pending status), then update status
+      console.log('Updating transfer order inventory...')
+      let statusResponse, inventoryResponse
+      
+      try {
+        inventoryResponse = await apiService.updateTransferOrderInventory(transferOrderId, 'approve')
+        console.log('Inventory update response:', inventoryResponse)
+      } catch (error) {
+        console.error('Inventory update failed:', error)
+        throw new Error(`Inventory update failed: ${error.message}`)
+      }
+      
+      try {
+        statusResponse = await apiService.updateTransferOrderStatus(transferOrderId, {
+          status: 'Approved',
+          approvedBy: 'Central Kitchen Manager',
+          notes: 'Transfer order approved by Central Kitchen'
+        })
+        console.log('Status update response:', statusResponse)
+      } catch (error) {
+        console.error('Status update failed:', error)
+        throw new Error(`Status update failed: ${error.message}`)
+      }
+
+      if (statusResponse.success && inventoryResponse.success) {
+        // Send notification back to Kuwait City
+        const itemType = transferOrder.items[0]?.itemType || 'Mixed'
+        const itemDetails = transferOrder.items.map(item => 
+          `${item.itemName} (${item.quantity} ${item.unitOfMeasure || 'pcs'})`
+        ).join(', ')
+        
+        console.log('Creating acceptance notification for Kuwait City...')
+        const notificationResponse = await apiService.createNotification({
+          title: 'Transfer Order Accepted',
+          message: `Transfer order #${transferOrder.transferNumber} has been accepted. Items transferred: ${itemDetails}`,
+          type: 'transfer_acceptance',
+          targetOutlet: 'Kuwait City',
+          sourceOutlet: 'Central Kitchen',
+          transferOrderId: transferOrderId,
+          itemType: itemType,
+          priority: 'normal'
+        })
+        console.log('Notification response:', notificationResponse)
+        
+        alert('Transfer order accepted and notification sent to Kuwait City')
+        setShowTransferOrderModal(false)
+        setSelectedTransferOrder(null)
+        
+        // Mark notification as read
+        markAsRead(transferOrderId)
+      } else {
+        throw new Error(`Failed to update transfer order status. Status: ${statusResponse.success}, Inventory: ${inventoryResponse.success}`)
+      }
+      
+    } catch (error) {
+      console.error('Error accepting transfer order:', error)
+      console.error('Error details:', error.message)
+      alert(`Failed to accept transfer order: ${error.message}`)
+    } finally {
+      setTransferOrderLoading(false)
+    }
+  }
+
+  const handleRejectTransferOrder = async (transferOrderId: string) => {
+    try {
+      setTransferOrderLoading(true)
+      console.log('Starting rejection process for transfer order:', transferOrderId)
+      
+      // Get transfer order details to determine item type and create notification
+      console.log('Fetching transfer order details...')
+      const transferOrder = await getTransferOrderDetails(transferOrderId)
+      console.log('Transfer order details:', transferOrder)
+      
+      // Update inventory first (requires pending status), then update status
+      console.log('Updating transfer order inventory...')
+      let statusResponse, inventoryResponse
+      
+      try {
+        inventoryResponse = await apiService.updateTransferOrderInventory(transferOrderId, 'reject')
+        console.log('Inventory update response:', inventoryResponse)
+      } catch (error) {
+        console.error('Inventory update failed:', error)
+        throw new Error(`Inventory update failed: ${error.message}`)
+      }
+      
+      try {
+        statusResponse = await apiService.updateTransferOrderStatus(transferOrderId, {
+          status: 'Rejected',
+          approvedBy: 'Central Kitchen Manager',
+          notes: 'Transfer order rejected by Central Kitchen'
+        })
+        console.log('Status update response:', statusResponse)
+      } catch (error) {
+        console.error('Status update failed:', error)
+        throw new Error(`Status update failed: ${error.message}`)
+      }
+
+      if (statusResponse.success && inventoryResponse.success) {
+        // Send notification back to Kuwait City
+        const itemType = transferOrder.items[0]?.itemType || 'Mixed'
+        const itemDetails = transferOrder.items.map(item => 
+          `${item.itemName} (${item.quantity} ${item.unitOfMeasure || 'pcs'})`
+        ).join(', ')
+        
+        console.log('Creating notification for Kuwait City...')
+        const notificationResponse = await apiService.createNotification({
+          title: 'Transfer Order Rejected',
+          message: `Transfer order #${transferOrder.transferNumber} has been rejected. Requested items: ${itemDetails}`,
+          type: 'transfer_rejection',
+          targetOutlet: 'Kuwait City',
+          sourceOutlet: 'Central Kitchen',
+          transferOrderId: transferOrderId,
+          itemType: itemType,
+          priority: 'normal'
+        })
+        console.log('Notification response:', notificationResponse)
+        
+        alert('Transfer order rejected and notification sent to Kuwait City')
+        setShowTransferOrderModal(false)
+        setSelectedTransferOrder(null)
+        
+        // Mark notification as read
+        markAsRead(transferOrderId)
+      } else {
+        throw new Error(`Failed to update transfer order status. Status: ${statusResponse.success}, Inventory: ${inventoryResponse.success}`)
+      }
+      
+    } catch (error) {
+      console.error('Error rejecting transfer order:', error)
+      console.error('Error details:', error.message)
+      alert(`Failed to reject transfer order: ${error.message}`)
+    } finally {
+      setTransferOrderLoading(false)
+    }
+  }
+
   // Calculate summary statistics
   const totalItems = inventoryItems.length
   const totalValue = inventoryItems.reduce((sum, item) => sum + item.totalValue, 0)
@@ -465,10 +651,12 @@ const CentralKitchenRawMaterials: React.FC = () => {
             Requested Item
           </button>
           <NotificationDropdown
-            notifications={notifications}
+            notifications={rawMaterialNotifications}
             onMarkAsRead={markAsRead}
             onMarkAllAsRead={markAllAsRead}
             onClearAll={clearAll}
+            onViewTransferOrder={handleViewTransferOrder}
+            onRefresh={refreshNotifications}
           />
         </div>
       </div>
@@ -835,6 +1023,19 @@ const CentralKitchenRawMaterials: React.FC = () => {
         confirmText={confirmation.confirmText}
         cancelText={confirmation.cancelText}
         showCancel={confirmation.showCancel}
+      />
+
+      {/* Transfer Order Modal */}
+      <TransferOrderModal
+        isOpen={showTransferOrderModal}
+        onClose={() => {
+          setShowTransferOrderModal(false)
+          setSelectedTransferOrder(null)
+        }}
+        transferOrder={selectedTransferOrder}
+        onAccept={handleAcceptTransferOrder}
+        onReject={handleRejectTransferOrder}
+        loading={transferOrderLoading}
       />
     </div>
   )

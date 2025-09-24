@@ -90,6 +90,26 @@ const AddTransferOrder: React.FC = () => {
   const loadKuwaitCityData = async () => {
     try {
       console.log('Loading Kuwait City data for section:', kuwaitCitySection)
+
+      // Set Kuwait City as from outlet and Central Kitchen as to outlet
+      const today = new Date().toISOString().split('T')[0]
+      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+      // Generate transfer number
+      const transferNumber = `TR-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
+
+      setFormData(prev => ({
+        ...prev,
+        transferNumber: transferNumber,
+        fromWarehouseId: 'Kuwait City',
+        fromWarehouseName: 'Kuwait City',
+        toWarehouseId: 'Central Kitchen',
+        toWarehouseName: 'Central Kitchen',
+        transferDate: today,
+        expectedDeliveryDate: tomorrow,
+        status: 'Pending',
+        priority: 'Normal'
+      }))
       
       // Only load data for the specific section
       if (kuwaitCitySection === 'raw-materials' || kuwaitCitySection === 'both') {
@@ -174,41 +194,70 @@ const AddTransferOrder: React.FC = () => {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+    console.log('Form submitted!')
+    console.log('Form data:', formData)
+    console.log('Is from Kuwait City:', isFromKuwaitCity)
+
     if (!validateForm()) {
+      console.log('Form validation failed')
+      console.log('Validation errors:', errors)
       return
     }
 
-    // Calculate total amount
-    const totalAmount = formData.items.reduce((sum, item) => sum + item.totalPrice, 0)
+    console.log('Form validation passed')
 
-    const newTransferOrder: TransferOrder = {
-      id: Date.now().toString(),
-      transferNumber: formData.transferNumber,
-      fromWarehouseId: formData.fromWarehouseId,
-      fromWarehouseName: formData.fromWarehouseName,
-      toWarehouseId: formData.toWarehouseId,
-      toWarehouseName: formData.toWarehouseName,
-      transferDate: new Date(formData.transferDate),
-      expectedDeliveryDate: new Date(formData.expectedDeliveryDate),
-      status: formData.status,
-      priority: formData.priority,
-      totalAmount,
-      items: formData.items,
-      transferType: formData.transferType,
-      notes: formData.notes,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      createdBy: 'admin',
-      updatedBy: 'admin',
-      requestedBy: 'admin',
-      reason: 'Transfer request'
+    try {
+      // Calculate total amount
+      const totalAmount = formData.items.reduce((sum, item) => sum + item.totalPrice, 0)
+
+      // Prepare transfer order data for API
+      const transferOrderData = {
+        fromOutlet: formData.fromWarehouseId || 'Kuwait City',
+        toOutlet: formData.toWarehouseId || 'Central Kitchen',
+        transferDate: formData.transferDate,
+        priority: formData.priority,
+        items: formData.items.map(item => ({
+          itemType: item.itemType === 'raw-material' ? 'Raw Material' : 'Finished Goods',
+          itemCode: item.materialCode,
+          itemName: item.materialName,
+          category: item.category,
+          subCategory: item.subCategory,
+          unitOfMeasure: item.unitOfMeasure,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          notes: item.remarks
+        })),
+        notes: formData.notes,
+        requestedBy: 'Kuwait City Manager'
+      }
+
+      console.log('Creating Transfer Order:', transferOrderData)
+      console.log('Transfer order data being sent:', JSON.stringify(transferOrderData, null, 2))
+
+      // Call API to create transfer order
+      console.log('Calling API...')
+      const response = await apiService.createTransferOrder(transferOrderData)
+      console.log('API Response:', response)
+
+      if (response.success) {
+        alert('Transfer order created successfully!')
+        navigate('/transfer-orders')
+      } else {
+        throw new Error(response.message || 'Failed to create transfer order')
+      }
+    } catch (error) {
+      console.error('Error creating transfer order:', error)
+      console.error('Error details:', error)
+      
+      let errorMessage = 'Unknown error'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      }
+      
+      alert(`Failed to create transfer order: ${errorMessage}`)
     }
-
-    console.log('Creating Transfer Order:', newTransferOrder)
-    navigate('/transfer-orders')
   }
 
   const handleInputChange = (field: string, value: string) => {
