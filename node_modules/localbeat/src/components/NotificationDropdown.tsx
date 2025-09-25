@@ -62,18 +62,6 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
     }
   }
 
-  const getNotificationBgColor = (type: string) => {
-    switch (type) {
-      case 'warning':
-        return 'bg-yellow-50 border-yellow-200'
-      case 'success':
-        return 'bg-green-50 border-green-200'
-      case 'error':
-        return 'bg-red-50 border-red-200'
-      default:
-        return 'bg-blue-50 border-blue-200'
-    }
-  }
 
   const formatTimestamp = (timestamp: Date) => {
     const now = new Date()

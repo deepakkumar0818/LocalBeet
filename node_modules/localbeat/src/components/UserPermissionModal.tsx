@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { X, Save, RefreshCw, User, Shield, Key } from 'lucide-react'
+import { X, Save, User, Shield, Key } from 'lucide-react'
 
 interface User {
   id: string

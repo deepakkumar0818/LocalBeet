@@ -4,9 +4,6 @@ import {
   Users, 
   Shield, 
   Key, 
-  Eye, 
-  EyeOff, 
-  Check, 
   X,
   Plus,
   Edit,
@@ -99,7 +96,7 @@ const Settings: React.FC = () => {
     }
   ])
 
-  const [permissions, setPermissions] = useState<Permission[]>([
+  const [permissions] = useState<Permission[]>([
     // Dashboard
     { id: 'dashboard.view', name: 'View Dashboard', description: 'Access to main dashboard', category: 'Dashboard', module: 'Dashboard' },
     
@@ -148,8 +145,6 @@ const Settings: React.FC = () => {
 
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [editingRole, setEditingRole] = useState<Role | null>(null)
-  const [showAddUser, setShowAddUser] = useState(false)
-  const [showAddRole, setShowAddRole] = useState(false)
   const [showUserPermissionModal, setShowUserPermissionModal] = useState(false)
   const [showRoleModal, setShowRoleModal] = useState(false)
 
@@ -174,18 +169,6 @@ const Settings: React.FC = () => {
     }))
   }
 
-  const handleRolePermissionChange = (roleId: string, permissionId: string, checked: boolean) => {
-    setRoles(prev => prev.map(role => {
-      if (role.id === roleId) {
-        if (checked) {
-          return { ...role, permissions: [...role.permissions, permissionId] }
-        } else {
-          return { ...role, permissions: role.permissions.filter(p => p !== permissionId) }
-        }
-      }
-      return role
-    }))
-  }
 
   const handleUserPermissionSave = (userId: string, newPermissions: string[]) => {
     setUsers(prev => prev.map(user => 
@@ -291,7 +274,7 @@ const Settings: React.FC = () => {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">User Management</h2>
             <button
-              onClick={() => setShowAddUser(true)}
+              onClick={() => {}}
               className="btn-primary flex items-center"
             >
               <Plus className="h-4 w-4 mr-2" />

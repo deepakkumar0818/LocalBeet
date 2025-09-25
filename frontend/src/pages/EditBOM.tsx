@@ -29,7 +29,7 @@ const EditBOM: React.FC = () => {
     productName: 'Steel Frame Assembly',
     productDescription: 'Complete steel frame for construction',
     version: '1.0',
-    effectiveDate: new Date('2024-01-01'),
+    effectiveDate: new Date('2024-01-01').toISOString(),
     status: 'Active',
     totalCost: 1250.75,
     items: [
@@ -52,8 +52,8 @@ const EditBOM: React.FC = () => {
         totalCost: 625.00
       }
     ],
-    createdAt: new Date('2024-01-15'),
-    updatedAt: new Date('2024-01-15'),
+    createdAt: new Date('2024-01-15').toISOString(),
+    updatedAt: new Date('2024-01-15').toISOString(),
     createdBy: 'admin',
     updatedBy: 'admin'
   }
@@ -66,7 +66,7 @@ const EditBOM: React.FC = () => {
         productName: mockBOM.productName,
         productDescription: mockBOM.productDescription,
         version: mockBOM.version,
-        effectiveDate: mockBOM.effectiveDate.toISOString().split('T')[0],
+        effectiveDate: mockBOM.effectiveDate.split('T')[0],
         status: mockBOM.status,
         items: mockBOM.items
       })
@@ -113,11 +113,11 @@ const EditBOM: React.FC = () => {
       productName: formData.productName,
       productDescription: formData.productDescription,
       version: formData.version,
-      effectiveDate: new Date(formData.effectiveDate),
+        effectiveDate: new Date(formData.effectiveDate).toISOString(),
       status: formData.status,
       totalCost,
       items: formData.items,
-      updatedAt: new Date(),
+      updatedAt: new Date().toISOString(),
       updatedBy: 'admin'
     }
 

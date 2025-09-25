@@ -96,8 +96,8 @@ const AddWarehouse: React.FC = () => {
       managerName: formData.contactPerson,
       isActive: formData.status === 'Active',
       storageTypes: ['Dry Storage'],
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       createdBy: 'admin',
       updatedBy: 'admin'
     }

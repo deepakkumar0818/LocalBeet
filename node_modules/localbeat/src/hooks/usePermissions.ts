@@ -1,12 +1,5 @@
 import { useState, useEffect } from 'react'
 
-interface Permission {
-  id: string
-  name: string
-  description: string
-  category: string
-  module: string
-}
 
 interface User {
   id: string

@@ -24,8 +24,8 @@ const WarehouseMaster: React.FC = () => {
       managerName: 'John Smith',
       isActive: true,
       storageTypes: ['Dry Storage', 'Cold Storage'],
-      createdAt: new Date('2024-01-15'),
-      updatedAt: new Date('2024-01-15'),
+    createdAt: new Date('2024-01-15').toISOString(),
+    updatedAt: new Date('2024-01-15').toISOString(),
       createdBy: 'admin',
       updatedBy: 'admin'
     },
@@ -47,8 +47,8 @@ const WarehouseMaster: React.FC = () => {
       managerName: 'Jane Doe',
       isActive: true,
       storageTypes: ['Dry Storage'],
-      createdAt: new Date('2024-01-16'),
-      updatedAt: new Date('2024-01-16'),
+      createdAt: new Date('2024-01-16').toISOString(),
+      updatedAt: new Date('2024-01-16').toISOString(),
       createdBy: 'admin',
       updatedBy: 'admin'
     }

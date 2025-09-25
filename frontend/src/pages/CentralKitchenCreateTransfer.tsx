@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Truck, Package, Plus, Save, RefreshCw, ArrowRight } from 'lucide-react'
+import { Truck, Plus, Save, RefreshCw } from 'lucide-react'
 import { apiService } from '../services/api'
 
 interface Outlet {
@@ -15,7 +15,9 @@ interface TransferItem {
   id: string
   itemCode: string
   itemName: string
+  itemType: 'Raw Material' | 'Finished Goods'
   category: string
+  subCategory?: string
   unitOfMeasure: string
   quantity: number
   unitPrice: number
@@ -76,7 +78,7 @@ const CentralKitchenCreateTransfer: React.FC = () => {
         setRawMaterials(rawMaterialsResponse.data)
         console.log('Loaded raw materials:', rawMaterialsResponse.data.length)
       } else {
-        console.error('Failed to load raw materials:', rawMaterialsResponse.message)
+        console.error('Failed to load raw materials:', (rawMaterialsResponse as any).error || 'API Error')
       }
 
       // Load finished goods from Central Kitchen dedicated database
@@ -85,7 +87,7 @@ const CentralKitchenCreateTransfer: React.FC = () => {
         setFinishedGoods(finishedGoodsResponse.data)
         console.log('Loaded finished goods:', finishedGoodsResponse.data.length)
       } else {
-        console.error('Failed to load finished goods:', finishedGoodsResponse.message)
+        console.error('Failed to load finished goods:', (finishedGoodsResponse as any).error || 'API Error')
       }
     } catch (err) {
       console.error('Error loading materials data:', err)
@@ -103,7 +105,7 @@ const CentralKitchenCreateTransfer: React.FC = () => {
       const newForms = [...prev, {
         id: newFormId,
         data: {
-          itemType: '',
+          itemType: 'Raw Material' as 'Raw Material' | 'Finished Goods',
           itemCode: '',
           itemName: '',
           category: '',
@@ -138,7 +140,7 @@ const CentralKitchenCreateTransfer: React.FC = () => {
         
         // If itemCode changes, update itemName and category based on selected item
         if (field === 'itemCode' && value) {
-          const selectedItem = getSelectedItem(updatedForm.data.itemType, value)
+          const selectedItem = getSelectedItem(updatedForm.data.itemType || 'Raw Material', value)
           if (selectedItem) {
             updatedForm.data.itemName = selectedItem.materialName || selectedItem.productName || ''
             updatedForm.data.category = selectedItem.category || selectedItem.subCategory || ''
@@ -255,18 +257,6 @@ const CentralKitchenCreateTransfer: React.FC = () => {
   }
 
 
-  const categories = [
-    'Raw Materials',
-    'Finished Goods',
-    'Beverages',
-    'Meals',
-    'Bakery',
-    'Snacks',
-    'Desserts',
-    'Salads',
-    'Soups',
-    'Sandwiches'
-  ]
 
   const unitOfMeasures = [
     'pcs',

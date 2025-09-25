@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Package, TrendingUp, TrendingDown, AlertTriangle, Store, RefreshCw, Upload, Plus, Bell } from 'lucide-react'
+import { Package, TrendingDown, AlertTriangle, RefreshCw, Upload, Plus, Bell } from 'lucide-react'
 import { apiService } from '../services/api'
 import { useConfirmation } from '../hooks/useConfirmation'
 import ConfirmationModal from '../components/ConfirmationModal'
@@ -152,14 +152,23 @@ const CentralKitchenFinishedGoods: React.FC = () => {
             minimumStock: item.minimumStock,
             maximumStock: item.maximumStock,
             totalValue: item.currentStock * item.unitPrice,
-            productionDate: new Date(),
-            expiryDate: item.shelfLife ? new Date(Date.now() + item.shelfLife * 24 * 60 * 60 * 1000) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            productionDate: new Date().toISOString(),
+            expiryDate: item.shelfLife ? new Date(Date.now() + item.shelfLife * 24 * 60 * 60 * 1000).toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
             qualityStatus: 'Good',
             batchNumber: `FG-${item.productCode}-${Date.now()}`,
             location: 'Main Storage',
             status: item.status,
             notes: item.notes || '',
-            isActive: item.isActive
+            isActive: item.isActive,
+            reservedStock: item.reservedStock || 0,
+            reorderPoint: item.reorderPoint || item.minimumStock || 0,
+            storageLocation: item.storageLocation || 'Default Location',
+            storageTemperature: item.storageTemperature || 'Room Temperature',
+            lastStockCount: item.lastStockCount || new Date().toISOString(),
+            shelfLife: item.shelfLife || 0,
+            qualityNotes: item.qualityNotes || '',
+            transferSource: item.transferSource || 'Central Kitchen',
+            lastUpdated: item.lastUpdated || new Date().toISOString()
           }))
           
           setFinishedGoodInventoryItems(transformedItems)
@@ -169,8 +178,8 @@ const CentralKitchenFinishedGoods: React.FC = () => {
           setError('No finished goods inventory found. Please add some finished goods to the central kitchen.')
         }
       } else {
-        console.error('Failed to load finished goods inventory:', finishedGoodsResponse.message || 'API Error')
-        setError(`Failed to load inventory from server: ${finishedGoodsResponse.message || 'Unknown error'}`)
+        console.error('Failed to load finished goods inventory:', (finishedGoodsResponse as any).error || 'API Error')
+        setError(`Failed to load inventory from server: ${(finishedGoodsResponse as any).error || 'Unknown error'}`)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load inventory')
@@ -186,27 +195,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
     setSortOrder('asc')
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'In Stock': return 'bg-green-100 text-green-800'
-      case 'Low Stock': return 'bg-yellow-100 text-yellow-800'
-      case 'Out of Stock': return 'bg-red-100 text-red-800'
-      case 'Overstock': return 'bg-blue-100 text-blue-800'
-      case 'Expired': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'In Stock': return <Package className="h-4 w-4" />
-      case 'Low Stock': return <AlertTriangle className="h-4 w-4" />
-      case 'Out of Stock': return <TrendingDown className="h-4 w-4" />
-      case 'Overstock': return <TrendingUp className="h-4 w-4" />
-      case 'Expired': return <AlertTriangle className="h-4 w-4" />
-      default: return <Package className="h-4 w-4" />
-    }
-  }
 
 
   const handleImport = () => {
@@ -354,7 +343,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       if (response.success) {
         return response.data
       } else {
-        throw new Error(response.message || 'Failed to fetch transfer order')
+        throw new Error((response as any).error || 'Failed to fetch transfer order')
       }
     } catch (error) {
       console.error('Error fetching transfer order:', error)
@@ -396,7 +385,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
         console.log('Inventory update response:', inventoryResponse)
       } catch (error) {
         console.error('Inventory update failed:', error)
-        throw new Error(`Inventory update failed: ${error.message}`)
+        throw new Error(`Inventory update failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
       
       try {
@@ -408,7 +397,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
         console.log('Status update response:', statusResponse)
       } catch (error) {
         console.error('Status update failed:', error)
-        throw new Error(`Status update failed: ${error.message}`)
+        throw new Error(`Status update failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
 
       if (statusResponse.success && inventoryResponse.success) {
@@ -443,8 +432,8 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       
     } catch (error) {
       console.error('Error accepting transfer order:', error)
-      console.error('Error details:', error.message)
-      alert(`Failed to accept transfer order: ${error.message}`)
+      console.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
+      alert(`Failed to accept transfer order: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setTransferOrderLoading(false)
     }
@@ -469,7 +458,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
         console.log('Inventory update response:', inventoryResponse)
       } catch (error) {
         console.error('Inventory update failed:', error)
-        throw new Error(`Inventory update failed: ${error.message}`)
+        throw new Error(`Inventory update failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
       
       try {
@@ -481,7 +470,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
         console.log('Status update response:', statusResponse)
       } catch (error) {
         console.error('Status update failed:', error)
-        throw new Error(`Status update failed: ${error.message}`)
+        throw new Error(`Status update failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
 
       if (statusResponse.success && inventoryResponse.success) {
@@ -516,8 +505,8 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       
     } catch (error) {
       console.error('Error rejecting transfer order:', error)
-      console.error('Error details:', error.message)
-      alert(`Failed to reject transfer order: ${error.message}`)
+      console.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
+      alert(`Failed to reject transfer order: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setTransferOrderLoading(false)
     }
@@ -528,7 +517,6 @@ const CentralKitchenFinishedGoods: React.FC = () => {
   const totalValue = finishedGoodInventoryItems.reduce((sum, item) => sum + item.totalValue, 0)
   const lowStockItems = finishedGoodInventoryItems.filter(item => item.status === 'Low Stock').length
   const outOfStockItems = finishedGoodInventoryItems.filter(item => item.status === 'Out of Stock').length
-  const overstockItems = finishedGoodInventoryItems.filter(item => item.status === 'Overstock').length
   const expiredItems = finishedGoodInventoryItems.filter(item => item.status === 'Expired').length
 
   // Get unique categories

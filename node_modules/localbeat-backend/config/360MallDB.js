@@ -14,7 +14,7 @@ const connect360MallDB = async () => {
 
     console.log(`✅ 360 Mall MongoDB Connected: ${conn.host}`);
     return conn;
-  } catch (error) {
+  } catch (error) {mak
     console.error('❌ 360 Mall MongoDB connection error:', error.message);
     process.exit(1);
   }

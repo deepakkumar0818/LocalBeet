@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, Save, X, Plus, Trash2, Package } from 'lucide-react'
-import { TransferOrder, TransferOrderItem } from '../types'
+import { TransferOrderItem } from '../types'
 import { apiService } from '../services/api'
 
 const AddTransferOrder: React.FC = () => {
@@ -22,8 +22,8 @@ const AddTransferOrder: React.FC = () => {
     toWarehouseName: '',
     transferDate: '',
     expectedDeliveryDate: '',
-    status: 'Draft' as 'Draft' | 'Approved' | 'In Transit' | 'Delivered' | 'Cancelled',
-    priority: 'Medium' as 'Low' | 'Medium' | 'High' | 'Urgent',
+    status: 'Draft' as 'Draft' | 'Pending' | 'Approved' | 'In Transit' | 'Delivered' | 'Cancelled',
+    priority: 'Medium' as 'Low' | 'Medium' | 'High' | 'Urgent' | 'Normal',
     totalAmount: 0,
     items: [] as TransferOrderItem[],
     transferType: 'Internal' as 'Internal' | 'External' | 'Emergency',
@@ -210,7 +210,6 @@ const AddTransferOrder: React.FC = () => {
 
     try {
       // Calculate total amount
-      const totalAmount = formData.items.reduce((sum, item) => sum + item.totalPrice, 0)
 
       // Prepare transfer order data for API
       const transferOrderData = {
@@ -220,8 +219,8 @@ const AddTransferOrder: React.FC = () => {
         priority: formData.priority,
         items: formData.items.map(item => ({
           itemType: item.itemType === 'raw-material' ? 'Raw Material' : 'Finished Goods',
-          itemCode: item.materialCode,
-          itemName: item.materialName,
+          itemCode: item.materialCode || '',
+          itemName: item.materialName || '',
           category: item.category,
           subCategory: item.subCategory,
           unitOfMeasure: item.unitOfMeasure,

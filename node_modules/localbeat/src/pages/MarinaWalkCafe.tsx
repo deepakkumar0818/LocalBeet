@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Package, TrendingUp, TrendingDown, AlertTriangle, BarChart3, Truck, Users, Clock, RefreshCw, ShoppingCart, Coffee } from 'lucide-react'
+import { Package, Truck, RefreshCw, ShoppingCart, Coffee, Plus, Receipt, CreditCard, AlertTriangle } from 'lucide-react'
 import { apiService } from '../services/api'
 import NotificationDropdown from '../components/NotificationDropdown'
 import { useNotifications } from '../hooks/useNotifications'
@@ -66,11 +66,12 @@ interface FinishedGoodInventoryItem {
 }
 
 interface Outlet {
-  _id: string
+  id: string
   outletCode: string
   outletName: string
   outletType: string
   isCentralKitchen: boolean
+  status?: string
 }
 
 const MarinaWalkCafe: React.FC = () => {
@@ -81,12 +82,11 @@ const MarinaWalkCafe: React.FC = () => {
   const [finishedGoodInventoryItems, setFinishedGoodInventoryItems] = useState<FinishedGoodInventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterCategory, setFilterCategory] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
-  const [sortBy, setSortBy] = useState('materialName')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
-  const [importing, setImporting] = useState(false)
+  const [searchTerm] = useState('')
+  const [filterCategory] = useState('')
+  const [filterStatus] = useState('')
+  const [sortBy] = useState('materialName')
+  const [sortOrder] = useState<'asc' | 'desc'>('asc')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications('360 Mall')
 
@@ -191,8 +191,8 @@ const MarinaWalkCafe: React.FC = () => {
           setError('No raw materials inventory found. Please add some raw materials to Vibe Complex.')
         }
       } else {
-        console.error('Failed to load raw materials inventory:', rawMaterialsResponse.message || 'API Error')
-        setError(`Failed to load inventory from server: ${rawMaterialsResponse.message || 'Unknown error'}`)
+        console.error('Failed to load raw materials inventory:', (rawMaterialsResponse as any).error || 'API Error')
+        setError(`Failed to load inventory from server: ${(rawMaterialsResponse as any).error || 'Unknown error'}`)
       }
 
       // Load finished goods from Vibe Complex dedicated database
@@ -249,7 +249,7 @@ const MarinaWalkCafe: React.FC = () => {
           setFinishedGoodInventoryItems([])
         }
       } else {
-        console.error('Failed to load finished goods inventory:', finishedGoodsResponse.message || 'API Error')
+        console.error('Failed to load finished goods inventory:', (finishedGoodsResponse as any).error || 'API Error')
         // Don't set error for finished goods as it's optional
       }
     } catch (err) {
@@ -258,39 +258,11 @@ const MarinaWalkCafe: React.FC = () => {
     }
   }
 
-  const clearFilters = () => {
-    setSearchTerm('')
-    setFilterCategory('')
-    setFilterStatus('')
-    setSortBy('materialName')
-    setSortOrder('asc')
-  }
 
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'In Stock': return 'bg-green-100 text-green-800'
-      case 'Low Stock': return 'bg-yellow-100 text-yellow-800'
-      case 'Out of Stock': return 'bg-red-100 text-red-800'
-      case 'Overstock': return 'bg-blue-100 text-blue-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'In Stock': return <Package className="h-4 w-4" />
-      case 'Low Stock': return <AlertTriangle className="h-4 w-4" />
-      case 'Out of Stock': return <TrendingDown className="h-4 w-4" />
-      case 'Overstock': return <TrendingUp className="h-4 w-4" />
-      default: return <Package className="h-4 w-4" />
-    }
-  }
 
 
-  const handleImport = () => {
-    fileInputRef.current?.click()
-  }
+
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -302,7 +274,7 @@ const MarinaWalkCafe: React.FC = () => {
     }
 
     try {
-      setImporting(true)
+      // setImporting(true)
       const text = await file.text()
       const lines = text.split('\n').filter(line => line.trim())
       
@@ -425,7 +397,7 @@ const MarinaWalkCafe: React.FC = () => {
     } catch (err) {
       alert('Error importing file: ' + (err instanceof Error ? err.message : 'Unknown error'))
     } finally {
-      setImporting(false)
+      // setImporting(false)
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }

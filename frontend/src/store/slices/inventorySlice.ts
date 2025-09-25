@@ -40,7 +40,9 @@ const loadFromStorage = (): RawMaterial[] => {
       supplierId: '',
       isActive: true,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      createdBy: 'admin',
+      updatedBy: 'admin'
     },
     {
       id: 'rm-002',
@@ -56,7 +58,9 @@ const loadFromStorage = (): RawMaterial[] => {
       supplierId: '',
       isActive: true,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      createdBy: 'admin',
+      updatedBy: 'admin'
     },
     {
       id: 'rm-003',
@@ -72,7 +76,9 @@ const loadFromStorage = (): RawMaterial[] => {
       supplierId: '',
       isActive: true,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      createdBy: 'admin',
+      updatedBy: 'admin'
     },
     {
       id: 'rm-004',
@@ -88,7 +94,9 @@ const loadFromStorage = (): RawMaterial[] => {
       supplierId: '',
       isActive: true,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      createdBy: 'admin',
+      updatedBy: 'admin'
     },
     {
       id: 'rm-005',
@@ -104,7 +112,9 @@ const loadFromStorage = (): RawMaterial[] => {
       supplierId: '',
       isActive: true,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      createdBy: 'admin',
+      updatedBy: 'admin'
     }
   ]
 }

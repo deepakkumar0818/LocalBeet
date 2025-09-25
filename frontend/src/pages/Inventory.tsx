@@ -120,7 +120,7 @@ const Inventory: React.FC = () => {
       totalValue: 2275.00,
       referenceNumber: 'PO-2024-001',
       referenceType: 'Purchase Order',
-      movementDate: new Date('2024-01-20'),
+      movementDate: new Date('2024-01-20').toISOString(),
       performedBy: 'John Smith',
       notes: 'Received from supplier',
       batchNumber: 'B001'
@@ -139,7 +139,7 @@ const Inventory: React.FC = () => {
       totalValue: 1875.00,
       referenceNumber: 'JO-2024-001',
       referenceType: 'Production Order',
-      movementDate: new Date('2024-01-19'),
+      movementDate: new Date('2024-01-19').toISOString(),
       performedBy: 'Jane Doe',
       notes: 'Issued for production',
       batchNumber: 'B002'
@@ -158,7 +158,7 @@ const Inventory: React.FC = () => {
       totalValue: 4750.00,
       referenceNumber: 'SO-2024-001',
       referenceType: 'Sales Order',
-      movementDate: new Date('2024-01-18'),
+      movementDate: new Date('2024-01-18').toISOString(),
       performedBy: 'Mike Johnson',
       notes: 'Sold to customer',
       batchNumber: 'B003'
@@ -389,7 +389,7 @@ const Inventory: React.FC = () => {
                       <div key={movement.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
                         <div>
                           <p className="text-sm font-medium text-gray-900">{movement.materialName}</p>
-                          <p className="text-xs text-gray-500">{movement.movementDate.toLocaleDateString()}</p>
+                          <p className="text-xs text-gray-500">{new Date(movement.movementDate).toLocaleDateString()}</p>
                         </div>
                         <div className="text-right">
                           <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getMovementTypeColor(movement.movementType)}`}>
@@ -483,7 +483,7 @@ const Inventory: React.FC = () => {
                   {filteredMovements.map(movement => (
                     <tr key={movement.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {movement.movementDate.toLocaleDateString()}
+                        {new Date(movement.movementDate).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>

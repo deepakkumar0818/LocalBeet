@@ -42,8 +42,8 @@ const EditPurchaseOrder: React.FC = () => {
     // supplierContact: 'John Smith',
     // supplierEmail: 'john@abcsteel.com',
     // supplierAddress: '123 Industrial Street, Manufacturing District, City, State 12345',
-    orderDate: new Date('2024-01-15'),
-    expectedDeliveryDate: new Date('2024-02-15'),
+    orderDate: new Date('2024-01-15').toISOString(),
+    expectedDeliveryDate: new Date('2024-02-15').toISOString(),
     // priority: 'High',
     status: 'Confirmed',
     // paymentTerms: 'Net 30',
@@ -83,8 +83,8 @@ const EditPurchaseOrder: React.FC = () => {
     ],
     notes: 'Supplier requires advance payment for expedited delivery.',
     // specialInstructions: 'All materials must be certified and include material certificates. Delivery to loading dock only.',
-    createdAt: new Date('2024-01-15'),
-    updatedAt: new Date('2024-01-20'),
+    createdAt: new Date('2024-01-15').toISOString(),
+    updatedAt: new Date('2024-01-20').toISOString(),
     createdBy: 'admin',
     updatedBy: 'admin'
   }
@@ -98,8 +98,8 @@ const EditPurchaseOrder: React.FC = () => {
         supplierContact: 'John Smith',
         supplierEmail: 'john@abcsteel.com',
         supplierAddress: '123 Industrial Street',
-        orderDate: mockPurchaseOrder.orderDate.toISOString().split('T')[0],
-        expectedDeliveryDate: mockPurchaseOrder.expectedDeliveryDate.toISOString().split('T')[0],
+        orderDate: mockPurchaseOrder.orderDate.split('T')[0],
+        expectedDeliveryDate: mockPurchaseOrder.expectedDeliveryDate.split('T')[0],
         // priority: 'High',
         priority: 'High',
         status: 'Approved',
@@ -160,8 +160,8 @@ const EditPurchaseOrder: React.FC = () => {
       // supplierContact: formData.supplierContact,
       // supplierEmail: formData.supplierEmail,
       // supplierAddress: formData.supplierAddress,
-      orderDate: new Date(formData.orderDate),
-      expectedDeliveryDate: new Date(formData.expectedDeliveryDate),
+      orderDate: new Date(formData.orderDate).toISOString(),
+      expectedDeliveryDate: new Date(formData.expectedDeliveryDate).toISOString(),
       // priority: formData.priority,
       status: formData.status as 'Draft' | 'Sent' | 'Confirmed' | 'Partial' | 'Completed' | 'Cancelled',
       // paymentTerms: formData.paymentTerms,
@@ -170,7 +170,7 @@ const EditPurchaseOrder: React.FC = () => {
       items: formData.items,
       notes: formData.notes,
       // specialInstructions: formData.specialInstructions,
-      updatedAt: new Date(),
+      updatedAt: new Date().toISOString(),
       updatedBy: 'admin'
     }
 

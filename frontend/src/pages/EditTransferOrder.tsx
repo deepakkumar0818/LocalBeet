@@ -15,7 +15,7 @@ const EditTransferOrder: React.FC = () => {
     toWarehouseName: '',
     transferDate: '',
     expectedDeliveryDate: '',
-    status: 'Draft' as 'Draft' | 'Approved' | 'In Transit' | 'Delivered' | 'Cancelled',
+    status: 'Draft' as 'Draft' | 'Pending' | 'Approved' | 'In Transit' | 'Delivered' | 'Cancelled',
     priority: 'Medium' as 'Low' | 'Medium' | 'High' | 'Urgent',
     totalAmount: 0,
     items: [] as TransferOrderItem[],
@@ -30,7 +30,7 @@ const EditTransferOrder: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
-  const statusOptions = ['Draft', 'Approved', 'In Transit', 'Delivered', 'Cancelled']
+  const statusOptions = ['Draft', 'Pending', 'Approved', 'In Transit', 'Delivered', 'Cancelled']
   const priorityOptions = ['Low', 'Medium', 'High', 'Urgent']
   const transferTypeOptions = ['Internal', 'External', 'Emergency']
 
@@ -50,8 +50,8 @@ const EditTransferOrder: React.FC = () => {
     fromWarehouseName: 'Main Warehouse',
     toWarehouseId: 'WH-002',
     toWarehouseName: 'Secondary Warehouse',
-    transferDate: new Date('2024-01-20'),
-    expectedDeliveryDate: new Date('2024-01-22'),
+    transferDate: new Date('2024-01-20').toISOString(),
+    expectedDeliveryDate: new Date('2024-01-22').toISOString(),
     status: 'In Transit',
     priority: 'High',
     totalAmount: 15750.00,
@@ -93,8 +93,8 @@ const EditTransferOrder: React.FC = () => {
     transferType: 'Internal',
     reason: 'Inventory rebalancing between warehouses for better distribution',
     notes: 'Transfer approved for inventory optimization. Ensure proper handling of aluminum sheets.',
-    createdAt: new Date('2024-01-20'),
-    updatedAt: new Date('2024-01-21'),
+    createdAt: new Date('2024-01-20').toISOString(),
+    updatedAt: new Date('2024-01-21').toISOString(),
     createdBy: 'admin',
     updatedBy: 'admin'
   }
@@ -108,8 +108,8 @@ const EditTransferOrder: React.FC = () => {
         fromWarehouseName: mockTransferOrder.fromWarehouseName,
         toWarehouseId: mockTransferOrder.toWarehouseId,
         toWarehouseName: mockTransferOrder.toWarehouseName,
-        transferDate: mockTransferOrder.transferDate.toISOString().split('T')[0],
-        expectedDeliveryDate: mockTransferOrder.expectedDeliveryDate?.toISOString().split('T')[0] || '',
+        transferDate: mockTransferOrder.transferDate.split('T')[0],
+        expectedDeliveryDate: mockTransferOrder.expectedDeliveryDate?.split('T')[0] || '',
         status: mockTransferOrder.status,
         priority: mockTransferOrder.priority,
         totalAmount: mockTransferOrder.totalAmount,
@@ -174,8 +174,8 @@ const EditTransferOrder: React.FC = () => {
       fromWarehouseName: formData.fromWarehouseName,
       toWarehouseId: formData.toWarehouseId,
       toWarehouseName: formData.toWarehouseName,
-      transferDate: new Date(formData.transferDate),
-      expectedDeliveryDate: new Date(formData.expectedDeliveryDate),
+      transferDate: new Date(formData.transferDate).toISOString(),
+      expectedDeliveryDate: new Date(formData.expectedDeliveryDate).toISOString(),
       status: formData.status,
       priority: formData.priority,
       totalAmount,
@@ -186,7 +186,7 @@ const EditTransferOrder: React.FC = () => {
       transferType: formData.transferType,
       reason: formData.reason,
       notes: formData.notes,
-      updatedAt: new Date(),
+      updatedAt: new Date().toISOString(),
       updatedBy: 'admin'
     }
 

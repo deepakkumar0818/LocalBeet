@@ -4,13 +4,9 @@ import {
   LayoutDashboard, 
   Package, 
   FileText, 
-  ClipboardList, 
   ShoppingCart, 
-  Receipt, 
-  Warehouse, 
   Truck,
   BarChart3,
-  TrendingUp,
   Menu,
   X,
   Settings,
@@ -31,7 +27,15 @@ interface LayoutProps {
   children: React.ReactNode
 }
 
-const navigation = [
+interface NavigationItem {
+  name: string;
+  href?: string;
+  icon: any;
+  hasDropdown?: boolean;
+  children?: NavigationItem[];
+}
+
+const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Recipe Master', href: '/bill-of-materials', icon: FileText },
   // { name: 'Job Orders', href: '/job-orders', icon: ClipboardList },
@@ -202,8 +206,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       <div className="ml-6 mt-1 space-y-1">
                         {item.children.map((child) => {
                           const ChildIcon = child.icon
-                          const isChildActive = location.pathname === child.href
-                          const hasChildDropdown = child.hasDropdown
+                          const isChildActive = child.href ? location.pathname === child.href : false
+                          const hasChildDropdown = child.hasDropdown || false
                           const isChildDropdownOpen = openDropdowns.has(child.name)
                           
                           if (hasChildDropdown) {
@@ -227,13 +231,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 </button>
                                 {isChildDropdownOpen && child.children && (
                                   <div className="ml-6 mt-1 space-y-1">
-                                    {child.children.map((grandChild) => {
+                                    {child.children.map((grandChild: NavigationItem) => {
                                       const GrandChildIcon = grandChild.icon
-                                      const isGrandChildActive = location.pathname === grandChild.href
+                                      const isGrandChildActive = grandChild.href ? location.pathname === grandChild.href : false
                                       return (
                                         <Link
                                           key={grandChild.name}
-                                          to={grandChild.href}
+                                          to={grandChild.href || '#'}
                                           className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                                             isGrandChildActive
                                               ? 'bg-primary-100 text-primary-700'
@@ -254,7 +258,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           return (
                             <Link
                               key={child.name}
-                              to={child.href}
+                              to={child.href || '#'}
                               className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                                 isChildActive
                                   ? 'bg-primary-100 text-primary-700'
@@ -336,8 +340,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       <div className="ml-6 mt-1 space-y-1">
                         {item.children.map((child) => {
                           const ChildIcon = child.icon
-                          const isChildActive = location.pathname === child.href
-                          const hasChildDropdown = child.hasDropdown
+                          const isChildActive = child.href ? location.pathname === child.href : false
+                          const hasChildDropdown = child.hasDropdown || false
                           const isChildDropdownOpen = openDropdowns.has(child.name)
                           
                           if (hasChildDropdown) {
@@ -361,13 +365,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 </button>
                                 {isChildDropdownOpen && child.children && (
                                   <div className="ml-6 mt-1 space-y-1">
-                                    {child.children.map((grandChild) => {
+                                    {child.children.map((grandChild: NavigationItem) => {
                                       const GrandChildIcon = grandChild.icon
-                                      const isGrandChildActive = location.pathname === grandChild.href
+                                      const isGrandChildActive = grandChild.href ? location.pathname === grandChild.href : false
                                       return (
                                         <Link
                                           key={grandChild.name}
-                                          to={grandChild.href}
+                                          to={grandChild.href || '#'}
                                           className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                                             isGrandChildActive
                                               ? 'bg-primary-100 text-primary-700'
@@ -388,7 +392,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           return (
                             <Link
                               key={child.name}
-                              to={child.href}
+                              to={child.href || '#'}
                               className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                                 isChildActive
                                   ? 'bg-primary-100 text-primary-700'

@@ -33,8 +33,8 @@ const GoodReceiptNotes: React.FC = () => {
       warehouseName: 'Main Warehouse',
       receivedBy: 'John Doe',
       notes: 'All items received in good condition',
-      createdAt: new Date('2024-01-20'),
-      updatedAt: new Date('2024-01-20'),
+    createdAt: new Date('2024-01-20').toISOString(),
+    updatedAt: new Date('2024-01-20').toISOString(),
       createdBy: 'admin',
       updatedBy: 'admin'
     }
@@ -157,8 +157,8 @@ const GoodReceiptNotes: React.FC = () => {
             receivedBy: values[6] || 'admin',
             createdBy: values[6] || 'admin',
             updatedBy: values[7] || 'admin',
-            createdAt: new Date(),
-            updatedAt: new Date()
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
           }
 
           setGRNs(prev => [...prev, grnData])

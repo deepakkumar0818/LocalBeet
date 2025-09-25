@@ -1,8 +1,8 @@
 // Base interfaces
 export interface BaseEntity {
   id: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
   createdBy: string;
   updatedBy: string;
 }
@@ -47,7 +47,7 @@ export interface BillOfMaterials extends BaseEntity {
   productName: string;
   productDescription: string;
   version: string;
-  effectiveDate: Date;
+  effectiveDate: string;
   expiryDate?: Date;
   status: 'Draft' | 'Active' | 'Obsolete';
   totalCost: number;
@@ -71,7 +71,7 @@ export interface JobOrder extends BaseEntity {
   jobOrderNumber: string;
   customerId: string;
   customerName: string;
-  orderDate: Date;
+  orderDate: string;
   deliveryDate: Date;
   status: 'Pending' | 'In Progress' | 'Completed' | 'Cancelled';
   priority: 'Low' | 'Medium' | 'High' | 'Urgent';
@@ -95,8 +95,8 @@ export interface PurchaseOrder extends BaseEntity {
   poNumber: string;
   supplierId: string;
   supplierName: string;
-  orderDate: Date;
-  expectedDeliveryDate: Date;
+  orderDate: string;
+  expectedDeliveryDate: string;
   status: 'Draft' | 'Sent' | 'Confirmed' | 'Partial' | 'Completed' | 'Cancelled';
   totalAmount: number;
   items: PurchaseOrderItem[];
@@ -166,7 +166,7 @@ export interface StoreIssueVoucher extends BaseEntity {
   department: string;
   issuedTo: string;
   issuedBy: string;
-  issueDate: Date;
+  issueDate: string;
   status: 'Draft' | 'Approved' | 'Issued' | 'Cancelled';
   totalAmount: number;
   items: StoreIssueItem[];
@@ -178,15 +178,22 @@ export interface StoreIssueVoucher extends BaseEntity {
 
 // Transfer Order
 export interface TransferOrderItem {
-  materialId: string;
-  materialCode: string;
-  materialName: string;
+  id?: string;
+  materialId?: string;
+  materialCode?: string;
+  materialName?: string;
+  itemCode?: string;
+  itemName?: string;
   itemType?: 'raw-material' | 'finished-good';
+  category?: string;
+  subCategory?: string;
   quantity: number;
   unitOfMeasure: string;
   unitPrice: number;
   totalPrice: number;
+  totalValue?: number;
   remarks?: string;
+  notes?: string;
 }
 
 export interface TransferOrder extends BaseEntity {
@@ -195,9 +202,9 @@ export interface TransferOrder extends BaseEntity {
   fromWarehouseName: string;
   toWarehouseId: string;
   toWarehouseName: string;
-  transferDate: Date;
-  expectedDeliveryDate?: Date;
-  status: 'Draft' | 'Approved' | 'In Transit' | 'Delivered' | 'Cancelled';
+  transferDate: string;
+  expectedDeliveryDate?: string;
+  status: 'Draft' | 'Pending' | 'Approved' | 'In Transit' | 'Delivered' | 'Cancelled';
   priority: 'Low' | 'Medium' | 'High' | 'Urgent';
   totalAmount: number;
   items: TransferOrderItem[];
@@ -268,11 +275,18 @@ export interface ApiResponse<T> {
 }
 
 export interface PaginatedResponse<T> {
+  success: boolean;
   data: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+  message?: string;
+  error?: string;
 }
 
 // Inventory Management
@@ -315,7 +329,7 @@ export interface StockMovement {
   totalValue: number;
   referenceNumber?: string;
   referenceType?: 'Purchase Order' | 'Sales Order' | 'Transfer Order' | 'Production Order' | 'Adjustment';
-  movementDate: Date;
+  movementDate: string;
   performedBy: string;
   notes?: string;
   batchNumber?: string;
@@ -325,7 +339,7 @@ export interface StockMovement {
 export interface InventoryReport {
   id: string;
   reportType: 'Stock Summary' | 'Stock Movement' | 'Low Stock Alert' | 'Value Report' | 'ABC Analysis';
-  generatedDate: Date;
+  generatedDate: string;
   generatedBy: string;
   period: {
     startDate: Date;

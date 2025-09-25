@@ -1,16 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Edit, Trash2, Filter, Download, Upload } from 'lucide-react'
 import { RawMaterial } from '../types'
 import { useAppSelector, useAppDispatch } from '../store/hooks'
-import { 
-  setLoading, 
-  setError, 
-  importRawMaterials,
-  addRawMaterial,
-  updateRawMaterial,
-  deleteRawMaterial
-} from '../store/slices/inventorySlice'
+import { importRawMaterials } from '../store/slices/inventorySlice'
+import { apiService } from '../services/api'
 
 const RawMaterials: React.FC = () => {
   const navigate = useNavigate()
@@ -124,7 +118,7 @@ const RawMaterials: React.FC = () => {
         const response = await apiService.deleteRawMaterial(id)
         if (response.success) {
           // Reload materials from API
-          await loadMaterials()
+          window.location.reload()
         } else {
           alert('Failed to delete material')
         }
@@ -385,7 +379,9 @@ const RawMaterials: React.FC = () => {
             supplierId: '',
             isActive: true,
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
+            createdBy: 'admin',
+            updatedBy: 'admin'
           }
 
           console.log('Processed material data:', materialData)
@@ -402,7 +398,8 @@ const RawMaterials: React.FC = () => {
               description: materialData.description,
               category: materialData.category,
               unitOfMeasure: materialData.unitOfMeasure,
-              updatedAt: new Date().toISOString()
+              updatedAt: new Date().toISOString(),
+              updatedBy: 'admin'
             }
             
             updatedMaterials.push(updatedMaterial)
@@ -474,7 +471,7 @@ const RawMaterials: React.FC = () => {
           </div>
           <p className="text-red-600 mb-4">{error}</p>
           <button
-            onClick={loadMaterials}
+            onClick={() => window.location.reload()}
             className="btn-primary"
           >
             Retry
@@ -679,7 +676,6 @@ const RawMaterials: React.FC = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredMaterials.map((material) => {
-                const stockStatus = getStockStatus(material.currentStock, material.minimumStock)
                 return (
                   <tr key={material.id} className="hover:bg-gray-50">
                     <td className="table-cell font-medium">{material.materialCode}</td>

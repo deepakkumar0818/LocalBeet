@@ -126,13 +126,13 @@ const PurchaseOrders: React.FC = () => {
       ...purchaseOrders.map(po => [
         po.poNumber,
         po.supplierName,
-        po.orderDate.toLocaleDateString(),
-        po.expectedDeliveryDate.toLocaleDateString(),
+        new Date(po.orderDate).toLocaleDateString(),
+        new Date(po.expectedDeliveryDate).toLocaleDateString(),
         po.status,
         po.terms,
         po.totalAmount.toFixed(2),
-        po.createdAt.toLocaleDateString(),
-        po.updatedAt.toLocaleDateString(),
+        new Date(po.createdAt).toLocaleDateString(),
+        new Date(po.updatedAt).toLocaleDateString(),
         po.notes || ''
       ].map(field => `"${field}"`).join(','))
     ].join('\n')
@@ -266,11 +266,11 @@ const PurchaseOrders: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Order Date</label>
-                  <p className="text-sm text-gray-900">{selectedPO.orderDate.toLocaleDateString()}</p>
+                  <p className="text-sm text-gray-900">{new Date(selectedPO.orderDate).toLocaleDateString()}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Expected Delivery</label>
-                  <p className="text-sm text-gray-900">{selectedPO.expectedDeliveryDate.toLocaleDateString()}</p>
+                  <p className="text-sm text-gray-900">{new Date(selectedPO.expectedDeliveryDate).toLocaleDateString()}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Status</label>
@@ -511,8 +511,8 @@ const PurchaseOrders: React.FC = () => {
                 <tr key={po.id} className="hover:bg-gray-50">
                   <td className="table-cell font-medium">{po.poNumber}</td>
                   <td className="table-cell">{po.supplierName}</td>
-                  <td className="table-cell">{po.orderDate.toLocaleDateString()}</td>
-                  <td className="table-cell">{po.expectedDeliveryDate.toLocaleDateString()}</td>
+                <td className="table-cell">{new Date(po.orderDate).toLocaleDateString()}</td>
+                <td className="table-cell">{new Date(po.expectedDeliveryDate).toLocaleDateString()}</td>
                   <td className="table-cell">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(po.status)}`}>
                       {po.status}

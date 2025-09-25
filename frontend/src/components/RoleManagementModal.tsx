@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { X, Save, Shield, Plus, Trash2 } from 'lucide-react'
+import { X, Save, Shield, Trash2 } from 'lucide-react'
 
 interface Role {
   id: string

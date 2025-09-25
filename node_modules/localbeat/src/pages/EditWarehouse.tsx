@@ -55,8 +55,8 @@ const EditWarehouse: React.FC = () => {
     managerName: 'John Smith',
     isActive: true,
     storageTypes: ['Dry Storage', 'Cold Storage'],
-    createdAt: new Date('2024-01-15'),
-    updatedAt: new Date('2024-01-20'),
+    createdAt: new Date('2024-01-15').toISOString(),
+    updatedAt: new Date('2024-01-20').toISOString(),
     createdBy: 'admin',
     updatedBy: 'admin'
   }
@@ -152,7 +152,7 @@ const EditWarehouse: React.FC = () => {
       managerName: formData.contactPerson,
       isActive: formData.status === 'Active',
       storageTypes: ['Dry Storage', 'Cold Storage'],
-      updatedAt: new Date(),
+      updatedAt: new Date().toISOString(),
       updatedBy: 'admin'
     }
 

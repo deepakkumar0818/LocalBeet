@@ -114,7 +114,7 @@ const Dashboard: React.FC = () => {
     totalSales: Object.values(outletSalesData).reduce((sum, outlet) => sum + outlet.totalSales, 0),
     totalOrders: Object.values(outletSalesData).reduce((sum, outlet) => sum + outlet.totalOrders, 0),
     avgOrderValue: 0, // Will be calculated
-    outletBreakdown: Object.entries(outletSalesData).map(([key, outlet]) => ({
+    outletBreakdown: Object.entries(outletSalesData).map(([, outlet]) => ({
       name: outlet.name,
       sales: outlet.totalSales,
       orders: outlet.totalOrders,
@@ -319,7 +319,7 @@ const Dashboard: React.FC = () => {
       <div className="card p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Top Products</h3>
         <div className="space-y-4">
-              {outlet.topProducts.map((product, index) => (
+              {outlet.topProducts.map((product) => (
                 <div key={product.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div>
                     <p className="font-medium text-gray-900">{product.name}</p>

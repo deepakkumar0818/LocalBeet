@@ -1,5 +1,5 @@
 import React from 'react'
-import { X, Truck, Store, Package, Calendar, User, AlertCircle } from 'lucide-react'
+import { X, Truck, Store, Calendar, User, AlertCircle } from 'lucide-react'
 
 export interface TransferOrderItem {
   _id?: string
@@ -79,22 +79,6 @@ const TransferOrderModal: React.FC<TransferOrderModalProps> = ({
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'Approved':
-        return 'bg-green-100 text-green-800 border-green-200'
-      case 'In Transit':
-        return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'Delivered':
-        return 'bg-green-100 text-green-800 border-green-200'
-      case 'Cancelled':
-        return 'bg-red-100 text-red-800 border-red-200'
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
-    }
-  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -191,7 +175,7 @@ const TransferOrderModal: React.FC<TransferOrderModalProps> = ({
                   <span className="text-sm font-medium text-gray-600">Requested By</span>
                 </div>
                 <p className="text-gray-900">{transferOrder.requestedBy}</p>
-                <p className="text-xs text-gray-500">{formatDate(transferOrder.requestedAt)}</p>
+                <p className="text-xs text-gray-500">{formatDate(transferOrder.requestedAt || transferOrder.transferDate)}</p>
               </div>
             </div>
 

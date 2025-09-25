@@ -71,8 +71,8 @@ const AddPurchaseOrder: React.FC = () => {
       poNumber: formData.purchaseOrderNumber,
       supplierId: 'SUP-001',
       supplierName: formData.supplierName,
-      orderDate: new Date(formData.orderDate),
-      expectedDeliveryDate: new Date(formData.expectedDeliveryDate),
+      orderDate: new Date(formData.orderDate).toISOString(),
+      expectedDeliveryDate: new Date(formData.expectedDeliveryDate).toISOString(),
       status: formData.status as 'Draft' | 'Sent' | 'Confirmed' | 'Partial' | 'Completed' | 'Cancelled',
       totalAmount,
       items: formData.items.map(item => ({
@@ -85,8 +85,8 @@ const AddPurchaseOrder: React.FC = () => {
       })),
       terms: formData.paymentTerms,
       notes: formData.notes,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       createdBy: 'admin',
       updatedBy: 'admin'
     }

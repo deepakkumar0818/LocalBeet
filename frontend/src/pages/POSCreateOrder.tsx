@@ -7,9 +7,7 @@ import {
   Search, 
   ShoppingCart, 
   CreditCard, 
-  Receipt,
   ArrowLeft,
-  User,
   Clock,
   Package
 } from 'lucide-react'
@@ -31,7 +29,7 @@ interface CartItem {
 }
 
 interface Customer {
-  id: string
+  id?: string
   name: string
   phone: string
   email?: string
@@ -50,7 +48,7 @@ const POSCreateOrder: React.FC = () => {
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [discount, setDiscount] = useState(0)
-  const [tax, setTax] = useState(0)
+  const [tax] = useState(0)
   const [loading, setLoading] = useState(false)
 
   // Sample products data

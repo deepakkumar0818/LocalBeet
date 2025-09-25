@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Package, TrendingUp, TrendingDown, AlertTriangle, BarChart3, Truck, Users, Clock, RefreshCw, Car, ShoppingCart, Search } from 'lucide-react'
+import { Package, Truck, RefreshCw, Car, ShoppingCart, Search } from 'lucide-react'
 import { apiService } from '../services/api'
 import NotificationDropdown from '../components/NotificationDropdown'
 import { useNotifications } from '../hooks/useNotifications'
@@ -33,11 +33,12 @@ interface OutletInventoryItem {
 }
 
 interface Outlet {
-  _id: string
+  id: string
   outletCode: string
   outletName: string
   outletType: string
   isCentralKitchen: boolean
+  status?: string
 }
 
 interface FinishedGoodInventoryItem {
@@ -82,11 +83,11 @@ const DriveThruExpress: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterCategory, setFilterCategory] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
-  const [sortBy, setSortBy] = useState('materialName')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
-  const [importing, setImporting] = useState(false)
+  const [filterCategory] = useState('')
+  const [filterStatus] = useState('')
+  const [sortBy] = useState('materialName')
+  const [sortOrder] = useState<'asc' | 'desc'>('asc')
+  const [, setImporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications('Taiba Hospital')
   const [editingItem, setEditingItem] = useState<OutletInventoryItem | null>(null)
@@ -216,8 +217,8 @@ const DriveThruExpress: React.FC = () => {
           setError('No raw materials inventory found. Please add some raw materials to Taiba Kitchen.')
         }
       } else {
-        console.error('Failed to load raw materials inventory:', rawMaterialsResponse.message || 'API Error')
-        setError(`Failed to load inventory from server: ${rawMaterialsResponse.message || 'Unknown error'}`)
+        console.error('Failed to load raw materials inventory:', (rawMaterialsResponse as any).error || 'API Error')
+        setError(`Failed to load inventory from server: ${(rawMaterialsResponse as any).error || 'Unknown error'}`)
       }
 
       // Load finished goods inventory from Taiba Kitchen dedicated API
@@ -274,7 +275,7 @@ const DriveThruExpress: React.FC = () => {
           setFinishedGoodInventoryItems([])
         }
       } else {
-        console.error('Failed to load finished goods inventory:', finishedGoodsResponse.message || 'API Error')
+        console.error('Failed to load finished goods inventory:', (finishedGoodsResponse as any).error || 'API Error')
         // Don't set error for finished goods as it's optional
       }
     } catch (err) {
@@ -283,26 +284,7 @@ const DriveThruExpress: React.FC = () => {
     }
   }
 
-  const clearFilters = () => {
-    setSearchTerm('')
-    setFilterCategory('')
-    setFilterStatus('')
-    setSortBy('materialName')
-    setSortOrder('asc')
-  }
 
-  const handleEditItem = (item: OutletInventoryItem) => {
-    setEditingItem(item)
-    setEditFormData({
-      currentStock: item.currentStock.toString(),
-      minimumStock: item.minimumStock.toString(),
-      maximumStock: item.maximumStock.toString(),
-      reorderPoint: item.reorderPoint.toString(),
-      unitPrice: item.unitPrice.toString(),
-      notes: item.notes || ''
-    })
-    setShowEditModal(true)
-  }
 
   const handleSaveEdit = async () => {
     if (!editingItem) return
@@ -329,7 +311,7 @@ const DriveThruExpress: React.FC = () => {
         setShowEditModal(false)
         setEditingItem(null)
       } else {
-        alert(`Failed to update inventory item: ${response.message}`)
+        alert(`Failed to update inventory item: ${(response as any).error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error updating inventory item:', error)
@@ -398,7 +380,7 @@ const DriveThruExpress: React.FC = () => {
         setShowFinishedGoodEditModal(false)
         setEditingFinishedGood(null)
       } else {
-        alert(`Failed to update finished good inventory item: ${response.message}`)
+        alert(`Failed to update finished good inventory item: ${(response as any).error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error updating finished good inventory item:', error)
@@ -434,15 +416,6 @@ const DriveThruExpress: React.FC = () => {
     }
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'In Stock': return <Package className="h-4 w-4" />
-      case 'Low Stock': return <AlertTriangle className="h-4 w-4" />
-      case 'Out of Stock': return <TrendingDown className="h-4 w-4" />
-      case 'Overstock': return <TrendingUp className="h-4 w-4" />
-      default: return <Package className="h-4 w-4" />
-    }
-  }
 
   if (loading) {
     return (
@@ -492,9 +465,6 @@ const DriveThruExpress: React.FC = () => {
 
 
 
-  const handleImport = () => {
-    fileInputRef.current?.click()
-  }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]

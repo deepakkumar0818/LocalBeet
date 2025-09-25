@@ -131,14 +131,6 @@ const TransferOrders: React.FC = () => {
     }
   }
 
-  const getTransferTypeColor = (transferType: string) => {
-    switch (transferType) {
-      case 'Emergency': return 'bg-red-100 text-red-800'
-      case 'Regular': return 'bg-blue-100 text-blue-800'
-      case 'Scheduled': return 'bg-green-100 text-green-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
 
 
 
@@ -198,7 +190,11 @@ const TransferOrders: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">From Outlet</label>
                   <div className="text-sm text-gray-900">
-                    <div className="font-medium">{selectedTransfer.fromOutlet?.name || selectedTransfer.fromOutlet || 'N/A'}</div>
+                    <div className="font-medium">
+                      {typeof selectedTransfer.fromOutlet === 'object'
+                        ? selectedTransfer.fromOutlet?.name
+                        : selectedTransfer.fromOutlet || 'N/A'}
+                    </div>
                     {selectedTransfer.fromOutlet?.code && (
                       <>
                         <div className="text-xs text-gray-500">{selectedTransfer.fromOutlet.code} • {selectedTransfer.fromOutlet.type || 'Outlet'}</div>
@@ -210,7 +206,11 @@ const TransferOrders: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">To Outlet</label>
                   <div className="text-sm text-gray-900">
-                    <div className="font-medium">{selectedTransfer.toOutlet?.name || selectedTransfer.toOutlet || 'N/A'}</div>
+                    <div className="font-medium">
+                      {typeof selectedTransfer.toOutlet === 'object'
+                        ? selectedTransfer.toOutlet?.name
+                        : selectedTransfer.toOutlet || 'N/A'}
+                    </div>
                     {selectedTransfer.toOutlet?.code && (
                       <>
                         <div className="text-xs text-gray-500">{selectedTransfer.toOutlet.code} • {selectedTransfer.toOutlet.type || 'Outlet'}</div>
