@@ -1,5 +1,5 @@
-const VibeComplexRawMaterial = require('./vibeComplexRawMaterial');
-const VibeComplexFinishedProduct = require('./vibeComplexFinishedProduct');
+const VibeComplexRawMaterial = require('./VibeComplexRawMaterial');
+const VibeComplexFinishedProduct = require('./VibeComplexFinishedProduct');
 
 let vibeComplexConnection = null;
 let vibeComplexModels = {};
