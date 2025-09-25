@@ -1,5 +1,5 @@
-const Mall360RawMaterial = require('./mall360RawMaterial');
-const Mall360FinishedProduct = require('./mall360FinishedProduct');
+const Mall360RawMaterial = require('./Mall360RawMaterial');
+const Mall360FinishedProduct = require('./Mall360FinishedProduct');
 
 let mall360Connection = null;
 let mall360Models = {};

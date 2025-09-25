@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-
 const purchaseOrderItemSchema = new mongoose.Schema({
   materialId: { type: String, required: true },
   materialCode: { type: String, required: true },
