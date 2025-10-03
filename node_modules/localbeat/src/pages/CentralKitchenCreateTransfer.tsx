@@ -228,7 +228,9 @@ const CentralKitchenCreateTransfer: React.FC = () => {
       console.log('Creating transfer with data:', transferPayload)
 
       // Call the transfer API
+      console.log('🚀 Calling apiService.createTransfer...')
       const response = await apiService.createTransfer(transferPayload)
+      console.log('📥 Transfer API response:', response)
 
       if (response.success) {
         // Send notification to the destination outlet (Kuwait City, 360 Mall, Vibes Complex, or Taiba Hospital)
@@ -284,7 +286,12 @@ const CentralKitchenCreateTransfer: React.FC = () => {
       }
       
     } catch (err) {
-      console.error('Error creating transfer:', err)
+      console.error('❌ Error creating transfer:', err)
+      console.error('❌ Error details:', {
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined,
+        response: (err as any)?.response
+      })
       alert(`Failed to create transfer order: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
       setLoading(false)

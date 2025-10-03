@@ -806,7 +806,7 @@ const DowntownRestaurant: React.FC = () => {
           </button>
           {currentSection === 'raw-materials' && (
             <button
-              onClick={() => navigate('/transfer-orders/add?from=kuwait-city&section=raw-materials')}
+              onClick={() => navigate('/downtown-restaurant/request-raw-materials')}
               className="btn-primary flex items-center"
             >
               <Truck className="h-4 w-4 mr-2" />
@@ -815,20 +815,11 @@ const DowntownRestaurant: React.FC = () => {
           )}
           {currentSection === 'finished-goods' && (
             <button
-              onClick={() => navigate('/transfer-orders/add?from=kuwait-city&section=finished-goods')}
+              onClick={() => navigate('/downtown-restaurant/request-finished-goods')}
               className="btn-primary flex items-center"
             >
               <Truck className="h-4 w-4 mr-2" />
               Request Finished Goods
-            </button>
-          )}
-          {currentSection !== 'sales-orders' && currentSection !== 'raw-materials' && currentSection !== 'finished-goods' && (
-            <button
-              onClick={() => navigate('/transfer-orders/add?from=kuwait-city')}
-              className="btn-primary flex items-center"
-            >
-              <Truck className="h-4 w-4 mr-2" />
-              Request Transfer
             </button>
           )}
         <NotificationDropdown

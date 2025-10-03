@@ -306,7 +306,7 @@ const TransferOrders: React.FC = () => {
           <p className="text-gray-600">Manage material transfers between warehouses</p>
         </div>
         <button
-          onClick={() => navigate('/transfer-orders/add')}
+          onClick={() => navigate('/central-kitchen/create-transfer')}
           className="btn-primary flex items-center"
         >
           <Plus className="h-4 w-4 mr-2" />

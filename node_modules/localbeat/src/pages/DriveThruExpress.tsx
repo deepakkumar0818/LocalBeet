@@ -829,13 +829,22 @@ const DriveThruExpress: React.FC = () => {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </button>
-          {currentSection !== 'sales-orders' && (
+          {currentSection === 'raw-materials' && (
             <button
-              onClick={() => navigate('/transfer-orders/add')}
+              onClick={() => navigate('/drive-thru-express/request-raw-materials')}
               className="btn-primary flex items-center"
             >
               <Truck className="h-4 w-4 mr-2" />
-              Request Transfer
+              Request Raw Materials
+            </button>
+          )}
+          {currentSection === 'finished-goods' && (
+            <button
+              onClick={() => navigate('/drive-thru-express/request-finished-goods')}
+              className="btn-primary flex items-center"
+            >
+              <Truck className="h-4 w-4 mr-2" />
+              Request Finished Goods
             </button>
           )}
           <NotificationDropdown

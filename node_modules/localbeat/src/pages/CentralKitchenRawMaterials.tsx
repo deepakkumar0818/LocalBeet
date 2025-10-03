@@ -76,7 +76,9 @@ const CentralKitchenRawMaterials: React.FC = () => {
     notification.isTransferOrder && 
     (notification.itemType === 'Raw Material' || notification.itemType === 'Mixed') &&
     (notification.title?.includes('Transfer Request from Kuwait City') || 
-     notification.title?.includes('Transfer Request from 360 Mall'))
+     notification.title?.includes('Transfer Request from 360 Mall') ||
+     notification.title?.includes('Transfer Request from Vibe Complex') ||
+     notification.title?.includes('Transfer Request from Taiba Hospital'))
   )
 
   useEffect(() => {
@@ -451,10 +453,26 @@ const CentralKitchenRawMaterials: React.FC = () => {
         ).join(', ')
         
         // Determine target outlet based on transfer order source
-        const targetOutlet = transferOrder.fromOutlet || 'Kuwait City'
+        const targetOutlet = typeof transferOrder.fromOutlet === 'string' ? transferOrder.fromOutlet : (transferOrder.fromOutlet as any)?.outletName || transferOrder.fromOutlet?.name || 'Unknown Outlet'
         
+        console.log(`🔍 Transfer Order Details:`, {
+          transferOrderId,
+          fromOutlet: transferOrder.fromOutlet,
+          fromOutletType: typeof transferOrder.fromOutlet,
+          fromOutletString: JSON.stringify(transferOrder.fromOutlet),
+          toOutlet: transferOrder.toOutlet,
+          targetOutlet,
+          targetOutletType: typeof targetOutlet,
+          fullTransferOrder: transferOrder
+        })
         console.log(`Creating acceptance notification for ${targetOutlet}...`)
-        const notificationResponse = await apiService.createNotification({
+        
+        if (!targetOutlet) {
+          console.error('❌ ERROR: targetOutlet is undefined! Transfer order fromOutlet:', transferOrder.fromOutlet);
+          alert('Error: Cannot determine target outlet for notification');
+          return;
+        }
+        const notificationData = {
           title: 'Transfer Order Accepted',
           message: `Transfer order #${transferOrder.transferNumber} has been accepted. Items transferred: ${itemDetails}`,
           type: 'transfer_acceptance',
@@ -463,8 +481,11 @@ const CentralKitchenRawMaterials: React.FC = () => {
           transferOrderId: transferOrderId,
           itemType: itemType,
           priority: 'normal'
-        })
-        console.log('Notification response:', notificationResponse)
+        }
+        
+        console.log('🔔 Creating notification with data:', notificationData)
+        const notificationResponse = await apiService.createNotification(notificationData)
+        console.log('🔔 Notification response:', notificationResponse)
         
         alert(`Transfer order accepted and notification sent to ${targetOutlet}`)
         setShowTransferOrderModal(false)

@@ -10,9 +10,14 @@ router.get('/:outletName', (req, res) => {
     const { outletName } = req.params;
     const { type, limit = 50 } = req.query;
     
+    console.log(`🔔 Notifications API: Fetching notifications for outlet: "${outletName}"`);
+    console.log(`🔔 Available notifications:`, notifications.map(n => ({ id: n.id, targetOutlet: n.targetOutlet, title: n.title })));
+    
     let filteredNotifications = notifications.filter(notification => 
       notification.targetOutlet === outletName
     );
+    
+    console.log(`🔔 Filtered notifications for "${outletName}":`, filteredNotifications.length);
     
     // Filter by type if specified
     if (type) {
@@ -56,6 +61,14 @@ router.post('/', (req, res) => {
       itemType,
       priority = 'normal'
     } = req.body;
+    
+    console.log(`🔔 Creating notification:`, {
+      title,
+      targetOutlet,
+      sourceOutlet,
+      type,
+      itemType
+    });
     
     // Validate required fields
     if (!title || !message || !type || !targetOutlet) {
