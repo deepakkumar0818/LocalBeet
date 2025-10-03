@@ -33,6 +33,12 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
+  // Debug notifications
+  useEffect(() => {
+    console.log('🔔 NotificationDropdown: Received notifications:', notifications)
+    console.log('🔔 NotificationDropdown: Number of notifications:', notifications.length)
+  }, [notifications])
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

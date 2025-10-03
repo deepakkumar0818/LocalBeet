@@ -90,6 +90,20 @@ const MarinaWalkCafe: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Vibe Complex')
 
+  // Debug notifications when they change
+  useEffect(() => {
+    console.log(`🔔 Vibes Complex: Notifications updated:`, notifications)
+    console.log(`🔔 Vibes Complex: Number of notifications: ${notifications.length}`)
+    if (notifications.length > 0) {
+      console.log(`🔔 Vibes Complex: First notification:`, notifications[0])
+    }
+  }, [notifications])
+
+  // Debug when component mounts
+  useEffect(() => {
+    console.log(`🔔 Vibes Complex: Component mounted, loading notifications for: "Vibe Complex"`)
+  }, [])
+
   // Determine current section based on URL
   const getCurrentSection = () => {
     const path = location.pathname
@@ -105,22 +119,29 @@ const MarinaWalkCafe: React.FC = () => {
   const getFilteredNotifications = () => {
     const currentSection = getCurrentSection()
     
+    console.log(`🔔 Vibes Complex: Current section: ${currentSection}`)
+    console.log(`🔔 Vibes Complex: All notifications:`, notifications)
+    
+    let filtered = []
     if (currentSection === 'raw-materials') {
       // Show only Raw Material notifications
-      return notifications.filter(notification => 
+      filtered = notifications.filter(notification => 
         notification.isTransferOrder && 
         (notification.itemType === 'Raw Material' || notification.itemType === 'Mixed')
       )
     } else if (currentSection === 'finished-goods') {
       // Show only Finished Goods notifications
-      return notifications.filter(notification => 
+      filtered = notifications.filter(notification => 
         notification.isTransferOrder && 
         (notification.itemType === 'Finished Goods' || notification.itemType === 'Mixed')
       )
     } else {
       // Show all notifications for other sections
-      return notifications
+      filtered = notifications
     }
+    
+    console.log(`🔔 Vibes Complex: Filtered notifications for ${currentSection}:`, filtered)
+    return filtered
   }
 
   useEffect(() => {
@@ -141,6 +162,16 @@ const MarinaWalkCafe: React.FC = () => {
       }
     }
   }, [notifications])
+
+  // Auto-refresh notifications every 5 seconds to catch new approvals
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('🔄 Vibes Complex: Auto-refreshing notifications...')
+      refreshNotifications()
+    }, 5000) // Refresh every 5 seconds
+
+    return () => clearInterval(interval)
+  }, [refreshNotifications])
 
   // Reload inventory when filters change
   useEffect(() => {
@@ -806,13 +837,22 @@ const MarinaWalkCafe: React.FC = () => {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </button>
-          {currentSection !== 'sales-orders' && (
+          {currentSection === 'raw-materials' && (
             <button
-              onClick={() => navigate('/transfer-orders/add')}
+              onClick={() => navigate('/marina-walk-cafe/request-raw-materials')}
               className="btn-primary flex items-center"
             >
               <Truck className="h-4 w-4 mr-2" />
-              Request Transfer
+              Request Raw Materials
+            </button>
+          )}
+          {currentSection === 'finished-goods' && (
+            <button
+              onClick={() => navigate('/marina-walk-cafe/request-finished-goods')}
+              className="btn-primary flex items-center"
+            >
+              <Truck className="h-4 w-4 mr-2" />
+              Request Finished Goods
             </button>
           )}
           <NotificationDropdown

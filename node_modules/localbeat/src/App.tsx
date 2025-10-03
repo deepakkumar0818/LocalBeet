@@ -20,7 +20,6 @@ import WarehouseMaster from './pages/WarehouseMaster'
 import AddWarehouse from './pages/AddWarehouse'
 import EditWarehouse from './pages/EditWarehouse'
 import TransferOrders from './pages/TransferOrders'
-import AddTransferOrder from './pages/AddTransferOrder'
 import EditTransferOrder from './pages/EditTransferOrder'
 import Inventory from './pages/Inventory'
 import OutletMaster from './pages/OutletMaster'
@@ -42,6 +41,14 @@ import SalesOrders from './pages/SalesOrders'
 import AddSalesOrder from './pages/AddSalesOrder'
 import POSCreateOrder from './pages/POSCreateOrder'
 import Settings from './pages/Settings'
+import KuwaitCityRequestRawMaterials from './pages/KuwaitCityRequestRawMaterials'
+import KuwaitCityRequestFinishedGoods from './pages/KuwaitCityRequestFinishedGoods'
+import Mall360RequestRawMaterials from './pages/Mall360RequestRawMaterials'
+import Mall360RequestFinishedGoods from './pages/Mall360RequestFinishedGoods'
+import VibesComplexRequestRawMaterials from './pages/VibesComplexRequestRawMaterials'
+import VibesComplexRequestFinishedGoods from './pages/VibesComplexRequestFinishedGoods'
+import TaibaHospitalRequestRawMaterials from './pages/TaibaHospitalRequestRawMaterials'
+import TaibaHospitalRequestFinishedGoods from './pages/TaibaHospitalRequestFinishedGoods'
 
 function App() {
   return (
@@ -68,7 +75,6 @@ function App() {
         <Route path="/warehouse-master/add" element={<AddWarehouse />} />
         <Route path="/warehouse-master/edit/:id" element={<EditWarehouse />} />
         <Route path="/transfer-orders" element={<TransferOrders />} />
-        <Route path="/transfer-orders/add" element={<AddTransferOrder />} />
         <Route path="/transfer-orders/edit/:id" element={<EditTransferOrder />} />
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/outlets" element={<OutletMaster />} />
@@ -83,15 +89,23 @@ function App() {
         <Route path="/downtown-restaurant" element={<DowntownRestaurant />} />
         <Route path="/downtown-restaurant/raw-materials" element={<DowntownRestaurant />} />
         <Route path="/downtown-restaurant/finished-goods" element={<DowntownRestaurant />} />
+        <Route path="/downtown-restaurant/request-raw-materials" element={<KuwaitCityRequestRawMaterials />} />
+        <Route path="/downtown-restaurant/request-finished-goods" element={<KuwaitCityRequestFinishedGoods />} />
         <Route path="/marina-walk-cafe" element={<MarinaWalkCafe />} />
         <Route path="/marina-walk-cafe/raw-materials" element={<MarinaWalkCafe />} />
         <Route path="/marina-walk-cafe/finished-goods" element={<MarinaWalkCafe />} />
+        <Route path="/marina-walk-cafe/request-raw-materials" element={<VibesComplexRequestRawMaterials />} />
+        <Route path="/marina-walk-cafe/request-finished-goods" element={<VibesComplexRequestFinishedGoods />} />
         <Route path="/mall-food-court" element={<MallFoodCourt />} />
         <Route path="/mall-food-court/raw-materials" element={<MallFoodCourt />} />
         <Route path="/mall-food-court/finished-goods" element={<MallFoodCourt />} />
+        <Route path="/mall-food-court/request-raw-materials" element={<Mall360RequestRawMaterials />} />
+        <Route path="/mall-food-court/request-finished-goods" element={<Mall360RequestFinishedGoods />} />
         <Route path="/drive-thru-express" element={<DriveThruExpress />} />
         <Route path="/drive-thru-express/raw-materials" element={<DriveThruExpress />} />
         <Route path="/drive-thru-express/finished-goods" element={<DriveThruExpress />} />
+        <Route path="/drive-thru-express/request-raw-materials" element={<TaibaHospitalRequestRawMaterials />} />
+        <Route path="/drive-thru-express/request-finished-goods" element={<TaibaHospitalRequestFinishedGoods />} />
         <Route path="/raw-material-forecast" element={<RawMaterialForecast />} />
         <Route path="/raw-material-forecast/add" element={<AddForecast />} />
         <Route path="/sales-orders" element={<SalesOrders />} />

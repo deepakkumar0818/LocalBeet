@@ -28,7 +28,9 @@ export const useNotifications = (outletName?: string) => {
 
     try {
       setLoading(true)
+      console.log(`🔔 useNotifications: Loading notifications for outlet: "${outletName}"`)
       const response = await apiService.getNotifications(outletName, undefined, 20)
+      console.log(`🔔 useNotifications: API response:`, response)
       
       if (response.success) {
         const apiNotifications: Notification[] = response.data.map((notif: any) => {

@@ -94,22 +94,29 @@ const MallFoodCourt: React.FC = () => {
   const getFilteredNotifications = () => {
     const currentSection = getCurrentSection()
     
+    console.log(`🔔 360 Mall: Current section: ${currentSection}`)
+    console.log(`🔔 360 Mall: All notifications:`, notifications)
+    
+    let filtered = []
     if (currentSection === 'raw-materials') {
       // Show only Raw Material notifications
-      return notifications.filter(notification => 
+      filtered = notifications.filter(notification => 
         notification.isTransferOrder && 
         (notification.itemType === 'Raw Material' || notification.itemType === 'Mixed')
       )
     } else if (currentSection === 'finished-goods') {
       // Show only Finished Goods notifications
-      return notifications.filter(notification => 
+      filtered = notifications.filter(notification => 
         notification.isTransferOrder && 
         (notification.itemType === 'Finished Goods' || notification.itemType === 'Mixed')
       )
     } else {
       // Show all notifications for other sections
-      return notifications
+      filtered = notifications
     }
+    
+    console.log(`🔔 360 Mall: Filtered notifications for ${currentSection}:`, filtered)
+    return filtered
   }
 
   // Determine current section based on URL
@@ -125,6 +132,20 @@ const MallFoodCourt: React.FC = () => {
 
   useEffect(() => {
     loadOutletData()
+  }, [])
+
+  // Debug notifications when they change
+  useEffect(() => {
+    console.log(`🔔 360 Mall: Notifications updated:`, notifications)
+    console.log(`🔔 360 Mall: Number of notifications: ${notifications.length}`)
+    if (notifications.length > 0) {
+      console.log(`🔔 360 Mall: First notification:`, notifications[0])
+    }
+  }, [notifications])
+
+  // Debug when component mounts
+  useEffect(() => {
+    console.log(`🔔 360 Mall: Component mounted, loading notifications for: "360 Mall"`)
   }, [])
 
   // Reload inventory when filters change
@@ -148,6 +169,16 @@ const MallFoodCourt: React.FC = () => {
       }
     }
   }, [notifications])
+
+  // Auto-refresh notifications every 5 seconds to catch new approvals
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('🔄 360 Mall: Auto-refreshing notifications...')
+      refreshNotifications()
+    }, 5000) // Refresh every 5 seconds
+
+    return () => clearInterval(interval)
+  }, [refreshNotifications])
 
   const loadOutletData = async () => {
     try {
@@ -683,7 +714,7 @@ const MallFoodCourt: React.FC = () => {
           </button>
           {currentSection === 'raw-materials' && (
             <button
-              onClick={() => navigate('/transfer-orders/add?from=360-mall&section=raw-materials')}
+              onClick={() => navigate('/mall-food-court/request-raw-materials')}
               className="btn-primary flex items-center"
             >
               <Truck className="h-4 w-4 mr-2" />
@@ -692,20 +723,11 @@ const MallFoodCourt: React.FC = () => {
           )}
           {currentSection === 'finished-goods' && (
             <button
-              onClick={() => navigate('/transfer-orders/add?from=360-mall&section=finished-goods')}
+              onClick={() => navigate('/mall-food-court/request-finished-goods')}
               className="btn-primary flex items-center"
             >
               <Truck className="h-4 w-4 mr-2" />
               Request Finished Goods
-            </button>
-          )}
-          {currentSection !== 'sales-orders' && currentSection !== 'raw-materials' && currentSection !== 'finished-goods' && (
-            <button
-              onClick={() => navigate('/transfer-orders/add?from=360-mall')}
-              className="btn-primary flex items-center"
-            >
-              <Truck className="h-4 w-4 mr-2" />
-              Request Transfer
             </button>
           )}
           <NotificationDropdown

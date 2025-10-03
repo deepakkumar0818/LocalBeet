@@ -1775,14 +1775,25 @@ class ApiService {
     totalValue: number;
     notes?: string;
   }) {
-    return this.request<{
-      success: boolean;
-      message: string;
-      data: any;
-    }>('/transfers/create', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    console.log('🔧 API Service: createTransfer called with data:', data);
+    console.log('🔧 API Service: Calling /transfers/create endpoint');
+    
+    try {
+      const response = await this.request<{
+        success: boolean;
+        message: string;
+        data: any;
+      }>('/transfers/create', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      
+      console.log('🔧 API Service: createTransfer response:', response);
+      return response;
+    } catch (error) {
+      console.error('🔧 API Service: createTransfer error:', error);
+      throw error;
+    }
   }
 
   // Taiba Kitchen Raw Materials API
@@ -2096,6 +2107,9 @@ class ApiService {
     const queryString = params.toString();
     const endpoint = queryString ? `/${outletName}?${queryString}` : `/${outletName}`;
     
+    console.log(`🔔 API Service: getNotifications called for outlet: "${outletName}"`)
+    console.log(`🔔 API Service: Constructed endpoint: "/notifications${endpoint}"`)
+    
     return this.request<{
       success: boolean;
       data: Array<{
@@ -2125,14 +2139,24 @@ class ApiService {
     itemType?: string;
     priority?: string;
   }) {
-    return this.request<{
-      success: boolean;
-      message: string;
-      data: any;
-    }>('/notifications', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    console.log('🔔 API Service: createNotification called with data:', data);
+    
+    try {
+      const response = await this.request<{
+        success: boolean;
+        message: string;
+        data: any;
+      }>('/notifications', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      
+      console.log('🔔 API Service: createNotification response:', response);
+      return response;
+    } catch (error) {
+      console.error('🔔 API Service: createNotification error:', error);
+      throw error;
+    }
   }
 
   async markNotificationAsRead(notificationId: string) {
