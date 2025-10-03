@@ -10,6 +10,8 @@ const AddTransferOrder: React.FC = () => {
   const [isFromCentralKitchen, setIsFromCentralKitchen] = useState(false)
   const [isFromKuwaitCity, setIsFromKuwaitCity] = useState(false)
   const [kuwaitCitySection, setKuwaitCitySection] = useState<'raw-materials' | 'finished-goods' | 'both'>('both')
+  const [isFrom360Mall, setIsFrom360Mall] = useState(false)
+  const [mall360Section, setMall360Section] = useState<'raw-materials' | 'finished-goods' | 'both'>('both')
   const [outlets, setOutlets] = useState<any[]>([])
   const [centralKitchen, setCentralKitchen] = useState<any>(null)
   const [rawMaterials, setRawMaterials] = useState<any[]>([])
@@ -32,7 +34,7 @@ const AddTransferOrder: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Check if coming from Central Kitchen or Kuwait City
+  // Check if coming from Central Kitchen, Kuwait City, or 360 Mall
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search)
     const fromParam = urlParams.get('from')
@@ -52,6 +54,17 @@ const AddTransferOrder: React.FC = () => {
       }
       
       loadKuwaitCityData()
+    } else if (fromParam === '360-mall') {
+      setIsFrom360Mall(true)
+      
+      // Determine which section to show
+      if (sectionParam === 'raw-materials' || sectionParam === 'finished-goods') {
+        setMall360Section(sectionParam as 'raw-materials' | 'finished-goods')
+      } else {
+        setMall360Section('both')
+      }
+      
+      load360MallData()
     }
   }, [location.search])
 
@@ -154,6 +167,73 @@ const AddTransferOrder: React.FC = () => {
     }
   }
 
+  const load360MallData = async () => {
+    try {
+      console.log('Loading 360 Mall data for section:', mall360Section)
+
+      // Set 360 Mall as from outlet and Central Kitchen as to outlet
+      const today = new Date().toISOString().split('T')[0]
+      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+      // Generate transfer number
+      const transferNumber = `TR-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
+
+      setFormData(prev => ({
+        ...prev,
+        transferNumber: transferNumber,
+        fromWarehouseId: '360 Mall',
+        fromWarehouseName: '360 Mall',
+        toWarehouseId: 'Central Kitchen',
+        toWarehouseName: 'Central Kitchen',
+        transferDate: today,
+        expectedDeliveryDate: tomorrow,
+        status: 'Pending',
+        priority: 'Normal'
+      }))
+      
+      // Only load data for the specific section
+      if (mall360Section === 'raw-materials' || mall360Section === 'both') {
+        const rawMaterialsResponse = await fetch('/api/360-mall/raw-materials?limit=1000')
+        const rawMaterialsData = await rawMaterialsResponse.json()
+        
+        console.log('Raw Materials API Response:', rawMaterialsData)
+        
+        if (rawMaterialsData.success && rawMaterialsData.data) {
+          const rawMaterials = Array.isArray(rawMaterialsData.data) ? rawMaterialsData.data : []
+          setRawMaterials(rawMaterials)
+          console.log('Raw Materials loaded for 360 Mall:', rawMaterials.length, 'items')
+        } else {
+          console.error('Failed to load Raw Materials:', rawMaterialsData)
+          setRawMaterials([])
+        }
+      } else {
+        setRawMaterials([])
+      }
+
+      if (mall360Section === 'finished-goods' || mall360Section === 'both') {
+        const finishedGoodsResponse = await fetch('/api/360-mall/finished-products?limit=1000')
+        const finishedGoodsData = await finishedGoodsResponse.json()
+        
+        console.log('Finished Goods API Response:', finishedGoodsData)
+        
+        if (finishedGoodsData.success && finishedGoodsData.data) {
+          const finishedGoods = Array.isArray(finishedGoodsData.data) ? finishedGoodsData.data : []
+          setFinishedGoods(finishedGoods)
+          console.log('Finished Goods loaded for 360 Mall:', finishedGoods.length, 'items')
+        } else {
+          console.error('Failed to load Finished Goods:', finishedGoodsData)
+          setFinishedGoods([])
+        }
+      } else {
+        setFinishedGoods([])
+      }
+    } catch (error) {
+      console.error('Error loading 360 Mall data:', error)
+      setRawMaterials([])
+      setFinishedGoods([])
+    }
+  }
+
   const statusOptions = ['Draft', 'Approved', 'In Transit', 'Delivered', 'Cancelled']
   const priorityOptions = ['Low', 'Medium', 'High', 'Urgent']
   const transferTypeOptions = ['Internal', 'External', 'Emergency']
@@ -211,9 +291,14 @@ const AddTransferOrder: React.FC = () => {
     try {
       // Calculate total amount
 
+      // Determine requested by based on source outlet
+      const requestedBy = isFromKuwaitCity ? 'Kuwait City Manager' : 
+                         isFrom360Mall ? '360 Mall Manager' : 
+                         'Central Kitchen Manager'
+
       // Prepare transfer order data for API
       const transferOrderData = {
-        fromOutlet: formData.fromWarehouseId || 'Kuwait City',
+        fromOutlet: formData.fromWarehouseId || (isFromKuwaitCity ? 'Kuwait City' : isFrom360Mall ? '360 Mall' : 'Central Kitchen'),
         toOutlet: formData.toWarehouseId || 'Central Kitchen',
         transferDate: formData.transferDate,
         priority: formData.priority,
@@ -229,7 +314,7 @@ const AddTransferOrder: React.FC = () => {
           notes: item.remarks
         })),
         notes: formData.notes,
-        requestedBy: 'Kuwait City Manager'
+        requestedBy: requestedBy
       }
 
       console.log('Creating Transfer Order:', transferOrderData)
@@ -241,6 +326,44 @@ const AddTransferOrder: React.FC = () => {
       console.log('API Response:', response)
 
       if (response.success) {
+        // Send notification to Central Kitchen if request is from an outlet
+        if (isFromKuwaitCity || isFrom360Mall) {
+          try {
+            // Determine item type for notification
+            const itemTypes = formData.items.map(item => item.itemType === 'raw-material' ? 'Raw Material' : 'Finished Goods')
+            const uniqueItemTypes = [...new Set(itemTypes)]
+            const itemType = uniqueItemTypes.length === 1 ? uniqueItemTypes[0] : 'Mixed'
+            
+            // Create detailed item description for notification
+            const itemDetails = formData.items.map(item => 
+              `${item.materialName} (${item.quantity} ${item.unitOfMeasure})`
+            ).join(', ')
+            
+            // Determine source outlet
+            const sourceOutlet = isFromKuwaitCity ? 'Kuwait City' : '360 Mall'
+            
+            // Create notification data
+            const notificationData = {
+              title: `Transfer Request from ${sourceOutlet} - ${itemType}`,
+              message: `Transfer order #${transferOrderData.fromOutlet}-${Date.now()} from ${sourceOutlet}. Items: ${itemDetails}`,
+              type: `transfer_request_${itemType.toLowerCase().replace(' ', '_')}`,
+              targetOutlet: 'Central Kitchen',
+              sourceOutlet: sourceOutlet,
+              transferOrderId: response.data._id || response.data.id,
+              itemType: itemType,
+              priority: formData.priority === 'Urgent' ? 'high' : 'normal'
+            }
+            
+            // Send notification
+            const notificationResponse = await apiService.createNotification(notificationData)
+            console.log(`Notification sent to Central Kitchen:`, notificationResponse)
+            
+          } catch (notificationError) {
+            console.error('Failed to send notification to Central Kitchen:', notificationError)
+            // Don't fail the transfer order creation if notification fails
+          }
+        }
+        
         alert('Transfer order created successfully!')
         navigate('/transfer-orders')
       } else {

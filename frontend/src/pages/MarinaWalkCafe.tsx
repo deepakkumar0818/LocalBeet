@@ -88,7 +88,7 @@ const MarinaWalkCafe: React.FC = () => {
   const [sortBy] = useState('materialName')
   const [sortOrder] = useState<'asc' | 'desc'>('asc')
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications('360 Mall')
+  const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Vibe Complex')
 
   // Determine current section based on URL
   const getCurrentSection = () => {
@@ -101,9 +101,46 @@ const MarinaWalkCafe: React.FC = () => {
 
   const currentSection = getCurrentSection()
 
+  // Filter notifications based on current section
+  const getFilteredNotifications = () => {
+    const currentSection = getCurrentSection()
+    
+    if (currentSection === 'raw-materials') {
+      // Show only Raw Material notifications
+      return notifications.filter(notification => 
+        notification.isTransferOrder && 
+        (notification.itemType === 'Raw Material' || notification.itemType === 'Mixed')
+      )
+    } else if (currentSection === 'finished-goods') {
+      // Show only Finished Goods notifications
+      return notifications.filter(notification => 
+        notification.isTransferOrder && 
+        (notification.itemType === 'Finished Goods' || notification.itemType === 'Mixed')
+      )
+    } else {
+      // Show all notifications for other sections
+      return notifications
+    }
+  }
+
   useEffect(() => {
     loadOutletData()
   }, [])
+
+  // Refresh inventory when notifications change (e.g., when transfer orders are received from Central Kitchen)
+  useEffect(() => {
+    if (notifications.length > 0) {
+      // Check if there are any new transfer notifications from Central Kitchen
+      const hasNewTransferNotifications = notifications.some(notif => 
+        !notif.read && notif.title?.includes('Transfer from Central Kitchen')
+      )
+      
+      if (hasNewTransferNotifications) {
+        console.log('New transfer notification detected for Vibes Complex, refreshing inventory...')
+        loadInventory()
+      }
+    }
+  }, [notifications])
 
   // Reload inventory when filters change
   useEffect(() => {
@@ -751,7 +788,7 @@ const MarinaWalkCafe: React.FC = () => {
             <Coffee className="h-8 w-8 text-green-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">360 Mall</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Vibes Complex</h1>
             <p className="text-gray-600">
               {currentSection === 'raw-materials' ? 'Raw Materials Inventory' :
                currentSection === 'finished-goods' ? 'Finished Goods Inventory' :
@@ -779,10 +816,11 @@ const MarinaWalkCafe: React.FC = () => {
             </button>
           )}
           <NotificationDropdown
-            notifications={notifications}
+            notifications={getFilteredNotifications()}
             onMarkAsRead={markAsRead}
             onMarkAllAsRead={markAllAsRead}
             onClearAll={clearAll}
+            onRefresh={refreshNotifications}
           />
         </div>
       </div>

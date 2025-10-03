@@ -69,22 +69,22 @@ const navigation: NavigationItem[] = [
       },
       { 
         name: '360 Mall', 
-        icon: Coffee, 
-        hasDropdown: true,
-        children: [
-          { name: 'POS Sales', href: '/marina-walk-cafe/sales-orders', icon: ShoppingCart },
-          { name: 'Raw Material Inventory', href: '/marina-walk-cafe/raw-materials', icon: Package },
-          { name: 'Finished Goods Inventory', href: '/marina-walk-cafe/finished-goods', icon: Layers },
-        ]
-      },
-      { 
-        name: 'Vibes Complex', 
         icon: ShoppingBag, 
         hasDropdown: true,
         children: [
           { name: 'POS Sales', href: '/mall-food-court/sales-orders', icon: ShoppingCart },
           { name: 'Raw Material Inventory', href: '/mall-food-court/raw-materials', icon: Package },
           { name: 'Finished Goods Inventory', href: '/mall-food-court/finished-goods', icon: Layers },
+        ]
+      },
+      { 
+        name: 'Vibes Complex', 
+        icon: Coffee, 
+        hasDropdown: true,
+        children: [
+          { name: 'POS Sales', href: '/marina-walk-cafe/sales-orders', icon: ShoppingCart },
+          { name: 'Raw Material Inventory', href: '/marina-walk-cafe/raw-materials', icon: Package },
+          { name: 'Finished Goods Inventory', href: '/marina-walk-cafe/finished-goods', icon: Layers },
         ]
       },
       { 
@@ -133,31 +133,58 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <>
       <style>{`
-        /* Custom scrollbar styling for sidebar */
+        /* Enhanced scrollbar styling for sidebar */
         .sidebar-nav::-webkit-scrollbar {
-          width: 8px;
+          width: 6px;
         }
         .sidebar-nav::-webkit-scrollbar-track {
-          background: #f3f4f6;
-          border-radius: 4px;
+          background: transparent;
+          border-radius: 3px;
         }
         .sidebar-nav::-webkit-scrollbar-thumb {
-          background: #9ca3af;
-          border-radius: 4px;
+          background: #d1d5db;
+          border-radius: 3px;
+          transition: background-color 0.2s ease;
         }
         .sidebar-nav::-webkit-scrollbar-thumb:hover {
-          background: #6b7280;
+          background: #9ca3af;
         }
         .sidebar-nav {
           scrollbar-width: thin;
-          scrollbar-color: #9ca3af #f3f4f6;
+          scrollbar-color: #d1d5db transparent;
+        }
+        
+        /* Smooth scrolling behavior */
+        .sidebar-nav {
+          scroll-behavior: smooth;
+        }
+        
+        /* Ensure proper height constraints */
+        .sidebar-container {
+          height: calc(100vh - 4rem); /* Subtract header height */
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .sidebar-nav-container {
+          flex: 1;
+          overflow-y: auto;
+          overflow-x: hidden;
+          min-height: 0;
+        }
+        
+        /* Mobile sidebar height fix */
+        .mobile-sidebar-nav {
+          height: calc(100vh - 4rem);
+          overflow-y: auto;
+          overflow-x: hidden;
         }
       `}</style>
       <div className="min-h-screen bg-gray-50">
       {/* Mobile sidebar */}
       <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
-        <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-white">
+        <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-white sidebar-container">
           <div className="flex h-16 items-center justify-between px-4 flex-shrink-0">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -176,7 +203,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <X className="h-6 w-6" />
             </button>
           </div>
-          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto sidebar-nav min-h-0" style={{ scrollbarWidth: 'thin', scrollbarColor: '#d1d5db #f3f4f6' }}>
+          <div className="sidebar-nav-container">
+            <nav className="px-4 py-4 space-y-1 sidebar-nav mobile-sidebar-nav">
             {navigation.map((item) => {
               const Icon = item.icon
               const isActive = location.pathname === item.href
@@ -291,13 +319,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </Link>
               )
             })}
-          </nav>
+            </nav>
+          </div>
         </div>
       </div>
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex flex-col flex-grow bg-white border-r border-gray-200">
+        <div className="flex flex-col flex-grow bg-white border-r border-gray-200 sidebar-container">
           <div className="flex h-16 items-center px-4 flex-shrink-0">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -310,7 +339,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             </div>
           </div>
-          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto sidebar-nav min-h-0" style={{ scrollbarWidth: 'thin', scrollbarColor: '#d1d5db #f3f4f6' }}>
+          <div className="sidebar-nav-container">
+            <nav className="px-4 py-4 space-y-1 sidebar-nav">
             {navigation.map((item) => {
               const Icon = item.icon
               const isActive = location.pathname === item.href
@@ -425,7 +455,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </Link>
               )
             })}
-          </nav>
+            </nav>
+          </div>
           <div className="flex-shrink-0 border-t border-gray-200 p-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">

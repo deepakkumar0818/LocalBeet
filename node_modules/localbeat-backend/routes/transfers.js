@@ -3,7 +3,7 @@ const router = express.Router();
 const connectDB = require('../config/database');
 const { connectCentralKitchenDB } = require('../config/centralKitchenDB');
 const connectKuwaitCityDB = require('../config/kuwaitCityDB');
-const connectMall360DB = require('../config/mall360DB');
+const connect360MallDB = require('../config/360MallDB');
 const connectVibeComplexDB = require('../config/vibeComplexDB');
 const connectTaibaKitchenDB = require('../config/taibaKitchenDB');
 const { initializeCentralKitchenModels, getCentralKitchenModels } = require('../models/centralKitchenModels');
@@ -27,7 +27,7 @@ router.use(async (req, res, next) => {
       kuwaitCityModels = initializeKuwaitCityModels(kuwaitCityConnection);
     }
     if (!mall360Models) {
-      const mall360Connection = await connectMall360DB();
+      const mall360Connection = await connect360MallDB();
       mall360Models = initializeMall360Models(mall360Connection);
     }
     if (!vibeComplexModels) {
@@ -79,6 +79,8 @@ router.post('/create', async (req, res) => {
           return mall360Models;
         case 'vibe complex':
         case 'vibe-complex':
+        case 'vibes complex':
+        case 'vibes-complex':
           return vibeComplexModels;
         case 'taiba hospital':
         case 'taiba-kitchen':
@@ -209,7 +211,9 @@ router.post('/create', async (req, res) => {
       message: 'Transfer created successfully',
       data: {
         transferId: transferOrder?.transferNumber || `TR-${Date.now()}`,
-        transferOrderId: transferOrder?._id,
+        transferNumber: transferOrder?.transferNumber || `TR-${Date.now()}`,
+        _id: transferOrder?._id,
+        id: transferOrder?._id,
         fromOutlet,
         toOutlet,
         transferDate,
@@ -233,21 +237,31 @@ router.post('/create', async (req, res) => {
 
 // Helper function to handle Raw Material transfers
 async function handleRawMaterialTransfer(centralKitchenModels, outletModels, itemCode, quantity, notes) {
+  console.log(`\n🔄 Starting Raw Material Transfer for ${itemCode}`);
+  console.log(`   Quantity: ${quantity}`);
+  
   const CentralKitchenRawMaterial = centralKitchenModels.CentralKitchenRawMaterial;
   
   // Get the correct Raw Material model based on the outlet
   let OutletRawMaterial;
+  let outletName = 'Unknown';
   if (outletModels.KuwaitCityRawMaterial) {
     OutletRawMaterial = outletModels.KuwaitCityRawMaterial;
+    outletName = 'Kuwait City';
   } else if (outletModels.Mall360RawMaterial) {
     OutletRawMaterial = outletModels.Mall360RawMaterial;
+    outletName = '360 Mall';
   } else if (outletModels.VibeComplexRawMaterial) {
     OutletRawMaterial = outletModels.VibeComplexRawMaterial;
+    outletName = 'Vibe Complex';
   } else if (outletModels.TaibaKitchenRawMaterial) {
     OutletRawMaterial = outletModels.TaibaKitchenRawMaterial;
+    outletName = 'Taiba Kitchen';
   } else {
     throw new Error('No valid Raw Material model found for the outlet');
   }
+  
+  console.log(`   Target Outlet: ${outletName}`);
 
   // Find the item in Central Kitchen
   const centralKitchenItem = await CentralKitchenRawMaterial.findOne({ materialCode: itemCode });
@@ -256,11 +270,13 @@ async function handleRawMaterialTransfer(centralKitchenModels, outletModels, ite
   }
 
   // Check if sufficient stock is available
+  console.log(`   Central Kitchen Stock: ${centralKitchenItem.currentStock}`);
   if (centralKitchenItem.currentStock < quantity) {
     throw new Error(`Insufficient stock in Central Kitchen. Available: ${centralKitchenItem.currentStock}, Required: ${quantity}`);
   }
 
   // Subtract from Central Kitchen stock
+  console.log(`   ⬇️ Reducing Central Kitchen stock by ${quantity}`);
   await CentralKitchenRawMaterial.findByIdAndUpdate(
     centralKitchenItem._id,
     { 
@@ -275,7 +291,8 @@ async function handleRawMaterialTransfer(centralKitchenModels, outletModels, ite
   
   if (outletItem) {
     // Add to existing outlet stock
-    await OutletRawMaterial.findByIdAndUpdate(
+    console.log(`   ⬆️ Adding ${quantity} to existing ${outletName} stock (current: ${outletItem.currentStock})`);
+    const updated = await OutletRawMaterial.findByIdAndUpdate(
       outletItem._id,
       { 
         $inc: { currentStock: quantity },
@@ -283,8 +300,10 @@ async function handleRawMaterialTransfer(centralKitchenModels, outletModels, ite
       },
       { new: true }
     );
+    console.log(`   ✅ Updated ${outletName} stock to: ${updated.currentStock}`);
   } else {
     // Create new item in outlet with the transferred quantity
+    console.log(`   🆕 Creating new item in ${outletName} with quantity: ${quantity}`);
     const newOutletItem = {
       materialCode: centralKitchenItem.materialCode,
       materialName: centralKitchenItem.materialName,
@@ -302,16 +321,17 @@ async function handleRawMaterialTransfer(centralKitchenModels, outletModels, ite
       storageRequirements: centralKitchenItem.storageRequirements,
       shelfLife: centralKitchenItem.shelfLife,
       isActive: centralKitchenItem.isActive,
-      status: centralKitchenItem.currentStock > centralKitchenItem.minimumStock ? 'In Stock' : 'Low Stock',
+      status: quantity > centralKitchenItem.minimumStock ? 'In Stock' : 'Low Stock',
       notes: notes || centralKitchenItem.notes,
       createdBy: 'Transfer System',
       updatedBy: 'Transfer System'
     };
 
-    await OutletRawMaterial.create(newOutletItem);
+    const created = await OutletRawMaterial.create(newOutletItem);
+    console.log(`   ✅ Created new item in ${outletName}:`, created.materialCode, 'with stock:', created.currentStock);
   }
 
-  console.log(`Successfully transferred ${quantity} ${itemCode} (Raw Material) from Central Kitchen to outlet`);
+  console.log(`✅ Successfully transferred ${quantity} ${itemCode} (Raw Material) from Central Kitchen to ${outletName}`);
 }
 
 // Helper function to handle Finished Goods transfers
