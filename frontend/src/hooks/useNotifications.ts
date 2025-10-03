@@ -31,10 +31,7 @@ export const useNotifications = (outletName?: string) => {
       const response = await apiService.getNotifications(outletName, undefined, 20)
       
       if (response.success) {
-        console.log('Raw notification data from API:', response.data)
         const apiNotifications: Notification[] = response.data.map((notif: any) => {
-          console.log('Processing notification:', notif)
-          console.log('transferOrderId:', notif.transferOrderId)
           return {
             id: notif.id,
             title: notif.title,
@@ -52,7 +49,6 @@ export const useNotifications = (outletName?: string) => {
           }
         })
         
-        console.log('Processed notifications:', apiNotifications)
         setNotifications(apiNotifications)
       }
     } catch (error) {

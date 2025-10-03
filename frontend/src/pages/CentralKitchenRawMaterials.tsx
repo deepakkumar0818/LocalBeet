@@ -71,10 +71,12 @@ const CentralKitchenRawMaterials: React.FC = () => {
   const [transferOrderLoading, setTransferOrderLoading] = useState(false)
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Central Kitchen')
   
-  // Filter notifications to only show Raw Material transfer requests
+  // Filter notifications to only show Raw Material transfer requests from any outlet
   const rawMaterialNotifications = notifications.filter(notification => 
     notification.isTransferOrder && 
-    (notification.itemType === 'Raw Material' || notification.itemType === 'Mixed')
+    (notification.itemType === 'Raw Material' || notification.itemType === 'Mixed') &&
+    (notification.title?.includes('Transfer Request from Kuwait City') || 
+     notification.title?.includes('Transfer Request from 360 Mall'))
   )
 
   useEffect(() => {
@@ -442,18 +444,21 @@ const CentralKitchenRawMaterials: React.FC = () => {
       }
 
       if (statusResponse.success && inventoryResponse.success) {
-        // Send notification back to Kuwait City
+        // Send notification back to the requesting outlet
         const itemType = transferOrder.items[0]?.itemType || 'Mixed'
         const itemDetails = transferOrder.items.map(item => 
           `${item.itemName} (${item.quantity} ${item.unitOfMeasure || 'pcs'})`
         ).join(', ')
         
-        console.log('Creating acceptance notification for Kuwait City...')
+        // Determine target outlet based on transfer order source
+        const targetOutlet = transferOrder.fromOutlet || 'Kuwait City'
+        
+        console.log(`Creating acceptance notification for ${targetOutlet}...`)
         const notificationResponse = await apiService.createNotification({
           title: 'Transfer Order Accepted',
           message: `Transfer order #${transferOrder.transferNumber} has been accepted. Items transferred: ${itemDetails}`,
           type: 'transfer_acceptance',
-          targetOutlet: 'Kuwait City',
+          targetOutlet: targetOutlet,
           sourceOutlet: 'Central Kitchen',
           transferOrderId: transferOrderId,
           itemType: itemType,
@@ -461,7 +466,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
         })
         console.log('Notification response:', notificationResponse)
         
-        alert('Transfer order accepted and notification sent to Kuwait City')
+        alert(`Transfer order accepted and notification sent to ${targetOutlet}`)
         setShowTransferOrderModal(false)
         setSelectedTransferOrder(null)
         

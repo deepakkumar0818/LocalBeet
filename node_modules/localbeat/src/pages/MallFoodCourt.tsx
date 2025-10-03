@@ -88,7 +88,29 @@ const MallFoodCourt: React.FC = () => {
   const [sortBy] = useState('materialName')
   const [sortOrder] = useState<'asc' | 'desc'>('asc')
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications('Vibes Complex')
+  const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('360 Mall')
+
+  // Filter notifications based on current section
+  const getFilteredNotifications = () => {
+    const currentSection = getCurrentSection()
+    
+    if (currentSection === 'raw-materials') {
+      // Show only Raw Material notifications
+      return notifications.filter(notification => 
+        notification.isTransferOrder && 
+        (notification.itemType === 'Raw Material' || notification.itemType === 'Mixed')
+      )
+    } else if (currentSection === 'finished-goods') {
+      // Show only Finished Goods notifications
+      return notifications.filter(notification => 
+        notification.isTransferOrder && 
+        (notification.itemType === 'Finished Goods' || notification.itemType === 'Mixed')
+      )
+    } else {
+      // Show all notifications for other sections
+      return notifications
+    }
+  }
 
   // Determine current section based on URL
   const getCurrentSection = () => {
@@ -112,12 +134,27 @@ const MallFoodCourt: React.FC = () => {
     }
   }, [searchTerm, filterCategory, filterStatus, sortBy, sortOrder])
 
+  // Refresh inventory when notifications change (e.g., when transfer orders are received from Central Kitchen)
+  useEffect(() => {
+    if (notifications.length > 0) {
+      // Check if there are any new transfer notifications from Central Kitchen
+      const hasNewTransferNotifications = notifications.some(notif => 
+        !notif.read && notif.title?.includes('Transfer from Central Kitchen')
+      )
+      
+      if (hasNewTransferNotifications) {
+        console.log('New transfer notification detected for 360 Mall, refreshing inventory...')
+        loadInventory()
+      }
+    }
+  }, [notifications])
+
   const loadOutletData = async () => {
     try {
       setLoading(true)
       setError(null)
       
-      // Get Vibes Complex outlet
+      // Get 360 Mall outlet
       const outletsResponse = await apiService.getOutlets({ limit: 1000 })
       if (outletsResponse.success) {
         const mallFoodCourt = outletsResponse.data.find(outlet => outlet.outletCode === 'OUT-003')
@@ -125,7 +162,7 @@ const MallFoodCourt: React.FC = () => {
           setOutlet(mallFoodCourt)
           await loadInventory()
         } else {
-          setError('Vibes Complex not found')
+          setError('360 Mall not found')
         }
       } else {
         setError('Failed to load outlet data')
@@ -140,7 +177,8 @@ const MallFoodCourt: React.FC = () => {
 
   const loadInventory = async () => {
     try {
-      console.log('Loading 360 Mall inventory from dedicated database')
+      console.log('🔍 Loading 360 Mall inventory from dedicated database')
+      console.log('   Search params:', { searchTerm, filterCategory, filterStatus, sortBy, sortOrder })
       
       // Load raw materials from 360 Mall dedicated database
       const rawMaterialsResponse = await apiService.get360MallRawMaterials({
@@ -152,8 +190,14 @@ const MallFoodCourt: React.FC = () => {
         sortOrder
       })
 
+      console.log('📦 Raw Materials API Response:', {
+        success: rawMaterialsResponse.success,
+        dataLength: rawMaterialsResponse.data?.length || 0
+      })
+
       if (rawMaterialsResponse.success) {
-        console.log('Loaded 360 Mall Raw Materials:', rawMaterialsResponse.data)
+        console.log('✅ Loaded 360 Mall Raw Materials:', rawMaterialsResponse.data?.length || 0, 'items')
+        console.log('   First few items:', rawMaterialsResponse.data?.slice(0, 3))
         
         if (rawMaterialsResponse.data && rawMaterialsResponse.data.length > 0) {
           // Transform the data to match the expected interface
@@ -276,7 +320,7 @@ const MallFoodCourt: React.FC = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading Vibes Complex...</p>
+          <p className="mt-4 text-gray-600">Loading 360 Mall...</p>
         </div>
       </div>
     )
@@ -364,8 +408,8 @@ const MallFoodCourt: React.FC = () => {
           const newItem: OutletInventoryItem = {
             id: `rm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             outletId: outlet?.id || 'mall-food-court-001',
-            outletCode: outlet?.outletCode || 'MFC001',
-            outletName: outlet?.outletName || 'Vibes Complex',
+            outletCode: outlet?.outletCode || 'OUT-003',
+            outletName: outlet?.outletName || '360 Mall',
             materialId: materialData.materialCode,
             materialCode: materialData.materialCode,
             materialName: materialData.materialName,
@@ -619,7 +663,7 @@ const MallFoodCourt: React.FC = () => {
             <ShoppingBag className="h-8 w-8 text-orange-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Vibes Complex</h1>
+            <h1 className="text-2xl font-bold text-gray-900">360 Mall</h1>
             <p className="text-gray-600">
               {currentSection === 'raw-materials' ? 'Raw Materials Inventory' :
                currentSection === 'finished-goods' ? 'Finished Goods Inventory' :
@@ -637,9 +681,27 @@ const MallFoodCourt: React.FC = () => {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </button>
-          {currentSection !== 'sales-orders' && (
+          {currentSection === 'raw-materials' && (
             <button
-              onClick={() => navigate('/transfer-orders/add')}
+              onClick={() => navigate('/transfer-orders/add?from=360-mall&section=raw-materials')}
+              className="btn-primary flex items-center"
+            >
+              <Truck className="h-4 w-4 mr-2" />
+              Request Raw Materials
+            </button>
+          )}
+          {currentSection === 'finished-goods' && (
+            <button
+              onClick={() => navigate('/transfer-orders/add?from=360-mall&section=finished-goods')}
+              className="btn-primary flex items-center"
+            >
+              <Truck className="h-4 w-4 mr-2" />
+              Request Finished Goods
+            </button>
+          )}
+          {currentSection !== 'sales-orders' && currentSection !== 'raw-materials' && currentSection !== 'finished-goods' && (
+            <button
+              onClick={() => navigate('/transfer-orders/add?from=360-mall')}
               className="btn-primary flex items-center"
             >
               <Truck className="h-4 w-4 mr-2" />
@@ -647,10 +709,11 @@ const MallFoodCourt: React.FC = () => {
             </button>
           )}
           <NotificationDropdown
-            notifications={notifications}
+            notifications={getFilteredNotifications()}
             onMarkAsRead={markAsRead}
             onMarkAllAsRead={markAllAsRead}
             onClearAll={clearAll}
+            onRefresh={refreshNotifications}
           />
         </div>
       </div>

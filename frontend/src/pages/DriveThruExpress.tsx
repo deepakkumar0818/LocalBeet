@@ -89,7 +89,7 @@ const DriveThruExpress: React.FC = () => {
   const [sortOrder] = useState<'asc' | 'desc'>('asc')
   const [, setImporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications('Taiba Hospital')
+  const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Taiba Hospital')
   const [editingItem, setEditingItem] = useState<OutletInventoryItem | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editFormData, setEditFormData] = useState({
@@ -127,9 +127,45 @@ const DriveThruExpress: React.FC = () => {
 
   const currentSection = getCurrentSection()
 
+  // Filter notifications based on current section
+  const getFilteredNotifications = () => {
+    const currentSection = getCurrentSection()
+    
+    if (currentSection === 'raw-materials') {
+      // Show only Raw Material notifications
+      return notifications.filter(notification => 
+        notification.isTransferOrder && 
+        (notification.itemType === 'Raw Material' || notification.itemType === 'Mixed')
+      )
+    } else if (currentSection === 'finished-goods') {
+      // Show only Finished Goods notifications
+      return notifications.filter(notification => 
+        notification.isTransferOrder && 
+        (notification.itemType === 'Finished Goods' || notification.itemType === 'Mixed')
+      )
+    } else {
+      // Show all notifications for other sections
+      return notifications
+    }
+  }
+
   useEffect(() => {
     loadOutletData()
   }, [])
+
+  // Refresh inventory when notifications change (e.g., when transfer orders are received from Central Kitchen)
+  useEffect(() => {
+    if (notifications.length > 0) {
+      const hasNewTransferNotifications = notifications.some(notif => 
+        !notif.read && notif.title?.includes('Transfer from Central Kitchen')
+      )
+      
+      if (hasNewTransferNotifications) {
+        console.log('New transfer notification detected for Taiba Hospital, refreshing inventory...')
+        loadInventory()
+      }
+    }
+  }, [notifications])
 
   // Reload inventory when filters change
   useEffect(() => {
@@ -803,10 +839,11 @@ const DriveThruExpress: React.FC = () => {
             </button>
           )}
           <NotificationDropdown
-            notifications={notifications}
+            notifications={getFilteredNotifications()}
             onMarkAsRead={markAsRead}
             onMarkAllAsRead={markAllAsRead}
             onClearAll={clearAll}
+            onRefresh={refreshNotifications}
           />
         </div>
       </div>

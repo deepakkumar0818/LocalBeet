@@ -231,7 +231,42 @@ const CentralKitchenCreateTransfer: React.FC = () => {
       const response = await apiService.createTransfer(transferPayload)
 
       if (response.success) {
-        alert(`Transfer created successfully!\n\nTransfer Details:\nFrom: ${outlet?.outletName}\nTo: ${transferPayload.toOutlet}\nItems: ${transferItems.length}\nTotal Value: ${transferPayload.totalValue.toFixed(2)} KWD\n\nTransfer ID: ${response.data.transferId}\n\nStock has been updated in both Central Kitchen and destination outlet.`)
+        // Send notification to the destination outlet (Kuwait City, 360 Mall, Vibes Complex, or Taiba Hospital)
+        if (transferPayload.toOutlet === 'Kuwait City' || transferPayload.toOutlet === '360 Mall' || transferPayload.toOutlet === 'Vibe Complex' || transferPayload.toOutlet === 'Taiba Hospital') {
+          try {
+            // Determine item type for notification
+            const itemTypes = transferItems.map(item => item.itemType)
+            const uniqueItemTypes = [...new Set(itemTypes)]
+            const itemType = uniqueItemTypes.length === 1 ? uniqueItemTypes[0] : 'Mixed'
+            
+            // Create detailed item description for notification
+            const itemDetails = transferItems.map(item => 
+              `${item.itemName} (${item.quantity} ${item.unitOfMeasure})`
+            ).join(', ')
+            
+            // Create notification data
+            const notificationData = {
+              title: `New Transfer from Central Kitchen - ${itemType}`,
+              message: `Transfer order #${response.data.transferNumber || 'N/A'} from Central Kitchen. Items: ${itemDetails}`,
+              type: `transfer_from_central_kitchen_${itemType.toLowerCase().replace(' ', '_')}`,
+              targetOutlet: transferPayload.toOutlet, // Dynamic: Kuwait City or 360 Mall
+              sourceOutlet: 'Central Kitchen',
+              transferOrderId: response.data._id || response.data.id,
+              itemType: itemType,
+              priority: transferPayload.priority === 'Urgent' ? 'high' : 'normal'
+            }
+            
+            // Send notification
+            const notificationResponse = await apiService.createNotification(notificationData)
+            console.log(`Notification sent to ${transferPayload.toOutlet}:`, notificationResponse)
+            
+          } catch (notificationError) {
+            console.error(`Failed to send notification to ${transferPayload.toOutlet}:`, notificationError)
+            // Don't fail the transfer if notification fails
+          }
+        }
+        
+        alert(`Transfer created successfully!\n\nTransfer Details:\nFrom: ${outlet?.outletName}\nTo: ${transferPayload.toOutlet}\nItems: ${transferItems.length}\nTotal Value: ${transferPayload.totalValue.toFixed(2)} KWD\n\nTransfer ID: ${response.data.transferId}\n\nStock has been updated in both Central Kitchen and destination outlet.${(transferPayload.toOutlet === 'Kuwait City' || transferPayload.toOutlet === '360 Mall' || transferPayload.toOutlet === 'Vibe Complex' || transferPayload.toOutlet === 'Taiba Hospital') ? `\n\nNotification sent to ${transferPayload.toOutlet}.` : ''}`)
         
         // Clear all forms and data after successful creation
         setItemForms([])
