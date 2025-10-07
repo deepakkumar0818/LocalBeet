@@ -1,5 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://localbeet.onrender.com/api";
-// const API_BASE_URL = "http://localhost:5000/api"
+// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://localbeet.onrender.com/api";
+const API_BASE_URL = "http://localhost:5000/api"
 
 class ApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -1827,6 +1827,33 @@ class ApiService {
       success: boolean;
       data: any;
     }>(`/taiba-kitchen/raw-materials/${id}`);
+  }
+
+  // Zoho Sync API
+  async syncWithZoho() {
+    console.log('🔄 API Service: Starting Zoho sync...');
+    
+    try {
+      const response = await this.request<{
+        success: boolean;
+        message: string;
+        data: {
+          totalItems: number;
+          addedItems: number;
+          updatedItems: number;
+          errorItems: number;
+          syncTimestamp: string;
+        };
+      }>('/sync-zoho/central-kitchen', {
+        method: 'POST'
+      });
+      
+      console.log('✅ API Service: Zoho sync completed successfully');
+      return response;
+    } catch (error) {
+      console.error('❌ API Service: Zoho sync failed:', error);
+      throw error;
+    }
   }
 
   async createTaibaKitchenRawMaterial(data: any) {

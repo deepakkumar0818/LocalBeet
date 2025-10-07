@@ -30,7 +30,6 @@ import CentralKitchenRawMaterials from './pages/CentralKitchenRawMaterials'
 import CentralKitchenFinishedGoods from './pages/CentralKitchenFinishedGoods'
 import CentralKitchenMakeFinishedGood from './pages/CentralKitchenMakeFinishedGood'
 import CentralKitchenCreateTransfer from './pages/CentralKitchenCreateTransfer'
-import AddInventoryItem from './pages/AddInventoryItem'
 import DowntownRestaurant from './pages/DowntownRestaurant'
 import MarinaWalkCafe from './pages/MarinaWalkCafe'
 import MallFoodCourt from './pages/MallFoodCourt'
@@ -85,7 +84,6 @@ function App() {
         <Route path="/central-kitchen/finished-goods" element={<CentralKitchenFinishedGoods />} />
         <Route path="/central-kitchen/make-finished-good" element={<CentralKitchenMakeFinishedGood />} />
         <Route path="/central-kitchen/create-transfer" element={<CentralKitchenCreateTransfer />} />
-        <Route path="/central-kitchen/add-item" element={<AddInventoryItem />} />
         <Route path="/downtown-restaurant" element={<DowntownRestaurant />} />
         <Route path="/downtown-restaurant/raw-materials" element={<DowntownRestaurant />} />
         <Route path="/downtown-restaurant/finished-goods" element={<DowntownRestaurant />} />
