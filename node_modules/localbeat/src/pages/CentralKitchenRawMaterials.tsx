@@ -833,6 +833,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Quantity</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
@@ -840,7 +841,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {inventoryItems.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center">
+                  <td colSpan={7} className="px-4 py-12 text-center">
                     <div className="text-gray-500">
                       <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                       <p className="text-lg font-medium text-gray-900 mb-2">No raw materials found</p>
@@ -870,6 +871,9 @@ const CentralKitchenRawMaterials: React.FC = () => {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                       {item.unitOfMeasure}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                      KWD {item.unitPrice ? Number(item.unitPrice).toFixed(3) : '0.000'}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                       {item.currentStock}

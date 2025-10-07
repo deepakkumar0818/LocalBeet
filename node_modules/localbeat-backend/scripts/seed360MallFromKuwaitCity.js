@@ -105,6 +105,6 @@ const seed360MallFromKuwaitCity = async () => {
 if (require.main === module) {
   seed360MallFromKuwaitCity();
 }
-
 module.exports = seed360MallFromKuwaitCity;
+
 
