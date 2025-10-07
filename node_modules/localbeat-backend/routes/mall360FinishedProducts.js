@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const connect360MallDB = require('../config/360MallDB');
+const connectMall360DB = require('../config/mall360DB');
 const { getMall360Models, initializeMall360Models } = require('../models/mall360Models');
 
 let Mall360FinishedProduct;
@@ -9,14 +9,14 @@ let Mall360FinishedProduct;
 router.use(async (req, res, next) => {
   if (!Mall360FinishedProduct) {
     try {
-      const connection = await connect360MallDB();
+      const connection = await connectMall360DB();
       const models = getMall360Models(connection);
       Mall360FinishedProduct = models.Mall360FinishedProduct;
       console.log('Mall360FinishedProduct model initialized for routes.');
     } catch (error) {
       try {
         // If models not initialized, initialize them first
-        const connection = await connect360MallDB();
+        const connection = await connectMall360DB();
         const models = initializeMall360Models(connection);
         Mall360FinishedProduct = models.Mall360FinishedProduct;
         console.log('Mall360FinishedProduct model initialized for routes.');

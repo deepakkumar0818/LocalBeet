@@ -3,7 +3,7 @@ const router = express.Router();
 const connectDB = require('../config/database');
 const { connectCentralKitchenDB } = require('../config/centralKitchenDB');
 const connectKuwaitCityDB = require('../config/kuwaitCityDB');
-const connect360MallDB = require('../config/360MallDB');
+const connectMall360DB = require('../config/mall360DB');
 const connectVibeComplexDB = require('../config/vibeComplexDB');
 const connectTaibaKitchenDB = require('../config/taibaKitchenDB');
 const { initializeCentralKitchenModels, getCentralKitchenModels } = require('../models/centralKitchenModels');
@@ -27,7 +27,7 @@ router.use(async (req, res, next) => {
       kuwaitCityModels = initializeKuwaitCityModels(kuwaitCityConnection);
     }
     if (!mall360Models) {
-      const mall360Connection = await connect360MallDB();
+      const mall360Connection = await connectMall360DB();
       mall360Models = initializeMall360Models(mall360Connection);
     }
     if (!vibeComplexModels) {
