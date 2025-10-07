@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Package, TrendingDown, AlertTriangle, RefreshCw, Upload, Plus, Bell } from 'lucide-react'
+import { Package, TrendingDown, AlertTriangle, RefreshCw, Upload, RotateCcw } from 'lucide-react'
 import { apiService } from '../services/api'
 import { useConfirmation } from '../hooks/useConfirmation'
 import ConfirmationModal from '../components/ConfirmationModal'
@@ -69,6 +69,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
   const [showTransferOrderModal, setShowTransferOrderModal] = useState(false)
   const [selectedTransferOrder, setSelectedTransferOrder] = useState<TransferOrder | null>(null)
   const [transferOrderLoading, setTransferOrderLoading] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Central Kitchen')
   
   // Filter notifications to only show Raw Material transfer requests from any outlet
@@ -170,7 +171,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
         } else {
           console.log('No raw materials inventory found for this central kitchen')
           setInventoryItems([])
-          setError('No raw materials inventory found. Please add some raw materials to the central kitchen.')
+          // Don't set error for empty inventory - show normal UI with empty state
         }
       } else {
         console.error('Failed to load raw materials inventory:', (inventoryResponse as any).error || 'API Error')
@@ -343,43 +344,6 @@ const CentralKitchenRawMaterials: React.FC = () => {
     }
   }
 
-  const handleMakeRequestedItemNotification = async () => {
-    // Get items with low stock or out of stock
-    const requestedItems = inventoryItems.filter(item => 
-      item.status === 'Low Stock' || item.status === 'Out of Stock'
-    )
-
-    if (requestedItems.length === 0) {
-      await showAlert(
-        'All Items In Stock',
-        'No items need to be requested at this time. All items are in stock.',
-        'info'
-      )
-      return
-    }
-
-    // Create notification message
-    const notificationMessage = `Requested Items Notification:\n\n` +
-      `Total items needing restock: ${requestedItems.length}\n\n` +
-      `Items to request:\n` +
-      requestedItems.map(item => 
-        `• ${item.materialName} (${item.materialCode}) - Current Stock: ${item.currentStock} ${item.unitOfMeasure}`
-      ).join('\n') +
-      `\n\nPlease contact suppliers to restock these items.`
-
-    // Show notification
-    await showAlert(
-      'Requested Items Notification',
-      notificationMessage,
-      'warning'
-    )
-    
-    // Here you could also implement additional notification logic like:
-    // - Send email notifications
-    // - Create notification records in database
-    // - Integrate with external notification services
-    console.log('Requested items notification generated:', requestedItems)
-  }
 
   // Get transfer order details from API
   const getTransferOrderDetails = async (transferOrderId: string): Promise<TransferOrder> => {
@@ -579,6 +543,32 @@ const CentralKitchenRawMaterials: React.FC = () => {
     }
   }
 
+  const handleSyncWithZoho = async () => {
+    setSyncing(true)
+    try {
+      console.log('🔄 Starting Zoho sync...')
+      const response = await apiService.syncWithZoho()
+      
+      if (response.success) {
+        showAlert(
+          'Sync Completed Successfully!',
+          `📊 Sync Results:\n• Total items processed: ${response.data.totalItems}\n• New items added: ${response.data.addedItems}\n• Items updated: ${response.data.updatedItems}\n• Errors: ${response.data.errorItems}\n\n🕒 Sync completed at: ${new Date(response.data.syncTimestamp).toLocaleString()}`,
+          'success'
+        )
+        
+        // Refresh the inventory data after successful sync
+        await loadCentralKitchenData()
+      } else {
+        showAlert('Sync Failed', response.message || 'Unknown error occurred during sync', 'error')
+      }
+    } catch (error) {
+      console.error('❌ Zoho sync failed:', error)
+      showAlert('Sync Failed', `Failed to sync with Zoho: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   // Calculate summary statistics
   const totalItems = inventoryItems.length
   const totalValue = inventoryItems.reduce((sum, item) => sum + item.totalValue, 0)
@@ -635,27 +625,21 @@ const CentralKitchenRawMaterials: React.FC = () => {
         </div>
         <div className="flex gap-3">
           <button
+            onClick={handleSyncWithZoho}
+            disabled={syncing}
+            className={`flex items-center ${syncing ? 'btn-disabled' : 'btn-primary'}`}
+            title="Sync inventory with Zoho"
+          >
+            <RotateCcw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync Inventory'}
+          </button>
+          <button
             onClick={loadCentralKitchenData}
             className="btn-secondary flex items-center"
             title="Refresh data"
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
-          </button>
-          <button
-            onClick={() => navigate('/central-kitchen/add-item')}
-            className="btn-primary flex items-center"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Raw Material
-          </button>
-          <button
-            onClick={handleMakeRequestedItemNotification}
-            className="btn-secondary flex items-center"
-            title="Requested Item"
-          >
-            <Bell className="h-4 w-4 mr-2" />
-            Requested Item
           </button>
           <NotificationDropdown
             notifications={rawMaterialNotifications}
@@ -854,34 +838,54 @@ const CentralKitchenRawMaterials: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {inventoryItems.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {item.materialCode}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {item.materialName}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {item.category}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {item.unitOfMeasure}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {item.currentStock}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => handleEditItem(item)}
-                      className="text-blue-600 hover:text-blue-900"
-                      title="Edit"
-                    >
-                      Edit
-                    </button>
+              {inventoryItems.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center">
+                    <div className="text-gray-500">
+                      <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                      <p className="text-lg font-medium text-gray-900 mb-2">No raw materials found</p>
+                      <p className="text-gray-600 mb-4">Click "Sync Inventory" to import items from Zoho Inventory</p>
+                      <button
+                        onClick={handleSyncWithZoho}
+                        disabled={syncing}
+                        className={`inline-flex items-center px-4 py-2 rounded-md text-sm font-medium ${syncing ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                      >
+                        <RotateCcw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                        {syncing ? 'Syncing...' : 'Sync Inventory'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                inventoryItems.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {item.materialCode}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {item.materialName}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {item.category}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {item.unitOfMeasure}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {item.currentStock}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={() => handleEditItem(item)}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="Edit"
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
