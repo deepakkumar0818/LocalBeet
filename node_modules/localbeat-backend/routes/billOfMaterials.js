@@ -136,19 +136,19 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Validate each item
+    // Validate each item (accept unitCost 0 for now but compute totalCost anyway)
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      if (!item.materialCode || !item.materialName || !item.quantity || !item.unitOfMeasure || !item.unitCost) {
+      if (!item.materialCode || !item.materialName || item.quantity == null || !item.unitOfMeasure) {
         return res.status(400).json({
           success: false,
-          message: `Item ${i + 1} is missing required fields (materialCode, materialName, quantity, unitOfMeasure, unitCost)`
+          message: `Item ${i + 1} is missing required fields (materialCode, materialName, quantity, unitOfMeasure)`
         });
       }
-      if (item.quantity <= 0 || item.unitCost <= 0) {
+      if (parseFloat(item.quantity) <= 0) {
         return res.status(400).json({
           success: false,
-          message: `Item ${i + 1} has invalid quantity or unit cost (must be greater than 0)`
+          message: `Item ${i + 1} has invalid quantity (must be greater than 0)`
         });
       }
     }
@@ -174,8 +174,8 @@ router.post('/', async (req, res) => {
         materialName: item.materialName,
         quantity: item.quantity,
         unitOfMeasure: item.unitOfMeasure,
-        unitCost: item.unitCost,
-        totalCost: item.quantity * item.unitCost
+        unitCost: parseFloat(item.unitCost) || 0,
+        totalCost: (parseFloat(item.quantity) || 0) * (parseFloat(item.unitCost) || 0)
       })),
       createdBy,
       updatedBy

@@ -1,11 +1,12 @@
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Save, X, Plus, Trash2 } from 'lucide-react'
-import { BOMItem } from '../types'
+import { BOMItem, RawMaterial } from '../types'
 import { apiService } from '../services/api'
 
 const AddBOM: React.FC = () => {
   const navigate = useNavigate()
+  const [materials, setMaterials] = useState<RawMaterial[]>([])
   const [formData, setFormData] = useState({
     bomCode: '',
     productName: '',
@@ -17,8 +18,123 @@ const AddBOM: React.FC = () => {
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [submitting, setSubmitting] = useState(false)
 
   const statusOptions = ['Draft', 'Active', 'Obsolete']
+  const unitOptions = ['grams', 'kg', 'ml'] as const
+
+  // Load Central Kitchen raw materials for dropdown (full inventory)
+  useEffect(() => {
+    (async () => {
+      try {
+        const all: RawMaterial[] = []
+        let page = 1
+        // Try to fetch up to 10k items in case pagination is enforced
+        while (true) {
+          const res = await apiService.getCentralKitchenRawMaterials({ page, limit: 1000 })
+          if (res?.success && Array.isArray(res.data)) {
+            all.push(...(res.data as unknown as RawMaterial[]))
+          }
+          const hasNext = (res as any)?.pagination?.hasNext || ((res as any)?.pagination?.currentPage || page) < ((res as any)?.pagination?.totalPages || page)
+          if (!hasNext) break
+          page += 1
+          if (page > 20) break // safety cap
+        }
+        const allowed = ['grams','kg','ml','g','l','liter','milliliter']
+        const filtered = all.filter(m => allowed.includes((m.unitOfMeasure || '').toLowerCase()))
+          .map(m => ({
+            ...m,
+            unitOfMeasure: (m.unitOfMeasure || '').toLowerCase() === 'g' ? 'grams' :
+                           (m.unitOfMeasure || '').toLowerCase() === 'l' || (m.unitOfMeasure || '').toLowerCase() === 'liter' ? 'ml' :
+                           (m.unitOfMeasure || '').toLowerCase() === 'milliliter' ? 'ml' : (m.unitOfMeasure || '')
+          }))
+        setMaterials(filtered)
+      } catch (err) {
+        console.error('Failed to load central kitchen raw materials', err)
+      }
+    })()
+  }, [])
+
+  // Auto-generate BOM code on load
+  useEffect(() => {
+    (async () => {
+      if (formData.bomCode && formData.bomCode.trim().length > 0) return
+      try {
+        const res = await apiService.getBillOfMaterials({ limit: 1, page: 1, sortBy: 'createdAt', sortOrder: 'desc' })
+        let nextCode = ''
+        const last = (res as any)?.data?.[0]
+        const lastCode: string | undefined = last?.bomCode
+        if (lastCode) {
+          const m = lastCode.match(/^(.*?)(\d+)$/)
+          if (m) {
+            const prefix = m[1]
+            const num = parseInt(m[2], 10)
+            const width = m[2].length
+            nextCode = `${prefix}${String(num + 1).padStart(width, '0')}`
+          }
+        }
+        if (!nextCode) {
+          const ts = new Date()
+          const y = ts.getFullYear()
+          const mm = String(ts.getMonth() + 1).padStart(2, '0')
+          const dd = String(ts.getDate()).padStart(2, '0')
+          const hh = String(ts.getHours()).padStart(2, '0')
+          const mi = String(ts.getMinutes()).padStart(2, '0')
+          nextCode = `BOM-${y}${mm}${dd}-${hh}${mi}`
+        }
+        setFormData(prev => ({ ...prev, bomCode: nextCode }))
+      } catch (err) {
+        // Fallback in case API fails
+        const ts = new Date()
+        const y = ts.getFullYear()
+        const mm = String(ts.getMonth() + 1).padStart(2, '0')
+        const dd = String(ts.getDate()).padStart(2, '0')
+        const hh = String(ts.getHours()).padStart(2, '0')
+        const mi = String(ts.getMinutes()).padStart(2, '0')
+        const code = `BOM-${y}${mm}${dd}-${hh}${mi}`
+        setFormData(prev => ({ ...prev, bomCode: code }))
+      }
+    })()
+  }, [])
+
+  type AllowedUnit = 'grams' | 'kg' | 'ml'
+
+  const findMaterial = (codeOrId: string) => {
+    return materials.find(
+      (m) => m.materialCode === codeOrId || (m.id && m.id === codeOrId)
+    )
+  }
+
+  const computeUnitCost = (
+    material: RawMaterial | undefined,
+    targetUnit: AllowedUnit
+  ): number => {
+    if (!material) return 0
+    const sourceUnit = (material.unitOfMeasure || '').toLowerCase()
+    const price = Number(material.unitPrice || 0)
+
+    if (price <= 0) return 0
+
+    // Normalize price per requested unit
+    if (sourceUnit === 'kg') {
+      if (targetUnit === 'kg') return price
+      if (targetUnit === 'grams') return price / 1000
+      if (targetUnit === 'ml') return 0 // incompatible
+    }
+    if (sourceUnit === 'grams') {
+      if (targetUnit === 'grams') return price
+      if (targetUnit === 'kg') return price * 1000
+      if (targetUnit === 'ml') return 0
+    }
+    if (sourceUnit === 'ml') {
+      if (targetUnit === 'ml') return price
+      // No cross mass-volume conversion without density
+      return 0
+    }
+    // Fallback: if same text
+    if (sourceUnit === targetUnit) return price
+    return 0
+  }
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -33,9 +149,7 @@ const AddBOM: React.FC = () => {
       newErrors.productName = 'Product name is required'
     }
     
-    if (!formData.productDescription.trim()) {
-      newErrors.productDescription = 'Product description is required'
-    }
+    // Product description optional
     
     if (!formData.version.trim()) {
       newErrors.version = 'Version is required'
@@ -57,11 +171,8 @@ const AddBOM: React.FC = () => {
     } else {
       // Validate each item
       formData.items.forEach((item, index) => {
-        if (!item.materialCode.trim()) {
-          newErrors[`item_${index}_code`] = 'Material code is required'
-        }
-        if (!item.materialName.trim()) {
-          newErrors[`item_${index}_name`] = 'Material name is required'
+        if (!item.materialCode.trim() && !item.materialId) {
+          newErrors[`item_${index}_code`] = 'Material is required'
         }
         if (!item.quantity || item.quantity <= 0) {
           newErrors[`item_${index}_quantity`] = 'Quantity must be greater than 0'
@@ -69,9 +180,7 @@ const AddBOM: React.FC = () => {
         if (!item.unitOfMeasure.trim()) {
           newErrors[`item_${index}_unit`] = 'Unit of measure is required'
         }
-        if (!item.unitCost || item.unitCost <= 0) {
-          newErrors[`item_${index}_cost`] = 'Unit cost must be greater than 0'
-        }
+        // unitCost may be 0; backend now accepts it (total will be 0)
       })
     }
 
@@ -87,11 +196,28 @@ const AddBOM: React.FC = () => {
     }
 
     try {
-      // Calculate total cost
-      const totalCost = formData.items.reduce((sum, item) => {
-        const itemTotal = item.quantity * item.unitCost
-        return sum + itemTotal
-      }, 0)
+      setSubmitting(true)
+      // Auto-calc costs based on selected materials and units
+      const itemsWithCosts = formData.items.map((item) => {
+        const selectedMaterial = findMaterial(item.materialCode || item.materialId)
+        const unit = (item.unitOfMeasure || 'grams') as AllowedUnit
+        const unitCost = computeUnitCost(selectedMaterial, unit)
+        const totalCost = Math.round((unitCost * (item.quantity || 0)) * 100) / 100
+
+        const materialCode = (item.materialCode || selectedMaterial?.materialCode || '').toString().trim().toUpperCase()
+        const materialName = (item.materialName || selectedMaterial?.materialName || '').toString().trim()
+
+        return {
+          ...item,
+          materialCode,
+          materialName,
+          unitOfMeasure: unit,
+          unitCost,
+          totalCost,
+        }
+      })
+
+      const totalCost = itemsWithCosts.reduce((sum, item) => sum + (item.totalCost || 0), 0)
 
       // Prepare BOM data with proper formatting
       const bomData = {
@@ -102,14 +228,14 @@ const AddBOM: React.FC = () => {
         effectiveDate: formData.effectiveDate,
         status: formData.status,
         totalCost: Math.round(totalCost * 100) / 100, // Round to 2 decimal places
-        items: formData.items.map(item => ({
+        items: itemsWithCosts.map(item => ({
           materialId: item.materialId || `MAT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          materialCode: item.materialCode.trim().toUpperCase(),
-          materialName: item.materialName.trim(),
+          materialCode: (item.materialCode || '').toString().trim().toUpperCase(),
+          materialName: (item.materialName || '').toString().trim(),
           quantity: parseFloat(item.quantity.toString()),
-          unitOfMeasure: item.unitOfMeasure.trim(),
-          unitCost: parseFloat(item.unitCost.toString()),
-          totalCost: Math.round(item.quantity * item.unitCost * 100) / 100
+          unitOfMeasure: (item.unitOfMeasure || '').toString().trim(),
+          unitCost: Number(item.unitCost || 0),
+          totalCost: Number(item.totalCost || 0)
         })),
         createdBy: 'admin',
         updatedBy: 'admin'
@@ -128,6 +254,8 @@ const AddBOM: React.FC = () => {
     } catch (error) {
       console.error('Error creating BOM:', error)
       alert('Error creating BOM: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -144,7 +272,7 @@ const AddBOM: React.FC = () => {
       materialCode: '',
       materialName: '',
       quantity: 0,
-      unitOfMeasure: '',
+      unitOfMeasure: 'grams',
       unitCost: 0,
       totalCost: 0
     }
@@ -157,9 +285,12 @@ const AddBOM: React.FC = () => {
       items: prev.items.map((item, i) => {
         if (i === index) {
           const updatedItem = { ...item, [field]: value }
-          if (field === 'quantity' || field === 'unitCost') {
-            updatedItem.totalCost = updatedItem.quantity * updatedItem.unitCost
-          }
+          // Recompute costs when quantity, unit, or material changes
+          const material = findMaterial(updatedItem.materialCode || updatedItem.materialId)
+          const unit = (updatedItem.unitOfMeasure || 'grams') as AllowedUnit
+          const unitCost = computeUnitCost(material, unit)
+          updatedItem.unitCost = unitCost
+          updatedItem.totalCost = (updatedItem.quantity || 0) * unitCost
           return updatedItem
         }
         return item
@@ -311,25 +442,35 @@ const AddBOM: React.FC = () => {
 
             <div className="space-y-4">
               {formData.items.map((item, index) => (
-                <div key={index} className="grid grid-cols-6 gap-3 p-4 border border-gray-200 rounded-lg bg-gray-50">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Material Code</label>
-                    <input
-                      type="text"
+                <div key={index} className="grid grid-cols-7 gap-3 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Material code</label>
+                    <select
                       className="input-field text-sm"
                       value={item.materialCode}
-                      onChange={(e) => updateBOMItem(index, 'materialCode', e.target.value)}
-                       placeholder="CHICKEN-001"
-                    />
+                      onChange={(e) => {
+                        const code = e.target.value
+                        const mat = findMaterial(code)
+                        updateBOMItem(index, 'materialCode', code)
+                        updateBOMItem(index, 'materialName', mat?.materialName || '')
+                        updateBOMItem(index, 'materialId', mat?.id || '')
+                      }}
+                    >
+                      <option value="">Select material</option>
+                      {materials.map((m) => (
+                        <option key={m.id} value={m.materialCode}>
+                          {`${m.materialCode} - ${m.materialName}`}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Material Name</label>
                     <input
                       type="text"
-                      className="input-field text-sm"
+                      className="input-field text-sm bg-gray-100"
                       value={item.materialName}
-                      onChange={(e) => updateBOMItem(index, 'materialName', e.target.value)}
-                       placeholder="Chicken Breast"
+                      readOnly
                     />
                   </div>
                   <div>
@@ -344,23 +485,24 @@ const AddBOM: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Unit</label>
-                    <input
-                      type="text"
+                    <select
                       className="input-field text-sm"
                       value={item.unitOfMeasure}
                       onChange={(e) => updateBOMItem(index, 'unitOfMeasure', e.target.value)}
-                       placeholder="grams"
-                    />
+                    >
+                      {unitOptions.map(u => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Unit Cost</label>
                     <input
                       type="number"
-                      step="0.01"
-                      className="input-field text-sm"
-                      value={item.unitCost}
-                      onChange={(e) => updateBOMItem(index, 'unitCost', parseFloat(e.target.value) || 0)}
-                      placeholder="0.00"
+                      step="0.0001"
+                      className="input-field text-sm bg-gray-100"
+                      value={Number(item.unitCost || 0).toFixed(4) as unknown as number}
+                      readOnly
                     />
                   </div>
                   <div className="flex items-end">
@@ -372,7 +514,7 @@ const AddBOM: React.FC = () => {
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="col-span-6">
+                  <div className="col-span-7">
                     <div className="text-sm text-gray-600">
                       Total Cost: {item.totalCost.toFixed(2)} KWD
                     </div>
@@ -404,10 +546,11 @@ const AddBOM: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="btn-primary flex items-center"
+              className={`btn-primary flex items-center ${submitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+              disabled={submitting}
             >
               <Save className="h-4 w-4 mr-2" />
-              Create BOM
+              {submitting ? 'Creating...' : 'Create BOM'}
             </button>
           </div>
         </form>
