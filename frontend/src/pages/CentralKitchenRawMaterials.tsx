@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Package, TrendingDown, AlertTriangle, RefreshCw, Upload, RotateCcw } from 'lucide-react'
 import { apiService } from '../services/api'
 import { useConfirmation } from '../hooks/useConfirmation'
@@ -44,7 +43,6 @@ interface Outlet {
 }
 
 const CentralKitchenRawMaterials: React.FC = () => {
-  const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { confirmation, showAlert, closeConfirmation } = useConfirmation()
   const [outlet, setOutlet] = useState<Outlet | null>(null)
