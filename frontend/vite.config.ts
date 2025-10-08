@@ -7,7 +7,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'https://localhost:5000', 
+        target: 'https://localbeet.onrender.com', 
         changeOrigin: true,
         secure: true,
         configure: (proxy, _options) => {
