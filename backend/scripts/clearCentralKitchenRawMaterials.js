@@ -1,8 +1,8 @@
 /**
- * Clear All Central Kitchen Raw Materials
- * Removes all raw material items from the Central Kitchen database
+ * Clear All Raw Materials from Central Kitchen Database
+ * This script will delete all raw material items from the Central Kitchen database
  * 
- * Usage: node backend/scripts/clearCentralKitchenRawMaterials.js
+ * Usage: node scripts/clearCentralKitchenRawMaterials.js
  */
 
 const { connectCentralKitchenDB } = require('../config/centralKitchenDB');
@@ -10,114 +10,91 @@ const { initializeCentralKitchenModels } = require('../models/centralKitchenMode
 
 async function clearCentralKitchenRawMaterials() {
   let centralKitchenConnection;
-  let CentralKitchenRawMaterial;
 
   try {
-    console.log('🗑️  Starting Central Kitchen Raw Materials Cleanup...');
+    console.log('🗑️  Clear Central Kitchen Raw Materials Database');
+    console.log('='.repeat(50));
     console.log('');
 
     // Connect to Central Kitchen database
     console.log('🔗 Connecting to Central Kitchen database...');
     centralKitchenConnection = await connectCentralKitchenDB();
     const centralKitchenModels = initializeCentralKitchenModels(centralKitchenConnection);
-    CentralKitchenRawMaterial = centralKitchenModels.CentralKitchenRawMaterial;
+    const CentralKitchenRawMaterial = centralKitchenModels.CentralKitchenRawMaterial;
 
     console.log('✅ Connected to Central Kitchen database');
     console.log('');
 
-    // Count existing items
-    const totalItems = await CentralKitchenRawMaterial.countDocuments({});
-    console.log(`📊 Found ${totalItems} raw material items in the database`);
+    // Get current count before deletion
+    const currentCount = await CentralKitchenRawMaterial.countDocuments({});
+    console.log(`📊 Current items in Central Kitchen database: ${currentCount}`);
     console.log('');
 
-    if (totalItems === 0) {
-      console.log('✅ Database is already empty. No items to remove.');
-      return { success: true, message: 'Database was already empty', deletedCount: 0 };
+    if (currentCount === 0) {
+      console.log('ℹ️  Database is already empty. No items to delete.');
+      return { success: true, message: 'Database already empty', deletedCount: 0 };
     }
 
-    // Confirm deletion
-    console.log('⚠️  WARNING: This will permanently delete ALL raw material items!');
-    console.log('⚠️  This action cannot be undone!');
+    // Warning message
+    console.log('⚠️  WARNING: This will DELETE ALL raw materials from Central Kitchen database!');
+    console.log(`⚠️  Total items to be deleted: ${currentCount}`);
     console.log('');
+    console.log('🗑️  Deleting all items...');
 
     // Delete all items
-    console.log('🗑️  Deleting all raw material items...');
     const deleteResult = await CentralKitchenRawMaterial.deleteMany({});
-    
+
+    console.log('');
     console.log('✅ Deletion completed!');
+    console.log(`   Deleted: ${deleteResult.deletedCount} items`);
     console.log('');
 
     // Verify deletion
-    const remainingItems = await CentralKitchenRawMaterial.countDocuments({});
+    const finalCount = await CentralKitchenRawMaterial.countDocuments({});
+    console.log(`📊 Final count in database: ${finalCount}`);
     
-    console.log('📊 CLEANUP SUMMARY:');
-    console.log('='.repeat(40));
-    console.log(`🗑️  Items deleted: ${deleteResult.deletedCount}`);
-    console.log(`📦 Items remaining: ${remainingItems}`);
-    console.log('');
-
-    if (remainingItems === 0) {
-      console.log('🎉 SUCCESS: All raw material items have been removed!');
-      console.log('✅ Central Kitchen Raw Materials database is now empty.');
+    if (finalCount === 0) {
+      console.log('✅ All items successfully deleted!');
     } else {
-      console.log('⚠️  WARNING: Some items may still remain in the database.');
+      console.log(`⚠️  Warning: ${finalCount} items still remain in database`);
     }
 
-    return {
-      success: true,
-      message: 'All raw materials cleared successfully',
-      deletedCount: deleteResult.deletedCount
-    };
+    console.log('');
+    console.log('='.repeat(50));
+    console.log('✅ Process completed successfully!');
+    console.log('');
+
+    return { success: true, deletedCount: deleteResult.deletedCount };
 
   } catch (error) {
-    console.error('💥 CLEANUP FAILED:', error.message);
+    console.error('');
+    console.error('❌ Error clearing Central Kitchen raw materials:', error.message);
     console.error('Stack trace:', error.stack);
-    return { success: false, message: error.message };
+    return { success: false, error: error.message };
   } finally {
     if (centralKitchenConnection) {
+      console.log('🔌 Closing database connection...');
       await centralKitchenConnection.close();
-      console.log('🔌 Database connection closed');
+      console.log('✅ Connection closed');
     }
+    process.exit(0);
   }
 }
 
-/**
- * Main execution
- */
-async function main() {
-  try {
-    console.log('🚀 Central Kitchen Raw Materials Cleanup Tool');
-    console.log('=============================================');
-    console.log('');
+// Run the script
+console.log('');
+console.log('🚀 Starting Central Kitchen Raw Materials Deletion...');
+console.log('');
 
-    const result = await clearCentralKitchenRawMaterials();
-    
+clearCentralKitchenRawMaterials()
+  .then((result) => {
     if (result.success) {
-      console.log('');
-      console.log('🎉 CLEANUP COMPLETED SUCCESSFULLY!');
-      console.log('');
-      console.log('📝 Next Steps:');
-      console.log('   1. Run sync with Zoho to repopulate with fresh data');
-      console.log('   2. Verify items appear correctly in the UI');
-      console.log('   3. Check that SKU codes are now properly formatted');
+      console.log(`✅ Success! Deleted ${result.deletedCount} items`);
     } else {
-      console.log('');
-      console.log('💥 CLEANUP FAILED!');
-      console.log(`   Reason: ${result.message}`);
+      console.error('❌ Failed:', result.error);
     }
-    
-  } catch (error) {
-    console.error('💥 UNEXPECTED ERROR:', error.message);
+  })
+  .catch((error) => {
+    console.error('💥 Unexpected error:', error);
     process.exit(1);
-  }
-}
-
-// Export for use in other scripts
-module.exports = {
-  clearCentralKitchenRawMaterials
-};
-
-// Run if called directly
-if (require.main === module) {
-  main();
-}
+  });
