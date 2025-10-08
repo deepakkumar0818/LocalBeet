@@ -41,5 +41,13 @@
     "mongodb"
   ],
   "author": "localbeet Team",
-  "license": "MIT"
+  "license": "MIT",
+  "nodemonConfig": {
+    "ignore": [
+      "data/**/*",
+      "logs/**/*",
+      "node_modules/**/*"
+    ],
+    "ext": "js,json"
+  }
 }
