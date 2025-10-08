@@ -46,6 +46,13 @@ const UNIT_MAPPING = {
 };
 
 /**
+ * Check if Zoho item has a valid SKU
+ */
+function hasValidSKU(zohoItem) {
+  return zohoItem.sku && zohoItem.sku.trim() !== '';
+}
+
+/**
  * Map Zoho item to Central Kitchen format
  */
 function mapZohoItemToCentralKitchen(zohoItem) {
@@ -62,18 +69,8 @@ function mapZohoItemToCentralKitchen(zohoItem) {
   // Map status
   const status = zohoItem.status === 'active' ? 'Active' : 'Inactive';
 
-  // Generate material code (prioritize SKU over item_id)
-  let materialCode;
-  if (zohoItem.sku && zohoItem.sku.trim() !== '') {
-    // Use the SKU if it exists and is not empty
-    materialCode = zohoItem.sku.trim();
-  } else {
-    // Generate a meaningful code from item name and category
-    const categoryPrefix = categoryName.substring(0, 3).toUpperCase();
-    const namePrefix = (zohoItem.name || 'ITEM').substring(0, 3).toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const randomSuffix = Math.random().toString(36).substr(2, 4).toUpperCase();
-    materialCode = `${categoryPrefix}-${namePrefix}-${randomSuffix}`;
-  }
+  // Use SKU as material code (SKU is guaranteed to exist due to filtering)
+  const materialCode = zohoItem.sku.trim();
 
   return {
     materialCode: materialCode,
@@ -133,11 +130,21 @@ async function syncZohoToCentralKitchen(dryRun = false, closeConnection = true) 
     console.log(`✅ Found ${zohoResponse.items.length} items in Zoho`);
     console.log('');
 
+    // Filter items with valid SKUs
+    const itemsWithSKU = zohoResponse.items.filter(item => hasValidSKU(item));
+    const itemsWithoutSKU = zohoResponse.items.filter(item => !hasValidSKU(item));
+
+    console.log('📊 ITEM FILTERING:');
+    console.log(`   Total items from Zoho: ${zohoResponse.items.length}`);
+    console.log(`   Items with SKU: ${itemsWithSKU.length}`);
+    console.log(`   Items without SKU (skipped): ${itemsWithoutSKU.length}`);
+    console.log('');
+
     if (dryRun) {
-      console.log('🔍 DRY RUN - Analyzing items without saving...');
+      console.log('🔍 DRY RUN - Items with SKU that would be synced:');
       console.log('='.repeat(60));
       
-      zohoResponse.items.forEach((item, index) => {
+      itemsWithSKU.forEach((item, index) => {
         const mapped = mapZohoItemToCentralKitchen(item);
         console.log(`${index + 1}. ${mapped.materialName} (${mapped.materialCode})`);
         console.log(`   Category: ${mapped.subCategory}`);
@@ -146,8 +153,19 @@ async function syncZohoToCentralKitchen(dryRun = false, closeConnection = true) 
         console.log(`   Stock: ${mapped.currentStock}`);
         console.log('');
       });
+
+      if (itemsWithoutSKU.length > 0) {
+        console.log('⚠️  Skipped items without SKU:');
+        itemsWithoutSKU.slice(0, 5).forEach(item => {
+          console.log(`   - ${item.name || 'Unknown'} (ID: ${item.item_id})`);
+        });
+        if (itemsWithoutSKU.length > 5) {
+          console.log(`   ... and ${itemsWithoutSKU.length - 5} more items without SKU`);
+        }
+        console.log('');
+      }
       
-      return { success: true, message: 'Dry run completed', itemsCount: zohoResponse.items.length };
+      return { success: true, message: 'Dry run completed', itemsCount: itemsWithSKU.length, skippedCount: itemsWithoutSKU.length };
     }
 
     // Connect to Central Kitchen database
@@ -159,15 +177,26 @@ async function syncZohoToCentralKitchen(dryRun = false, closeConnection = true) 
     console.log('✅ Connected to Central Kitchen database');
     console.log('');
 
-    // Process and save items
+    if (itemsWithoutSKU.length > 0) {
+      console.log('⚠️  Skipped items without SKU:');
+      itemsWithoutSKU.slice(0, 5).forEach(item => {
+        console.log(`   - ${item.name || 'Unknown'} (ID: ${item.item_id})`);
+      });
+      if (itemsWithoutSKU.length > 5) {
+        console.log(`   ... and ${itemsWithoutSKU.length - 5} more items without SKU`);
+      }
+      console.log('');
+    }
+
+    // Process and save items with SKUs only
     let successCount = 0;
     let updatedCount = 0;
     let errorCount = 0;
 
-    console.log('📝 Processing items...');
+    console.log('📝 Processing items with SKU...');
     console.log('='.repeat(60));
 
-    for (const zohoItem of zohoResponse.items) {
+    for (const zohoItem of itemsWithSKU) {
       try {
         const mappedItem = mapZohoItemToCentralKitchen(zohoItem);
         
@@ -218,16 +247,21 @@ async function syncZohoToCentralKitchen(dryRun = false, closeConnection = true) 
     console.log('');
     console.log('📊 SYNC SUMMARY:');
     console.log('='.repeat(40));
+    console.log(`📦 Total items from Zoho: ${zohoResponse.items.length}`);
+    console.log(`🔍 Items with SKU: ${itemsWithSKU.length}`);
+    console.log(`⚠️  Items without SKU (skipped): ${itemsWithoutSKU.length}`);
     console.log(`✅ Successfully added: ${successCount} items`);
     console.log(`🔄 Updated (existing): ${updatedCount} items`);
     console.log(`❌ Errors: ${errorCount} items`);
-    console.log(`📦 Total processed: ${zohoResponse.items.length} items`);
+    console.log(`📝 Total processed: ${successCount + updatedCount + errorCount} items`);
 
     return {
       success: true,
       message: 'Sync completed successfully',
       stats: {
-        total: zohoResponse.items.length,
+        totalFromZoho: zohoResponse.items.length,
+        withSKU: itemsWithSKU.length,
+        withoutSKU: itemsWithoutSKU.length,
         added: successCount,
         updated: updatedCount,
         errors: errorCount
