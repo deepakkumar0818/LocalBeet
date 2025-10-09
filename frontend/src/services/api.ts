@@ -1,5 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://localbeet.onrender.com/api";
-// const API_BASE_URL = "http://localhost:5000/api"
+// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://localbeet.onrender.com/api";
+const API_BASE_URL = "http://localhost:5000/api"
 
 class ApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -1854,6 +1854,69 @@ class ApiService {
       console.error('❌ API Service: Zoho sync failed:', error);
       throw error;
     }
+  }
+
+  // Sales Orders API
+  async getSalesOrders(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    outletId?: string;
+    outletCode?: string;
+    outletName?: string;
+    orderStatus?: string;
+    orderType?: string;
+    paymentStatus?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) queryParams.append(key, String(value));
+      });
+    }
+    const qs = queryParams.toString();
+    return this.request<{ success: boolean; data: any[]; pagination: any }>(`/sales-orders${qs ? `?${qs}` : ''}`);
+  }
+
+  async createSalesOrder(data: any) {
+    return this.request<{ success: boolean; data: any; message: string }>(`/sales-orders`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteSalesOrder(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/sales-orders/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async updateSalesOrderStatus(id: string, data: { orderStatus: string; updatedBy?: string }) {
+    return this.request<{ success: boolean; data: any; message: string }>(`/sales-orders/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Outlet-specific finished goods for POS dropdowns
+  async getOutletFinishedGoods(outletName: string, params?: { limit?: number; search?: string }) {
+    const qp = new URLSearchParams();
+    if (params?.limit) qp.append('limit', String(params.limit));
+    if (params?.search) qp.append('search', params.search);
+    const qs = qp.toString();
+    // Map to backend route base
+    const base = outletName.toLowerCase().includes('kuwait')
+      ? '/kuwait-city/finished-products'
+      : outletName.toLowerCase().includes('360') || outletName.toLowerCase().includes('mall')
+      ? '/360-mall/finished-products'
+      : outletName.toLowerCase().includes('vibe') || outletName.toLowerCase().includes('complex')
+      ? '/vibe-complex/finished-products'
+      : outletName.toLowerCase().includes('taiba')
+      ? '/taiba-kitchen/finished-products'
+      : '/finished-goods';
+    return this.request<{ success: boolean; data: any[]; pagination?: any }>(`${base}${qs ? `?${qs}` : ''}`);
   }
 
   async createTaibaKitchenRawMaterial(data: any) {
