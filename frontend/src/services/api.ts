@@ -1856,49 +1856,6 @@ class ApiService {
     }
   }
 
-  // Sales Orders API
-  async getSalesOrders(params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    outletId?: string;
-    outletCode?: string;
-    outletName?: string;
-    orderStatus?: string;
-    orderType?: string;
-    paymentStatus?: string;
-    sortBy?: string;
-    sortOrder?: string;
-  }) {
-    const queryParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) queryParams.append(key, String(value));
-      });
-    }
-    const qs = queryParams.toString();
-    return this.request<{ success: boolean; data: any[]; pagination: any }>(`/sales-orders${qs ? `?${qs}` : ''}`);
-  }
-
-  async createSalesOrder(data: any) {
-    return this.request<{ success: boolean; data: any; message: string }>(`/sales-orders`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async deleteSalesOrder(id: string) {
-    return this.request<{ success: boolean; message: string }>(`/sales-orders/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async updateSalesOrderStatus(id: string, data: { orderStatus: string; updatedBy?: string }) {
-    return this.request<{ success: boolean; data: any; message: string }>(`/sales-orders/${id}/status`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
 
   // Outlet-specific finished goods for POS dropdowns
   async getOutletFinishedGoods(outletName: string, params?: { limit?: number; search?: string }) {

@@ -75,12 +75,16 @@ const SalesOrders: React.FC = () => {
   // Detect outlet from URL
   const getOutletFromPath = () => {
     const path = location.pathname;
-    if (path.includes('/downtown-restaurant/sales-orders')) return 'Kuwait City';
-    if (path.includes('/marina-walk-cafe/sales-orders')) return '360 Mall';
-    if (path.includes('/mall-food-court/sales-orders')) return 'Vibes Complex';
-    if (path.includes('/drive-thru-express/sales-orders')) return 'Taiba Hospital';
+    // Check for outlet-specific paths
+    if (path.includes('/kuwait-city/') || path.includes('/downtown-restaurant/')) return 'Kuwait City';
+    if (path.includes('/360-mall/') || path.includes('/marina-walk-cafe/')) return '360 Mall';
+    if (path.includes('/vibes-complex/') || path.includes('/mall-food-court/')) return 'Vibes Complex';
+    if (path.includes('/taiba-hospital/') || path.includes('/drive-thru-express/')) return 'Taiba Hospital';
     return null;
   };
+
+  // Lock outlet immediately from path so UI doesn't flash "All Outlets"
+  const lockedOutletName = getOutletFromPath();
 
   const orderStatusOptions = ['Pending', 'Confirmed', 'Preparing', 'Ready', 'Served', 'Completed', 'Cancelled'];
   const orderTypeOptions = ['Dine-in', 'Takeaway', 'Delivery', 'Drive-thru'];
@@ -90,9 +94,13 @@ const SalesOrders: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
+      // Always prefer the outlet derived from the URL
+      const outletFromPath = getOutletFromPath();
+      const outletName = outletFromPath || currentOutlet?.outletName || '';
+      
       const response = await apiService.getSalesOrders({
         search: searchTerm,
-        outletId: outletFilter,
+        outletName: outletName,
         orderStatus: statusFilter,
         orderType: orderTypeFilter,
         paymentStatus: paymentStatusFilter,
@@ -117,6 +125,9 @@ const SalesOrders: React.FC = () => {
   };
 
   const loadSampleSalesOrders = () => {
+    // Get current outlet from URL
+    const currentOutletName = getOutletFromPath();
+    
     const sampleOrders: SalesOrder[] = [
       {
         _id: 'so-001',
@@ -124,10 +135,10 @@ const SalesOrders: React.FC = () => {
         outletId: {
           _id: 'outlet-downtown-001',
           outletCode: 'DT-001',
-          outletName: 'Kuwait City'
+          outletName: currentOutletName || 'Kuwait City'
         },
         outletCode: 'DT-001',
-        outletName: 'Kuwait City',
+        outletName: currentOutletName || 'Kuwait City',
         customerInfo: {
           customerName: 'John Smith',
           customerPhone: '+965-1234-5678',
@@ -191,10 +202,10 @@ const SalesOrders: React.FC = () => {
         outletId: {
           _id: 'outlet-marina-001',
           outletCode: 'MW-001',
-          outletName: '360 Mall'
+          outletName: currentOutletName || '360 Mall'
         },
         outletCode: 'MW-001',
-        outletName: '360 Mall',
+        outletName: currentOutletName || '360 Mall',
         customerInfo: {
           customerName: 'Sarah Johnson',
           customerPhone: '+965-9876-5432',
@@ -242,10 +253,10 @@ const SalesOrders: React.FC = () => {
         outletId: {
           _id: 'outlet-mall-001',
           outletCode: 'MF-001',
-          outletName: 'Vibes Complex'
+          outletName: currentOutletName || 'Vibes Complex'
         },
         outletCode: 'MF-001',
-        outletName: 'Vibes Complex',
+        outletName: currentOutletName || 'Vibes Complex',
         customerInfo: {
           customerName: 'Ahmed Al-Rashid',
           customerPhone: '+965-5555-1234',
@@ -302,24 +313,40 @@ const SalesOrders: React.FC = () => {
       }
     ];
 
-    setSalesOrders(sampleOrders);
+    // Filter sample orders to only show current outlet's orders
+    const filteredSampleOrders = currentOutletName 
+      ? sampleOrders.filter(order => order.outletName === currentOutletName)
+      : sampleOrders;
+
+    setSalesOrders(filteredSampleOrders);
     setError(null);
   };
 
   const loadOutlets = async () => {
     try {
+      console.log('SalesOrders - loadOutlets called, pathname:', location.pathname);
       const response = await apiService.getOutlets({ limit: 1000 });
       if (response.success) {
         setOutlets(response.data);
         
         // Set outlet filter based on URL
         const outletName = getOutletFromPath();
+        console.log('SalesOrders - Detected outlet from path:', outletName);
         if (outletName) {
+          // Optimistically set current outlet immediately to avoid UI flicker
+          if (!currentOutlet) {
+            setCurrentOutlet({ outletName } as any);
+          }
           const outlet = response.data.find(o => o.outletName === outletName);
+          console.log('SalesOrders - Found outlet in data:', outlet);
           if (outlet) {
             setCurrentOutlet(outlet);
             setOutletFilter(outlet._id);
+            console.log('SalesOrders - Set currentOutlet:', outlet.outletName);
           }
+        } else {
+          // Not on an outlet-specific route – allow outlet dropdown
+          setCurrentOutlet(null);
         }
       }
     } catch (err) {
@@ -329,11 +356,42 @@ const SalesOrders: React.FC = () => {
 
   useEffect(() => {
     loadOutlets();
-  }, []);
+  }, [location.pathname]);
 
   useEffect(() => {
     loadSalesOrders();
-  }, [searchTerm, outletFilter, statusFilter, orderTypeFilter, paymentStatusFilter]);
+  }, [searchTerm, outletFilter, statusFilter, orderTypeFilter, paymentStatusFilter, location.pathname]);
+
+  // Refresh data when component mounts or when navigating back from POS
+  useEffect(() => {
+    // Add a small delay to ensure any pending operations are completed
+    const timer = setTimeout(() => {
+      loadSalesOrders();
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Add a manual refresh function
+  const handleRefresh = () => {
+    loadSalesOrders();
+  };
+
+  // Auto-refresh when component becomes visible (e.g., when navigating back from POS)
+  useEffect(() => {
+    const handleFocus = () => {
+      // Small delay to ensure the component is fully loaded
+      setTimeout(() => {
+        loadSalesOrders();
+      }, 100);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
 
   const handleViewDetails = (order: SalesOrder) => {
     setSelectedOrder(order);
@@ -425,8 +483,15 @@ const SalesOrders: React.FC = () => {
           onClick={() => {
             const outletFromPath = getOutletFromPath()
             if (outletFromPath) {
-              const outletPath = outletFromPath.toLowerCase().replace(/\s+/g, '-')
-              navigate(`/${outletPath}/sales-orders/add`)
+              // Map outlet names to correct URL paths
+              const outletPathMap: Record<string, string> = {
+                'Kuwait City': 'kuwait-city',
+                '360 Mall': '360-mall', 
+                'Vibes Complex': 'vibes-complex',
+                'Taiba Hospital': 'taiba-hospital'
+              }
+              const outletPath = outletPathMap[outletFromPath] || outletFromPath.toLowerCase().replace(/\s+/g, '-')
+              navigate(`/${outletPath}/pos-sales/create-order`)
             } else {
               navigate('/sales-orders/add')
             }
@@ -458,7 +523,7 @@ const SalesOrders: React.FC = () => {
             </div>
           </div>
 
-          {!currentOutlet && (
+          {(!lockedOutletName && !currentOutlet) && (
             <div className="col-span-1">
               <label htmlFor="outletFilter" className="block text-sm font-medium text-gray-700">Outlet</label>
               <select
@@ -541,7 +606,7 @@ const SalesOrders: React.FC = () => {
             Clear Filters
           </button>
           <button
-            onClick={loadSalesOrders}
+            onClick={handleRefresh}
             className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
             <RefreshCw className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
@@ -767,3 +832,4 @@ const SalesOrders: React.FC = () => {
 };
 
 export default SalesOrders;
+

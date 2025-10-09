@@ -229,7 +229,19 @@ router.post('/', async (req, res) => {
       }
     } catch (_) {}
     if (!outlet) {
-      return res.status(400).json({ success: false, message: 'Outlet not found' });
+      // Create a virtual outlet object if not found in database
+      const outletName = req.body.outletName || 'Unknown Outlet';
+      const outletCode = req.body.outletCode || 'UNKNOWN';
+      
+      outlet = {
+        _id: new mongoose.Types.ObjectId(),
+        outletCode: outletCode,
+        outletName: outletName,
+        outletType: 'Restaurant',
+        status: 'Active'
+      };
+      
+      console.log(`Creating virtual outlet: ${outletName} (${outletCode})`);
     }
 
     // Generate order number - unique per outlet per day

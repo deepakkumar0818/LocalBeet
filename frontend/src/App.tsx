@@ -111,15 +111,27 @@ function App() {
         <Route path="/downtown-restaurant/sales-orders" element={<SalesOrders />} />
         <Route path="/downtown-restaurant/sales-orders/add" element={<AddSalesOrder />} />
         <Route path="/downtown-restaurant/pos-sales/create-order" element={<POSCreateOrder />} />
+        <Route path="/kuwait-city/sales-orders" element={<SalesOrders />} />
+        <Route path="/kuwait-city/sales-orders/add" element={<AddSalesOrder />} />
+        <Route path="/kuwait-city/pos-sales/create-order" element={<POSCreateOrder />} />
         <Route path="/marina-walk-cafe/sales-orders" element={<SalesOrders />} />
         <Route path="/marina-walk-cafe/sales-orders/add" element={<AddSalesOrder />} />
         <Route path="/marina-walk-cafe/pos-sales/create-order" element={<POSCreateOrder />} />
+        <Route path="/360-mall/sales-orders" element={<SalesOrders />} />
+        <Route path="/360-mall/sales-orders/add" element={<AddSalesOrder />} />
+        <Route path="/360-mall/pos-sales/create-order" element={<POSCreateOrder />} />
         <Route path="/mall-food-court/sales-orders" element={<SalesOrders />} />
         <Route path="/mall-food-court/sales-orders/add" element={<AddSalesOrder />} />
         <Route path="/mall-food-court/pos-sales/create-order" element={<POSCreateOrder />} />
+        <Route path="/vibes-complex/sales-orders" element={<SalesOrders />} />
+        <Route path="/vibes-complex/sales-orders/add" element={<AddSalesOrder />} />
+        <Route path="/vibes-complex/pos-sales/create-order" element={<POSCreateOrder />} />
         <Route path="/drive-thru-express/sales-orders" element={<SalesOrders />} />
         <Route path="/drive-thru-express/sales-orders/add" element={<AddSalesOrder />} />
         <Route path="/drive-thru-express/pos-sales/create-order" element={<POSCreateOrder />} />
+        <Route path="/taiba-hospital/sales-orders" element={<SalesOrders />} />
+        <Route path="/taiba-hospital/sales-orders/add" element={<AddSalesOrder />} />
+        <Route path="/taiba-hospital/pos-sales/create-order" element={<POSCreateOrder />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </Layout>
