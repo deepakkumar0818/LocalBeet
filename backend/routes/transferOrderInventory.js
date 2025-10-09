@@ -128,62 +128,114 @@ router.put('/:id/approve', ensureConnections, async (req, res) => {
         console.log(`📦 Processing item: ${item.itemCode} - ${item.itemName} (${item.quantity} ${item.unitOfMeasure})`);
         
         if (item.itemType === 'Raw Material') {
-        // Subtract from Central Kitchen Raw Materials
-        const centralKitchenItem = await req.centralKitchenModels.CentralKitchenRawMaterial.findOne({ materialCode: item.itemCode });
-        if (centralKitchenItem) {
-          console.log(`Central Kitchen BEFORE: ${centralKitchenItem.materialCode} - Stock: ${centralKitchenItem.currentStock}`);
-          centralKitchenItem.currentStock -= item.quantity;
-          await centralKitchenItem.save();
-          console.log(`Central Kitchen AFTER: ${centralKitchenItem.materialCode} - Stock: ${centralKitchenItem.currentStock}`);
+        // Handle source outlet (from where items are being transferred)
+        if (transferOrder.fromOutlet === 'Ingredient Master') {
+          // Subtract from Ingredient Master (main database)
+          const connectDB = require('../config/database');
+          const RawMaterial = require('../models/RawMaterial');
+          
+          const ingredientMasterItem = await RawMaterial.findOne({ materialCode: item.itemCode });
+          if (ingredientMasterItem) {
+            console.log(`Ingredient Master BEFORE: ${ingredientMasterItem.materialCode} - Stock: ${ingredientMasterItem.currentStock}`);
+            ingredientMasterItem.currentStock -= item.quantity;
+            await ingredientMasterItem.save();
+            console.log(`Ingredient Master AFTER: ${ingredientMasterItem.materialCode} - Stock: ${ingredientMasterItem.currentStock}`);
+          } else {
+            console.log(`Ingredient Master item not found: ${item.itemCode}`);
+          }
         } else {
-          console.log(`Central Kitchen item not found: ${item.itemCode}`);
+          // Subtract from Central Kitchen Raw Materials (existing logic)
+          const centralKitchenItem = await req.centralKitchenModels.CentralKitchenRawMaterial.findOne({ materialCode: item.itemCode });
+          if (centralKitchenItem) {
+            console.log(`Central Kitchen BEFORE: ${centralKitchenItem.materialCode} - Stock: ${centralKitchenItem.currentStock}`);
+            centralKitchenItem.currentStock -= item.quantity;
+            await centralKitchenItem.save();
+            console.log(`Central Kitchen AFTER: ${centralKitchenItem.materialCode} - Stock: ${centralKitchenItem.currentStock}`);
+          } else {
+            console.log(`Central Kitchen item not found: ${item.itemCode}`);
+          }
         }
 
-        // Add to requesting outlet Raw Materials
+        // Add to destination outlet Raw Materials
+        let destinationOutletName = transferOrder.toOutlet;
         let RawMaterialModel;
-        if (outletName.toLowerCase().includes('kuwait')) {
-          RawMaterialModel = outletModels.KuwaitCityRawMaterial;
-        } else if (outletName.toLowerCase().includes('360') || outletName.toLowerCase().includes('mall')) {
-          RawMaterialModel = outletModels.Mall360RawMaterial;
-        } else if (outletName.toLowerCase().includes('vibe') || outletName.toLowerCase().includes('complex')) {
-          RawMaterialModel = outletModels.VibeComplexRawMaterial;
-        } else if (outletName.toLowerCase().includes('taiba')) {
-          RawMaterialModel = outletModels.TaibaKitchenRawMaterial;
-        } else {
-          throw new Error(`Unknown raw material model for outlet: ${outletName}`);
-        }
         
-        if (!RawMaterialModel) {
-          throw new Error(`Raw material model not found for outlet: ${outletName}`);
-        }
-        
-        let outletItem = await RawMaterialModel.findOne({ materialCode: item.itemCode });
-        if (outletItem) {
-          console.log(`${outletName} BEFORE: ${outletItem.materialCode} - Stock: ${outletItem.currentStock}`);
-          outletItem.currentStock += item.quantity;
-          await outletItem.save();
-          console.log(`${outletName} AFTER: ${outletItem.materialCode} - Stock: ${outletItem.currentStock}`);
+        if (destinationOutletName === 'Central Kitchen') {
+          // Add to Central Kitchen Raw Materials
+          const centralKitchenItem = await req.centralKitchenModels.CentralKitchenRawMaterial.findOne({ materialCode: item.itemCode });
+          if (centralKitchenItem) {
+            console.log(`Central Kitchen BEFORE: ${centralKitchenItem.materialCode} - Stock: ${centralKitchenItem.currentStock}`);
+            centralKitchenItem.currentStock += item.quantity;
+            await centralKitchenItem.save();
+            console.log(`Central Kitchen AFTER: ${centralKitchenItem.materialCode} - Stock: ${centralKitchenItem.currentStock}`);
+          } else {
+            console.log(`Creating new Central Kitchen item: ${item.itemCode}`);
+            // Create new item in Central Kitchen if it doesn't exist
+            const newCentralKitchenItem = new req.centralKitchenModels.CentralKitchenRawMaterial({
+              materialCode: item.itemCode,
+              materialName: item.itemName,
+              parentCategory: 'Raw Materials',
+              subCategory: item.subCategory || item.category || 'General',
+              unitOfMeasure: item.unitOfMeasure,
+              currentStock: item.quantity,
+              unitPrice: item.unitPrice,
+              minimumStock: 10,
+              maximumStock: 1000,
+              reorderPoint: 20,
+              status: 'Active',
+              isActive: true,
+              createdBy: 'System',
+              updatedBy: 'System'
+            });
+            await newCentralKitchenItem.save();
+            console.log(`New Central Kitchen item created: ${newCentralKitchenItem.materialCode} - Stock: ${newCentralKitchenItem.currentStock}`);
+          }
         } else {
-          console.log(`Creating new ${outletName} item: ${item.itemCode}`);
-          // Create new item in the outlet if it doesn't exist
-          outletItem = new RawMaterialModel({
-            materialCode: item.itemCode,
-            materialName: item.itemName,
-            category: item.category || 'General',
-            subCategory: item.subCategory || 'General',
-            unitOfMeasure: item.unitOfMeasure,
-            currentStock: item.quantity,
-            unitPrice: item.unitPrice,
-            minimumStock: 10,
-            maximumStock: 1000,
-            reorderPoint: 20,
-            status: 'Active',
-            isActive: true,
-            createdBy: 'System',
-            updatedBy: 'System'
-          });
-          await outletItem.save();
-          console.log(`New ${outletName} item created: ${outletItem.materialCode} - Stock: ${outletItem.currentStock}`);
+          // Add to outlet Raw Materials (existing logic for 4 outlets)
+          if (destinationOutletName.toLowerCase().includes('kuwait')) {
+            RawMaterialModel = outletModels.KuwaitCityRawMaterial;
+          } else if (destinationOutletName.toLowerCase().includes('360') || destinationOutletName.toLowerCase().includes('mall')) {
+            RawMaterialModel = outletModels.Mall360RawMaterial;
+          } else if (destinationOutletName.toLowerCase().includes('vibe') || destinationOutletName.toLowerCase().includes('complex')) {
+            RawMaterialModel = outletModels.VibeComplexRawMaterial;
+          } else if (destinationOutletName.toLowerCase().includes('taiba')) {
+            RawMaterialModel = outletModels.TaibaKitchenRawMaterial;
+          } else {
+            throw new Error(`Unknown raw material model for destination outlet: ${destinationOutletName}`);
+          }
+          
+          if (!RawMaterialModel) {
+            throw new Error(`Raw material model not found for destination outlet: ${destinationOutletName}`);
+          }
+          
+          let outletItem = await RawMaterialModel.findOne({ materialCode: item.itemCode });
+          if (outletItem) {
+            console.log(`${destinationOutletName} BEFORE: ${outletItem.materialCode} - Stock: ${outletItem.currentStock}`);
+            outletItem.currentStock += item.quantity;
+            await outletItem.save();
+            console.log(`${destinationOutletName} AFTER: ${outletItem.materialCode} - Stock: ${outletItem.currentStock}`);
+          } else {
+            console.log(`Creating new ${destinationOutletName} item: ${item.itemCode}`);
+            // Create new item in the outlet if it doesn't exist
+            outletItem = new RawMaterialModel({
+              materialCode: item.itemCode,
+              materialName: item.itemName,
+              category: item.category || 'General',
+              subCategory: item.subCategory || 'General',
+              unitOfMeasure: item.unitOfMeasure,
+              currentStock: item.quantity,
+              unitPrice: item.unitPrice,
+              minimumStock: 10,
+              maximumStock: 1000,
+              reorderPoint: 20,
+              status: 'Active',
+              isActive: true,
+              createdBy: 'System',
+              updatedBy: 'System'
+            });
+            await outletItem.save();
+            console.log(`New ${destinationOutletName} item created: ${outletItem.materialCode} - Stock: ${outletItem.currentStock}`);
+          }
         }
       } else if (item.itemType === 'Finished Goods') {
         // Subtract from Central Kitchen Finished Products
@@ -259,9 +311,34 @@ router.put('/:id/approve', ensureConnections, async (req, res) => {
     // Update transfer order status
     console.log('✅ Updating transfer order status to Approved');
     transferOrder.status = 'Approved';
-    transferOrder.approvedBy = 'Central Kitchen Manager';
+    transferOrder.approvedBy = transferOrder.fromOutlet === 'Ingredient Master' ? 'Ingredient Master' : 'Central Kitchen Manager';
     transferOrder.transferStartedAt = new Date();
     await transferOrder.save();
+
+    // Create notification for the destination outlet
+    try {
+      const Notification = require('../models/Notification');
+      const sourceOutlet = transferOrder.fromOutlet;
+      const targetOutlet = transferOrder.toOutlet;
+      
+      const notification = new Notification({
+        title: `Transfer Approved from ${sourceOutlet}`,
+        message: `Transfer order #${transferOrder._id} has been approved and items have been added to your inventory.`,
+        type: 'transfer_approved',
+        targetOutlet: targetOutlet,
+        sourceOutlet: sourceOutlet,
+        transferOrderId: transferOrder._id.toString(),
+        itemType: transferOrder.items.some(item => item.itemType === 'Raw Material') ? 'Raw Material' : 'Finished Goods',
+        priority: transferOrder.priority || 'Normal',
+        read: false
+      });
+      
+      await notification.save();
+      console.log(`✅ Notification created for ${targetOutlet}: Transfer approved from ${sourceOutlet}`);
+    } catch (notificationError) {
+      console.error('⚠️  Failed to create notification:', notificationError);
+      // Don't fail the entire operation if notification creation fails
+    }
 
     console.log('✅ Transfer order approved successfully');
     res.status(200).json({

@@ -1,30 +1,112 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit, Trash2, Filter, Download, Upload } from 'lucide-react'
-import { RawMaterial } from '../types'
-import { useAppSelector, useAppDispatch } from '../store/hooks'
-import { importRawMaterials } from '../store/slices/inventorySlice'
+import { Plus, Search, Edit, Trash2, Filter, Download, Upload, RotateCcw, Truck } from 'lucide-react'
 import { apiService } from '../services/api'
+import { useConfirmation } from '../hooks/useConfirmation'
+
+interface RawMaterialItem {
+  _id: string
+  materialCode: string
+  materialName: string
+  parentCategory: string
+  subCategory: string
+  unitOfMeasure: string
+  description: string
+  unitPrice: number
+  currentStock: number
+  minimumStock: number
+  maximumStock: number
+  reorderPoint: number
+  supplierId: string
+  supplierName: string
+  storageRequirements?: {
+    temperature?: string
+    humidity?: string
+    specialConditions?: string
+  }
+  shelfLife: number
+  status: string
+  isActive: boolean
+  createdBy: string
+  updatedBy: string
+  zohoItemId?: string
+  lastSyncedAt?: Date
+  zohoSyncStatus?: string
+  createdAt: string
+  updatedAt: string
+}
 
 const RawMaterials: React.FC = () => {
   const navigate = useNavigate()
-  const dispatch = useAppDispatch()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { showAlert } = useConfirmation()
   
-  // Redux state
-  const { rawMaterials: materials, loading, error } = useAppSelector(state => state.inventory)
+  const [materials, setMaterials] = useState<RawMaterialItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
   const [importing, setImporting] = useState(false)
-
+  
   const [searchTerm, setSearchTerm] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterStockStatus, setFilterStockStatus] = useState('')
-  const [filterSupplier, setFilterSupplier] = useState('')
-  const [sortBy, setSortBy] = useState('materialCode')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
-  // Materials are automatically loaded from Redux store
+  useEffect(() => {
+    loadRawMaterials()
+  }, [searchTerm, filterCategory, filterStatus])
 
+  const loadRawMaterials = async () => {
+    try {
+      setLoading(true)
+      console.log('📦 Loading Ingredient Master from main database')
+      
+      const response = await apiService.getRawMaterials({
+        limit: 1000,
+        search: searchTerm,
+        category: filterCategory,
+        status: filterStatus
+      })
+
+      if (response.success && response.data) {
+        console.log('✅ Loaded Ingredient Master:', response.data.length, 'items')
+        setMaterials(response.data)
+      } else {
+        console.log('⚠️  No materials found')
+        setMaterials([])
+      }
+    } catch (err) {
+      console.error('❌ Error loading materials:', err)
+      showAlert('Error', `Failed to load materials: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSyncWithZoho = async () => {
+    setSyncing(true)
+    try {
+      const response = await apiService.syncWithZohoRawMaterials()
+      
+      if (response.success) {
+        showAlert(
+          'Sync Completed Successfully!',
+          `📊 Sync Results:\n• Total items processed: ${response.data.totalItems}\n• Items with SKU: ${response.data.itemsWithSKU}\n• Items without SKU (skipped): ${response.data.itemsWithoutSKU}\n• New items added: ${response.data.addedItems}\n• Items updated: ${response.data.updatedItems}\n• Errors: ${response.data.errorItems}\n\n🕒 Sync completed at: ${new Date(response.data.syncTimestamp).toLocaleString()}`,
+          'success'
+        )
+        await loadRawMaterials() // Refresh inventory
+      } else {
+        showAlert('Sync Failed', response.message || 'Unknown error occurred during sync', 'error')
+      }
+    } catch (error) {
+      showAlert(
+        'Sync Failed',
+        `Failed to sync with Zoho: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'error'
+      )
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const getStockStatus = (current: number, minimum: number) => {
     if (current <= minimum) return { status: 'Low', color: 'text-red-600 bg-red-100' }
@@ -35,9 +117,9 @@ const RawMaterials: React.FC = () => {
   const filteredMaterials = materials.filter(material => {
     const matchesSearch = material.materialName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          material.materialCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         material.description.toLowerCase().includes(searchTerm.toLowerCase())
+                         (material.description && material.description.toLowerCase().includes(searchTerm.toLowerCase()))
     
-    const matchesCategory = filterCategory === '' || material.category === filterCategory
+    const matchesCategory = filterCategory === '' || material.subCategory === filterCategory
     
     const matchesStatus = filterStatus === '' || 
                          (filterStatus === 'active' && material.isActive) ||
@@ -46,84 +128,23 @@ const RawMaterials: React.FC = () => {
     const stockStatus = getStockStatus(material.currentStock, material.minimumStock)
     const matchesStockStatus = filterStockStatus === '' || stockStatus.status.toLowerCase() === filterStockStatus.toLowerCase()
     
-    const matchesSupplier = filterSupplier === '' || material.supplierId === filterSupplier
-    
-    return matchesSearch && matchesCategory && matchesStatus && matchesStockStatus && matchesSupplier
-  }).sort((a, b) => {
-    let aValue, bValue
-    
-    switch (sortBy) {
-      case 'materialCode':
-        aValue = a.materialCode
-        bValue = b.materialCode
-        break
-      case 'materialName':
-        aValue = a.materialName
-        bValue = b.materialName
-        break
-      case 'category':
-        aValue = a.category
-        bValue = b.category
-        break
-      case 'unitPrice':
-        aValue = a.unitPrice
-        bValue = b.unitPrice
-        break
-      case 'currentStock':
-        aValue = a.currentStock
-        bValue = b.currentStock
-        break
-      case 'createdAt':
-        aValue = new Date(a.createdAt).getTime()
-        bValue = new Date(b.createdAt).getTime()
-        break
-      default:
-        aValue = a.materialCode
-        bValue = b.materialCode
-    }
-    
-    if (sortOrder === 'asc') {
-      return aValue > bValue ? 1 : -1
-    } else {
-      return aValue < bValue ? 1 : -1
-    }
+    return matchesSearch && matchesCategory && matchesStatus && matchesStockStatus
   })
 
-  const categories = [...new Set(materials.map(m => m.category))]
-  const suppliers = [
-    { id: 'SUP-FP-001', name: 'Fresh Produce Co' },
-    { id: 'SUP-PT-001', name: 'Pantry Essentials' },
-    { id: 'SUP-DA-001', name: 'Dairy Alternatives Inc' },
-    { id: 'SUP-SW-001', name: 'Sweeteners & Syrups' },
-    { id: 'SUP-BV-001', name: 'Beverage Solutions' },
-    { id: 'SUP-SP-001', name: 'Supplements Plus' },
-    { id: 'SUP-SF-001', name: 'Superfoods Direct' },
-    { id: 'SUP-DY-001', name: 'Dairy Farm Fresh' },
-    { id: 'SUP-BK-001', name: 'Artisan Bakery' }
-  ]
-
-  const clearFilters = () => {
-    setSearchTerm('')
-    setFilterCategory('')
-    setFilterStatus('')
-    setFilterStockStatus('')
-    setFilterSupplier('')
-    setSortBy('materialCode')
-    setSortOrder('asc')
-  }
+  const categories = [...new Set(materials.map(m => m.subCategory))]
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this material?')) {
       try {
         const response = await apiService.deleteRawMaterial(id)
         if (response.success) {
-          // Reload materials from API
-          window.location.reload()
+          showAlert('Success', 'Material deleted successfully', 'success')
+          await loadRawMaterials()
         } else {
-          alert('Failed to delete material')
+          showAlert('Error', 'Failed to delete material', 'error')
         }
       } catch (err) {
-        alert('Error deleting material: ' + (err instanceof Error ? err.message : 'Unknown error'))
+        showAlert('Error', `Error deleting material: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error')
         console.error('Error deleting material:', err)
       }
     }
@@ -135,11 +156,15 @@ const RawMaterials: React.FC = () => {
       const csvData = filteredMaterials.map(material => ({
         'SKU': material.materialCode,
         'Item Name': material.materialName,
-        'Parent Category': 'Raw Materials',
-        'SubCategory Name': material.category,
+        'Parent Category': material.parentCategory || 'Raw Materials',
+        'SubCategory Name': material.subCategory,
         'Unit': material.unitOfMeasure,
-        'Unit Name': material.unitOfMeasure,
-        'Default Purchase Unit Name': material.unitOfMeasure
+        'Unit Price (KWD)': material.unitPrice?.toFixed(3) || '0.000',
+        'Current Stock': material.currentStock,
+        'Minimum Stock': material.minimumStock,
+        'Status': material.status,
+        'Supplier': material.supplierName || '',
+        'Last Synced': material.lastSyncedAt ? new Date(material.lastSyncedAt).toLocaleString() : 'Never'
       }))
 
       // Convert to CSV string
@@ -157,325 +182,28 @@ const RawMaterials: React.FC = () => {
         )
       ].join('\n')
 
-      // Create and download file
+      // Create download link
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
       const link = document.createElement('a')
-      const url = URL.createObjectURL(blob)
-      link.setAttribute('href', url)
-      link.setAttribute('download', `raw-materials-export-${new Date().toISOString().split('T')[0]}.csv`)
-      link.style.visibility = 'hidden'
+      link.href = URL.createObjectURL(blob)
+      link.download = `ingredient-master-export-${new Date().toISOString().split('T')[0]}.csv`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
       
-      console.log('Export completed successfully')
+      showAlert('Success', `Exported ${filteredMaterials.length} materials to CSV`, 'success')
     } catch (err) {
+      showAlert('Error', `Failed to export: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error')
       console.error('Export failed:', err)
-      alert('Export failed. Please try again.')
     }
   }
-
-  const handleImport = () => {
-    console.log('Import button clicked')
-    if (fileInputRef.current) {
-      console.log('File input ref found, clicking...')
-      fileInputRef.current.click()
-    } else {
-      console.error('File input ref not found')
-    }
-  }
-
-  const downloadSampleCSV = () => {
-    const sampleData = [
-      {
-        'SKU': '10001',
-        'Item Name': 'Bhujia',
-        'Parent Category': 'Raw Materials',
-        'SubCategory Name': 'Bakery',
-        'Unit': 'kg',
-        'Unit Name': 'kg',
-        'Default Purchase Unit Name': 'kg'
-      },
-      {
-        'SKU': '10002',
-        'Item Name': 'Bran Flakes',
-        'Parent Category': 'Raw Materials',
-        'SubCategory Name': 'Bakery',
-        'Unit': 'kg',
-        'Unit Name': 'kg',
-        'Default Purchase Unit Name': 'kg'
-      },
-      {
-        'SKU': '10003',
-        'Item Name': 'Bread Improver',
-        'Parent Category': 'Raw Materials',
-        'SubCategory Name': 'Bakery',
-        'Unit': 'kg',
-        'Unit Name': 'kg',
-        'Default Purchase Unit Name': 'kg'
-      },
-      {
-        'SKU': '10004',
-        'Item Name': 'Caramel Syrup',
-        'Parent Category': 'Raw Materials',
-        'SubCategory Name': 'Bakery',
-        'Unit': 'kg',
-        'Unit Name': 'kg',
-        'Default Purchase Unit Name': 'kg'
-      },
-      {
-        'SKU': '10005',
-        'Item Name': 'Cocoa Powder',
-        'Parent Category': 'Raw Materials',
-        'SubCategory Name': 'Bakery',
-        'Unit': 'kg',
-        'Unit Name': 'kg',
-        'Default Purchase Unit Name': 'kg'
-      }
-    ]
-
-    const headers = Object.keys(sampleData[0])
-    const csvContent = [
-      headers.join(','),
-      ...sampleData.map(row => 
-        headers.map(header => {
-          const value = row[header as keyof typeof row]
-          return typeof value === 'string' && (value.includes(',') || value.includes('"')) 
-            ? `"${value.replace(/"/g, '""')}"` 
-            : value
-        }).join(',')
-      )
-    ].join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', 'sample-raw-materials-import.csv')
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) {
-      console.log('No file selected')
-      return
-    }
-
-    console.log('File selected:', file.name, 'Size:', file.size, 'Type:', file.type)
-
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      alert('Please select a CSV file')
-      return
-    }
-
-    try {
-      setImporting(true)
-      console.log('Starting import process...')
-      
-      const text = await file.text()
-      console.log('File content length:', text.length)
-      
-      const lines = text.split('\n').filter(line => line.trim())
-      console.log('Number of lines:', lines.length)
-      
-      if (lines.length < 2) {
-        alert('CSV file must contain at least a header row and one data row')
-        return
-      }
-
-      // Better CSV parsing to handle quoted fields with commas
-      const parseCSVLine = (line: string): string[] => {
-        const result: string[] = []
-        let current = ''
-        let inQuotes = false
-        
-        for (let i = 0; i < line.length; i++) {
-          const char = line[i]
-          
-          if (char === '"') {
-            if (inQuotes && line[i + 1] === '"') {
-              // Escaped quote
-              current += '"'
-              i++ // Skip next quote
-            } else {
-              // Toggle quote state
-              inQuotes = !inQuotes
-            }
-          } else if (char === ',' && !inQuotes) {
-            // Field separator
-            result.push(current.trim())
-            current = ''
-          } else {
-            current += char
-          }
-        }
-        
-        // Add the last field
-        result.push(current.trim())
-        return result
-      }
-
-      const headers = parseCSVLine(lines[0])
-      console.log('Headers:', headers)
-      
-      const data = lines.slice(1).map((line, index) => {
-        const values = parseCSVLine(line)
-        const row: any = {}
-        headers.forEach((header, headerIndex) => {
-          row[header] = values[headerIndex] || ''
-        })
-        console.log(`Row ${index + 1}:`, row)
-        return row
-      })
-
-      // Validate required fields
-      const requiredFields = ['SKU', 'Item Name', 'Parent Category', 'SubCategory Name', 'Unit', 'Unit Name', 'Default Purchase Unit Name']
-      const missingFields = requiredFields.filter(field => !headers.includes(field))
-      
-      if (missingFields.length > 0) {
-        alert(`Missing required columns: ${missingFields.join(', ')}\n\nRequired columns: ${requiredFields.join(', ')}\n\nFound columns: ${headers.join(', ')}`)
-        return
-      }
-
-      console.log('Starting to process', data.length, 'rows...')
-
-      // Process import data
-      let successCount = 0
-      let errorCount = 0
-      let updatedCount = 0
-      const errors: string[] = []
-      const processedMaterials = new Set<string>() // Track processed material codes
-      const newMaterials: RawMaterial[] = []
-      const updatedMaterials: RawMaterial[] = []
-
-      for (let i = 0; i < data.length; i++) {
-        const row = data[i]
-        try {
-          console.log(`Processing row ${i + 1}:`, row)
-          
-          const materialCode = row['SKU']
-          
-          // Check if we've already processed this material code in this import
-          if (processedMaterials.has(materialCode)) {
-            console.log(`Material ${materialCode} already processed in this import, skipping...`)
-            continue
-          }
-          
-          const materialData: RawMaterial = {
-            id: `rm-${Date.now()}-${i}`, // Generate unique ID
-            materialCode: materialCode,
-            materialName: row['Item Name'],
-            description: `${row['Parent Category']} - ${row['SubCategory Name']}`,
-            category: row['SubCategory Name'],
-            unitOfMeasure: row['Unit'],
-            unitPrice: 0,
-            currentStock: 0,
-            minimumStock: 0,
-            maximumStock: 0,
-            supplierId: '',
-            isActive: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            createdBy: 'admin',
-            updatedBy: 'admin'
-          }
-
-          console.log('Processed material data:', materialData)
-
-          // Check if material already exists
-          const existingMaterial = materials.find(m => m.materialCode === materialData.materialCode)
-          
-          if (existingMaterial) {
-            console.log('Material exists, updating existing material:', existingMaterial.id)
-            // Update existing material
-            const updatedMaterial = {
-              ...existingMaterial,
-              materialName: materialData.materialName,
-              description: materialData.description,
-              category: materialData.category,
-              unitOfMeasure: materialData.unitOfMeasure,
-              updatedAt: new Date().toISOString(),
-              updatedBy: 'admin'
-            }
-            
-            updatedMaterials.push(updatedMaterial)
-            updatedCount++
-            console.log(`Successfully updated ${materialData.materialCode}`)
-          } else {
-            console.log('Creating new material:', materialData.materialCode)
-            // Add new material
-            newMaterials.push(materialData)
-            successCount++
-            console.log(`Successfully created ${materialData.materialCode}`)
-          }
-          
-          // Mark this material code as processed
-          processedMaterials.add(materialCode)
-          
-        } catch (err) {
-          errorCount++
-          const errorMsg = `Error processing row ${i + 1} (${row['SKU'] || 'Unknown'}): ${err instanceof Error ? err.message : 'Unknown error'}`
-          errors.push(errorMsg)
-          console.error(errorMsg, err)
-        }
-      }
-
-      console.log('Import processing complete. Created:', successCount, 'Updated:', updatedCount, 'Errors:', errorCount)
-
-      // Dispatch import action to Redux store
-      dispatch(importRawMaterials([...newMaterials, ...updatedMaterials]))
-
-      // Show results
-      if (errorCount > 0) {
-        alert(`Import completed with errors:\n\nNew Materials Created: ${successCount}\nMaterials Updated: ${updatedCount}\nErrors: ${errorCount}\n\nErrors:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...' : ''}`)
-      } else {
-        alert(`Import completed successfully!\n\nNew Materials Created: ${successCount}\nMaterials Updated: ${updatedCount}`)
-      }
-
-    } catch (err) {
-      console.error('Import failed:', err)
-      alert(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}\n\nPlease check your CSV file format and try again.`)
-    } finally {
-      setImporting(false)
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    }
-  }
-
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading materials...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="text-red-600 mb-4">
-            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-          <p className="text-red-600 mb-4">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="btn-primary"
-          >
-            Retry
-          </button>
+          <p className="mt-4 text-gray-600">Loading ingredients...</p>
         </div>
       </div>
     )
@@ -489,13 +217,32 @@ const RawMaterials: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Ingredient Master</h1>
           <p className="text-gray-600">Manage your restaurant ingredients and raw material inventory</p>
         </div>
-        <button
-          onClick={() => navigate('/raw-materials/add')}
-          className="btn-primary flex items-center"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Ingredient
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSyncWithZoho}
+            disabled={syncing}
+            className={`flex items-center ${syncing ? 'btn-disabled' : 'btn-primary'}`}
+            title="Sync inventory with Zoho"
+          >
+            <RotateCcw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync Inventory'}
+          </button>
+          <button
+            onClick={() => navigate('/raw-materials/create-transfer')}
+            className="btn-secondary flex items-center"
+            title="Create transfer order"
+          >
+            <Truck className="h-4 w-4 mr-2" />
+            Create Transfer
+          </button>
+          <button
+            onClick={() => navigate('/raw-materials/add')}
+            className="btn-primary flex items-center"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Ingredient
+          </button>
+        </div>
       </div>
 
       {/* Filters and Search */}
@@ -517,44 +264,20 @@ const RawMaterials: React.FC = () => {
             </div>
             <div className="flex gap-2">
               <button 
-                onClick={clearFilters}
-                className="btn-secondary flex items-center"
-                title="Clear all filters"
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Clear Filters
-              </button>
-              <button 
                 onClick={handleExport}
-                className="btn-secondary flex items-center"
-                title="Export materials to CSV"
                 disabled={filteredMaterials.length === 0}
+                className={filteredMaterials.length === 0 ? "btn-disabled flex items-center" : "btn-secondary flex items-center"}
+                title="Export to CSV"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Export
-              </button>
-              <button 
-                onClick={handleImport}
-                className="btn-secondary flex items-center"
-                title="Import materials from CSV"
-                disabled={importing}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                {importing ? 'Importing...' : 'Import'}
-              </button>
-              <button 
-                onClick={downloadSampleCSV}
-                className="btn-secondary flex items-center"
-                title="Download sample CSV template"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Sample CSV
               </button>
             </div>
           </div>
 
           {/* Filter Options */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Category Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
               <select
@@ -569,6 +292,7 @@ const RawMaterials: React.FC = () => {
               </select>
             </div>
 
+            {/* Status Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               <select
@@ -582,6 +306,7 @@ const RawMaterials: React.FC = () => {
               </select>
             </div>
 
+            {/* Stock Status Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Stock Status</label>
               <select
@@ -595,65 +320,18 @@ const RawMaterials: React.FC = () => {
                 <option value="good">Good Stock</option>
               </select>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
-              <select
-                className="input-field"
-                value={filterSupplier}
-                onChange={(e) => setFilterSupplier(e.target.value)}
-              >
-                <option value="">All Suppliers</option>
-                {suppliers.map(supplier => (
-                  <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
-              <div className="flex gap-1">
-                <select
-                  className="input-field flex-1"
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                >
-                  <option value="materialCode">Material Code</option>
-                  <option value="materialName">Name</option>
-                  <option value="category">Category</option>
-                  <option value="unitPrice">Unit Price</option>
-                  <option value="currentStock">Current Stock</option>
-                  <option value="createdAt">Date Created</option>
-                </select>
-                <button
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                  className="btn-secondary px-3"
-                  title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
-                >
-                  {sortOrder === 'asc' ? '↑' : '↓'}
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Results Summary */}
           <div className="flex items-center justify-between text-sm text-gray-600">
             <span>
               Showing {filteredMaterials.length} of {materials.length} materials
-              {(searchTerm || filterCategory || filterStatus || filterStockStatus || filterSupplier) && (
+              {(searchTerm || filterCategory || filterStatus || filterStockStatus) && (
                 <span className="ml-2 text-blue-600">
                   (filtered)
                 </span>
               )}
             </span>
-            {filteredMaterials.length !== materials.length && (
-              <button
-                onClick={clearFilters}
-                className="text-blue-600 hover:text-blue-800 underline"
-              >
-                Clear filters
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -664,66 +342,110 @@ const RawMaterials: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="table-header">SKU</th>
-                <th className="table-header">Item Name</th>
-                <th className="table-header">Parent Category</th>
-                <th className="table-header">SubCategory Name</th>
-                <th className="table-header">Unit</th>
-                <th className="table-header">Unit Name</th>
-                <th className="table-header">Default Purchase Unit Name</th>
-                <th className="table-header">Actions</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Stock</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredMaterials.map((material) => {
-                return (
-                  <tr key={material.id} className="hover:bg-gray-50">
-                    <td className="table-cell font-medium">{material.materialCode}</td>
-                    <td className="table-cell">
-                      <div className="font-medium">{material.materialName}</div>
-                    </td>
-                    <td className="table-cell">Raw Materials</td>
-                    <td className="table-cell">
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {material.category}
-                      </span>
-                    </td>
-                    <td className="table-cell">{material.unitOfMeasure}</td>
-                    <td className="table-cell">{material.unitOfMeasure}</td>
-                    <td className="table-cell">{material.unitOfMeasure}</td>
-                    <td className="table-cell">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => navigate(`/raw-materials/edit/${material.id}`)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(material.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+              {filteredMaterials.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center space-y-4">
+                      <div className="text-gray-400">
+                        <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                        </svg>
                       </div>
-                    </td>
-                  </tr>
-                )
-              })}
+                      <div className="text-center">
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No ingredients found</h3>
+                        <p className="text-gray-600 mb-4">
+                          {materials.length === 0 
+                            ? 'Get started by syncing with Zoho Inventory or adding ingredients manually.' 
+                            : 'Try adjusting your filters or search criteria.'}
+                        </p>
+                        {materials.length === 0 && (
+                          <button
+                            onClick={handleSyncWithZoho}
+                            disabled={syncing}
+                            className={`${syncing ? 'btn-disabled' : 'btn-primary'} inline-flex items-center`}
+                          >
+                            <RotateCcw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                            {syncing ? 'Syncing...' : 'Sync Inventory'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredMaterials.map((material) => {
+                  const stockStatus = getStockStatus(material.currentStock, material.minimumStock)
+                  return (
+                    <tr key={material._id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{material.materialCode}</td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div className="font-medium">{material.materialName}</div>
+                        {material.description && (
+                          <div className="text-xs text-gray-500">{material.description}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                          {material.subCategory}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{material.unitOfMeasure}</td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                        KWD {material.unitPrice ? Number(material.unitPrice).toFixed(3) : '0.000'}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+                        {material.currentStock}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${stockStatus.color}`}>
+                          {stockStatus.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          material.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {material.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => navigate(`/raw-materials/edit/${material._id}`)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(material._id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
             </tbody>
           </table>
         </div>
       </div>
-
-      {/* Hidden file input for import */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".csv"
-        onChange={handleFileUpload}
-        style={{ display: 'none' }}
-      />
-
     </div>
   )
 }
