@@ -96,60 +96,34 @@ const AddSalesOrder: React.FC = () => {
     }
   }, [location.search])
 
-  const loadOutletData = async (outletName: string) => {
+  const loadOutletData = async (outletSlug: string) => {
     try {
       setLoading(true)
       
-      // Map outlet names to their data
-      const outletMap: Record<string, any> = {
-        'downtown-restaurant': {
-          id: 'outlet-downtown-001',
-          outletCode: 'DT-001',
-          outletName: 'Kuwait City',
-          outletType: 'Restaurant'
-        },
-        'marina-walk-cafe': {
-          id: 'outlet-marina-001',
-          outletCode: 'MW-001',
-          outletName: '360 Mall',
-          outletType: 'Cafe'
-        },
-        'mall-food-court': {
-          id: 'outlet-mall-001',
-          outletCode: 'MF-001',
-          outletName: 'Vibes Complex',
-          outletType: 'Food Court'
-        },
-        'drive-thru-express': {
-          id: 'outlet-drive-001',
-          outletCode: 'DTE-001',
-          outletName: 'Taiba Hospital',
-          outletType: 'Drive-Thru'
-        },
-        'central-kitchen': {
-          id: 'central-kitchen-001',
-          outletCode: 'CK-001',
-          outletName: 'Central Kitchen',
-          outletType: 'Kitchen'
-        },
-        'Central Kitchen': {
-          id: 'central-kitchen-001',
-          outletCode: 'CK-001',
-          outletName: 'Central Kitchen',
-          outletType: 'Kitchen'
-        }
+      // Resolve real outlet from API instead of hardcoded ids
+      const slugToName: Record<string, string> = {
+        'downtown-restaurant': 'Kuwait City',
+        'marina-walk-cafe': '360 Mall',
+        'mall-food-court': 'Vibes Complex',
+        'vibes-complex': 'Vibes Complex',
+        'drive-thru-express': 'Taiba Hospital',
+        'taiba-hospital': 'Taiba Hospital',
       }
+      const targetName = slugToName[outletSlug] || outletSlug
 
-      const outletData = outletMap[outletName]
-      if (outletData) {
-        setOutlet(outletData)
-        setFormData(prev => ({
-          ...prev,
-          outletId: outletData.id,
-          outletCode: outletData.outletCode,
-          outletName: outletData.outletName,
-          orderNumber: `SO-${outletData.outletCode}-${Date.now().toString().slice(-6)}`
-        }))
+      const outletsResponse = await apiService.getOutlets({ limit: 1000 })
+      if (outletsResponse.success && Array.isArray(outletsResponse.data)) {
+        const match = outletsResponse.data.find((o: any) => o.outletName === targetName)
+        if (match) {
+          setOutlet(match)
+          setFormData(prev => ({
+            ...prev,
+            outletId: match._id || match.id,
+            outletCode: match.outletCode,
+            outletName: match.outletName,
+            orderNumber: `SO-${match.outletCode}-${Date.now().toString().slice(-6)}`
+          }))
+        }
       }
       
       await loadProducts()
@@ -187,7 +161,14 @@ const AddSalesOrder: React.FC = () => {
 
   const loadProducts = async () => {
     try {
-      const response = await apiService.getFinishedGoods({ limit: 1000 })
+      // Fetch finished goods for current outlet to ensure only available items are shown
+      const outletName = (outlet?.outletName as string) || formData.outletName
+      let response: any
+      if (outletName) {
+        response = await apiService.getOutletFinishedGoods(outletName, { limit: 1000 })
+      } else {
+        response = await apiService.getOutletFinishedGoods('Kuwait City', { limit: 1000 })
+      }
       if (response.success) {
         setProducts(response.data)
       } else {

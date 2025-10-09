@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const mongoosePaginate = require('mongoose-paginate-v2');
 
 const salesOrderSchema = new mongoose.Schema({
   orderNumber: {
@@ -192,5 +193,8 @@ salesOrderSchema.index({ outletId: 1 });
 salesOrderSchema.index({ outletCode: 1 });
 salesOrderSchema.index({ 'orderTiming.orderDate': -1 });
 salesOrderSchema.index({ orderStatus: 1 });
+
+// Enable pagination support
+salesOrderSchema.plugin(mongoosePaginate);
 
 module.exports = mongoose.model('SalesOrder', salesOrderSchema);
