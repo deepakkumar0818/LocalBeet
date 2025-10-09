@@ -16,107 +16,15 @@ const initialState: InventoryState = {
 // Load initial data from localStorage
 const loadFromStorage = (): RawMaterial[] => {
   try {
-    const stored = localStorage.getItem('rawMaterials')
-    if (stored) {
-      return JSON.parse(stored)
-    }
+    // Clear localStorage to ensure fresh start
+    localStorage.removeItem('rawMaterials')
+    console.log('🧹 Cleared rawMaterials from localStorage')
   } catch (error) {
-    console.error('Error loading from localStorage:', error)
+    console.error('Error clearing localStorage:', error)
   }
   
-  // Return default sample data if nothing in storage
-  return [
-    {
-      id: 'rm-001',
-      materialCode: '10001',
-      materialName: 'Bhujia',
-      description: 'Traditional Indian snack',
-      category: 'Bakery',
-      unitOfMeasure: 'kg',
-      unitPrice: 0,
-      currentStock: 0,
-      minimumStock: 0,
-      maximumStock: 0,
-      supplierId: '',
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: 'admin',
-      updatedBy: 'admin'
-    },
-    {
-      id: 'rm-002',
-      materialCode: '10002',
-      materialName: 'Bran Flakes',
-      description: 'Healthy breakfast cereal',
-      category: 'Bakery',
-      unitOfMeasure: 'kg',
-      unitPrice: 0,
-      currentStock: 0,
-      minimumStock: 0,
-      maximumStock: 0,
-      supplierId: '',
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: 'admin',
-      updatedBy: 'admin'
-    },
-    {
-      id: 'rm-003',
-      materialCode: '10003',
-      materialName: 'Bread Improver',
-      description: 'Baking ingredient for better bread',
-      category: 'Bakery',
-      unitOfMeasure: 'kg',
-      unitPrice: 0,
-      currentStock: 0,
-      minimumStock: 0,
-      maximumStock: 0,
-      supplierId: '',
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: 'admin',
-      updatedBy: 'admin'
-    },
-    {
-      id: 'rm-004',
-      materialCode: '10004',
-      materialName: 'Caramel Syrup',
-      description: 'Sweet syrup for beverages',
-      category: 'Bakery',
-      unitOfMeasure: 'kg',
-      unitPrice: 0,
-      currentStock: 0,
-      minimumStock: 0,
-      maximumStock: 0,
-      supplierId: '',
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: 'admin',
-      updatedBy: 'admin'
-    },
-    {
-      id: 'rm-005',
-      materialCode: '10005',
-      materialName: 'Cocoa Powder',
-      description: 'Chocolate powder for baking',
-      category: 'Bakery',
-      unitOfMeasure: 'kg',
-      unitPrice: 0,
-      currentStock: 0,
-      minimumStock: 0,
-      maximumStock: 0,
-      supplierId: '',
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: 'admin',
-      updatedBy: 'admin'
-    }
-  ]
+  // Return empty array - no default sample data
+  return []
 }
 
 // Initialize with data from localStorage

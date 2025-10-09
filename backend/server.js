@@ -44,6 +44,10 @@ app.use('/api/central-kitchen/finished-products', require('./routes/centralKitch
 
 // Zoho Sync routes
 app.use('/api/sync-zoho', require('./routes/syncZoho'));
+app.use('/api/sync-zoho', require('./routes/syncZohoRawMaterials'));
+
+// Ingredient Master Transfer routes
+app.use('/api/ingredient-master', require('./routes/ingredientMasterTransfers'));
 
 // Kuwait City dedicated database routes (must come before general outlet routes)
 app.use('/api/kuwait-city/raw-materials', require('./routes/kuwaitCityRawMaterials'));

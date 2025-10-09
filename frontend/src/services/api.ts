@@ -2276,6 +2276,110 @@ class ApiService {
       method: 'DELETE',
     });
   }
+
+  // Transfer Orders API
+  async createTransferOrder(data: {
+    fromOutlet: string;
+    toOutlet: string;
+    transferDate: string;
+    priority: string;
+    notes: string;
+    items: Array<{
+      itemCode: string;
+      itemName: string;
+      itemType: string;
+      category: string;
+      subCategory?: string;
+      unitOfMeasure: string;
+      quantity: number;
+      unitPrice: number;
+      totalValue: number;
+      notes: string;
+    }>;
+  }) {
+    console.log('🚚 API Service: Creating transfer order...');
+    
+    try {
+      // Use different endpoint based on source outlet
+      const endpoint = data.fromOutlet === 'Ingredient Master' 
+        ? '/ingredient-master/create-transfer'
+        : '/transfer-orders';
+        
+      const response = await this.request<{
+        success: boolean;
+        message: string;
+        data: {
+          transferOrderId: string;
+        };
+      }>(endpoint, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      
+      console.log('✅ API Service: Transfer order created successfully');
+      return response;
+    } catch (error) {
+      console.error('❌ API Service: Transfer order creation failed:', error);
+      throw error;
+    }
+  }
+
+  // Zoho Sync API
+  async syncWithZoho() {
+    console.log('🔄 API Service: Starting Zoho sync for Central Kitchen...');
+    
+    try {
+      const response = await this.request<{
+        success: boolean;
+        message: string;
+        data: {
+          totalItems: number;
+          itemsWithSKU: number;
+          itemsWithoutSKU: number;
+          addedItems: number;
+          updatedItems: number;
+          errorItems: number;
+          syncTimestamp: string;
+        };
+      }>('/sync-zoho/central-kitchen', {
+        method: 'POST',
+      });
+      
+      console.log('✅ API Service: Zoho sync for Central Kitchen completed successfully');
+      return response;
+    } catch (error) {
+      console.error('❌ API Service: Zoho sync for Central Kitchen failed:', error);
+      throw error;
+    }
+  }
+
+  async syncWithZohoRawMaterials() {
+    console.log('🔄 API Service: Starting Zoho sync for Ingredient Master...');
+    
+    try {
+      const response = await this.request<{
+        success: boolean;
+        message: string;
+        data: {
+          totalItems: number;
+          itemsWithSKU: number;
+          itemsWithoutSKU: number;
+          addedItems: number;
+          updatedItems: number;
+          errorItems: number;
+          syncTimestamp: string;
+        };
+      }>('/sync-zoho/raw-materials', {
+        method: 'POST',
+      });
+      
+      console.log('✅ API Service: Zoho sync for Ingredient Master completed successfully');
+      return response;
+    } catch (error) {
+      console.error('❌ API Service: Zoho sync for Ingredient Master failed:', error);
+      throw error;
+    }
+  }
 }
 
 export const apiService = new ApiService();
