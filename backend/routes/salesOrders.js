@@ -220,14 +220,14 @@ router.post('/', async (req, res) => {
           outlet = await Outlet.findOne({ outletName: tryName });
         }
         if (!outlet && trySlug) {
-          if (trySlug.includes('downtown') || trySlug.includes('kuwait')) {
+          if (trySlug.includes('kuwait')) {
             outlet = await Outlet.findOne({ outletName: 'Kuwait City' });
           } else if (trySlug.includes('marina') || trySlug.includes('360')) {
             outlet = await Outlet.findOne({ outletName: '360 Mall' });
           } else if (trySlug.includes('mall') || trySlug.includes('vibes')) {
             outlet = await Outlet.findOne({ outletName: 'Vibes Complex' });
-          } else if (trySlug.includes('drive') || trySlug.includes('taiba')) {
-            outlet = await Outlet.findOne({ outletName: 'Taiba Hospital' });
+        } else if (trySlug.includes('drive') || trySlug.includes('taiba')) {
+          outlet = await Outlet.findOne({ outletName: 'Taiba Hospital' });
           }
         }
       }
@@ -280,10 +280,10 @@ router.post('/', async (req, res) => {
       } else if (outletNameLc.includes('360') || outletNameLc.includes('mall')) {
         const conn = await connectMall360DB();
         try { OutletFinishedProductModel = getMall360Models(conn).Mall360FinishedProduct; } catch (e) { OutletFinishedProductModel = initializeMall360Models(conn).Mall360FinishedProduct; }
-      } else if (outletNameLc.includes('vibe') || outletNameLc.includes('complex')) {
+      } else if (outletNameLc.includes('vibes') || outletNameLc.includes('complex')) {
         const conn = await connectVibeComplexDB();
         try { OutletFinishedProductModel = getVibeComplexModels(conn).VibeComplexFinishedProduct; } catch (e) { OutletFinishedProductModel = initializeVibeComplexModels(conn).VibeComplexFinishedProduct; }
-      } else if (outletNameLc.includes('taiba')) {
+      } else if (outletNameLc.includes('taiba') || outletNameLc.includes('hospital') || outletNameLc.includes('drive')) {
         const conn = await connectTaibaKitchenDB();
         try { OutletFinishedProductModel = getTaibaKitchenModels(conn).TaibaKitchenFinishedProduct; } catch (e) { OutletFinishedProductModel = initializeTaibaKitchenModels(conn).TaibaKitchenFinishedProduct; }
       }
@@ -340,10 +340,10 @@ router.post('/', async (req, res) => {
       } else if (outletNameLc.includes('360') || outletNameLc.includes('mall')) {
         const conn = await connectMall360DB();
         try { OutletRawMaterialModel = getMall360Models(conn).Mall360RawMaterial; } catch (e) { OutletRawMaterialModel = initializeMall360Models(conn).Mall360RawMaterial; }
-      } else if (outletNameLc.includes('vibe') || outletNameLc.includes('complex')) {
+      } else if (outletNameLc.includes('vibes') || outletNameLc.includes('complex')) {
         const conn = await connectVibeComplexDB();
         try { OutletRawMaterialModel = getVibeComplexModels(conn).VibeComplexRawMaterial; } catch (e) { OutletRawMaterialModel = initializeVibeComplexModels(conn).VibeComplexRawMaterial; }
-      } else if (outletNameLc.includes('taiba')) {
+      } else if (outletNameLc.includes('taiba') || outletNameLc.includes('hospital') || outletNameLc.includes('drive')) {
         const conn = await connectTaibaKitchenDB();
         try { OutletRawMaterialModel = getTaibaKitchenModels(conn).TaibaKitchenRawMaterial; } catch (e) { OutletRawMaterialModel = initializeTaibaKitchenModels(conn).TaibaKitchenRawMaterial; }
       }

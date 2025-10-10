@@ -148,7 +148,7 @@ const outletInventoryData = [
     notes: 'Crispy samosas for cafe appetizers'
   },
 
-  // Mall Food Court (OUT-003) - High volume quantities
+  // Vibes Complex (OUT-003) - High volume quantities
   {
     outletCode: 'OUT-003',
     productCode: 'FG-001', // Chicken Biryani

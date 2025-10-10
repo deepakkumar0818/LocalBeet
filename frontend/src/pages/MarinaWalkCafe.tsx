@@ -88,14 +88,14 @@ const MarinaWalkCafe: React.FC = () => {
   const [sortBy] = useState('materialName')
   const [sortOrder] = useState<'asc' | 'desc'>('asc')
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Vibe Complex')
+  const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('360 Mall')
 
   // Debug notifications when they change
   useEffect(() => {
-    console.log(`🔔 Vibes Complex: Notifications updated:`, notifications)
-    console.log(`🔔 Vibes Complex: Number of notifications: ${notifications.length}`)
+    console.log(`🔔 360 Mall: Notifications updated:`, notifications)
+    console.log(`🔔 360 Mall: Number of notifications: ${notifications.length}`)
     if (notifications.length > 0) {
-      console.log(`🔔 Vibes Complex: First notification:`, notifications[0])
+      console.log(`🔔 360 Mall: First notification:`, notifications[0])
     }
   }, [notifications])
 
@@ -166,7 +166,7 @@ const MarinaWalkCafe: React.FC = () => {
   // Auto-refresh notifications every 5 seconds to catch new approvals
   useEffect(() => {
     const interval = setInterval(() => {
-      console.log('🔄 Vibes Complex: Auto-refreshing notifications...')
+      console.log('🔄 360 Mall: Auto-refreshing notifications...')
       refreshNotifications()
     }, 5000) // Refresh every 5 seconds
 
@@ -185,15 +185,15 @@ const MarinaWalkCafe: React.FC = () => {
       setLoading(true)
       setError(null)
       
-      // Get Vibe Complex outlet
+      // Get 360 Mall outlet
       const outletsResponse = await apiService.getOutlets({ limit: 1000 })
       if (outletsResponse.success) {
-        const vibeComplex = outletsResponse.data.find(outlet => outlet.outletCode === 'OUT-002')
-        if (vibeComplex) {
-          setOutlet(vibeComplex)
+        const mall360 = outletsResponse.data.find(outlet => outlet.outletName === '360 Mall')
+        if (mall360) {
+          setOutlet(mall360)
           await loadInventory()
         } else {
-          setError('Vibe Complex not found')
+          setError('360 Mall not found')
         }
       } else {
         setError('Failed to load outlet data')
@@ -208,10 +208,10 @@ const MarinaWalkCafe: React.FC = () => {
 
   const loadInventory = async () => {
     try {
-      console.log('Loading Vibe Complex inventory from dedicated database')
+      console.log('Loading 360 Mall inventory from dedicated database')
       
-      // Load raw materials from Vibe Complex dedicated database
-      const rawMaterialsResponse = await apiService.getVibeComplexRawMaterials({
+      // Load raw materials from 360 Mall dedicated database
+      const rawMaterialsResponse = await apiService.get360MallRawMaterials({
         limit: 1000,
         search: searchTerm,
         subCategory: filterCategory,
@@ -221,15 +221,15 @@ const MarinaWalkCafe: React.FC = () => {
       })
 
       if (rawMaterialsResponse.success) {
-        console.log('Loaded Vibe Complex Raw Materials:', rawMaterialsResponse.data)
+        console.log('Loaded 360 Mall Raw Materials:', rawMaterialsResponse.data)
         
         if (rawMaterialsResponse.data && rawMaterialsResponse.data.length > 0) {
           // Transform the data to match the expected interface
           const transformedRawMaterials: OutletInventoryItem[] = rawMaterialsResponse.data.map((item: any) => ({
             id: item._id || item.id,
-            outletId: 'vibe-complex',
-            outletCode: 'OUT-002',
-            outletName: 'Vibe Complex',
+            outletId: outlet?._id || outlet?.id || '',
+            outletCode: outlet?.outletCode || '',
+            outletName: outlet?.outletName || '360 Mall',
             materialId: item._id,
             materialCode: item.materialCode,
             materialName: item.materialName,
@@ -254,17 +254,17 @@ const MarinaWalkCafe: React.FC = () => {
           
           setInventoryItems(transformedRawMaterials)
         } else {
-          console.log('No raw materials inventory found for Vibe Complex')
+          console.log('No raw materials inventory found for 360 Mall')
           setInventoryItems([])
-          setError('No raw materials inventory found. Please add some raw materials to Vibe Complex.')
+          setError('No raw materials inventory found. Please add some raw materials to 360 Mall.')
         }
       } else {
         console.error('Failed to load raw materials inventory:', (rawMaterialsResponse as any).error || 'API Error')
         setError(`Failed to load inventory from server: ${(rawMaterialsResponse as any).error || 'Unknown error'}`)
       }
 
-      // Load finished goods from Vibe Complex dedicated database
-      const finishedGoodsResponse = await apiService.getVibeComplexFinishedProducts({
+      // Load finished goods from 360 Mall dedicated database
+      const finishedGoodsResponse = await apiService.get360MallFinishedProducts({
         limit: 1000,
         search: searchTerm,
         subCategory: filterCategory,
@@ -274,15 +274,15 @@ const MarinaWalkCafe: React.FC = () => {
       })
 
       if (finishedGoodsResponse.success) {
-        console.log('Loaded Vibe Complex Finished Products:', finishedGoodsResponse.data)
+        console.log('Loaded 360 Mall Finished Products:', finishedGoodsResponse.data)
         
         if (finishedGoodsResponse.data && finishedGoodsResponse.data.length > 0) {
           // Transform the data to match the expected interface
           const transformedFinishedGoods: FinishedGoodInventoryItem[] = finishedGoodsResponse.data.map((item: any) => ({
             id: item._id || item.id,
-            outletId: 'vibe-complex',
-            outletCode: 'OUT-002',
-            outletName: 'Vibe Complex',
+            outletId: outlet?._id || outlet?.id || '',
+            outletCode: outlet?.outletCode || '',
+            outletName: outlet?.outletName || '360 Mall',
             productId: item._id,
             productCode: item.productCode,
             productName: item.productName,
@@ -378,7 +378,7 @@ const MarinaWalkCafe: React.FC = () => {
             // Add to local state
             const newItem: OutletInventoryItem = {
               id: `rm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              outletId: 'marina-walk-cafe-001',
+              outletId: outlet?._id || outlet?.id || '',
               outletCode: outlet?.outletCode || '',
               outletName: outlet?.outletName || '',
               materialId: materialData.materialCode,
@@ -422,7 +422,7 @@ const MarinaWalkCafe: React.FC = () => {
             // Add to local state
             const newItem: FinishedGoodInventoryItem = {
               id: `fg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              outletId: 'marina-walk-cafe-001',
+              outletId: outlet?._id || outlet?.id || '',
               outletCode: outlet?.outletCode || '',
               outletName: outlet?.outletName || '',
               productId: productData.productCode,
@@ -819,7 +819,7 @@ const MarinaWalkCafe: React.FC = () => {
             <Coffee className="h-8 w-8 text-green-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Vibes Complex</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{outlet?.outletName || '360 Mall'}</h1>
             <p className="text-gray-600">
               {currentSection === 'raw-materials' ? 'Raw Materials Inventory' :
                currentSection === 'finished-goods' ? 'Finished Goods Inventory' :
@@ -839,7 +839,7 @@ const MarinaWalkCafe: React.FC = () => {
           </button>
           {currentSection === 'raw-materials' && (
             <button
-              onClick={() => navigate('/marina-walk-cafe/request-raw-materials')}
+              onClick={() => navigate('/360-mall/request-raw-materials')}
               className="btn-primary flex items-center"
             >
               <Truck className="h-4 w-4 mr-2" />
@@ -848,7 +848,7 @@ const MarinaWalkCafe: React.FC = () => {
           )}
           {currentSection === 'finished-goods' && (
             <button
-              onClick={() => navigate('/marina-walk-cafe/request-finished-goods')}
+              onClick={() => navigate('/360-mall/request-finished-goods')}
               className="btn-primary flex items-center"
             >
               <Truck className="h-4 w-4 mr-2" />

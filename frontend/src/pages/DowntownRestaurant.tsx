@@ -157,7 +157,7 @@ const DowntownRestaurant: React.FC = () => {
       // Get Kuwait City outlet
       const outletsResponse = await apiService.getOutlets({ limit: 1000 })
       if (outletsResponse.success) {
-        const downtownRestaurant = outletsResponse.data.find(outlet => outlet.outletCode === 'OUT-001')
+        const downtownRestaurant = outletsResponse.data.find(outlet => outlet.outletName === 'Kuwait City')
         if (downtownRestaurant) {
           setOutlet(downtownRestaurant)
         } else {
@@ -343,7 +343,7 @@ const DowntownRestaurant: React.FC = () => {
             // Add to local state
             const newItem: OutletInventoryItem = {
               id: `rm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              outletId: 'downtown-restaurant-001',
+              outletId: outlet?._id || outlet?.id || '',
               outletCode: outlet?.outletCode || '',
               outletName: outlet?.outletName || '',
               materialId: materialData.materialCode,
@@ -387,7 +387,7 @@ const DowntownRestaurant: React.FC = () => {
             // Add to local state
             const newItem: FinishedGoodInventoryItem = {
               id: `fg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              outletId: 'downtown-restaurant-001',
+              outletId: outlet?._id || outlet?.id || '',
               outletCode: outlet?.outletCode || '',
               outletName: outlet?.outletName || '',
               productId: productData.productCode,
@@ -604,7 +604,7 @@ const DowntownRestaurant: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-900">POS Sales</h2>
           <button
-            onClick={() => navigate('/downtown-restaurant/pos-sales/create-order', { 
+            onClick={() => navigate('/kuwait-city/pos-sales/create-order', { 
               state: { outletName: 'Kuwait City' } 
             })}
             className="btn-primary flex items-center"
@@ -619,7 +619,7 @@ const DowntownRestaurant: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
           <div 
             className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => navigate('/downtown-restaurant/pos-sales/create-order', { 
+            onClick={() => navigate('/kuwait-city/pos-sales/create-order', { 
               state: { outletName: 'Kuwait City' } 
             })}
           >
@@ -741,7 +741,7 @@ const DowntownRestaurant: React.FC = () => {
 
       {/* Navigation Cards */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-        <div className="card p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/downtown-restaurant/raw-materials')}>
+        <div className="card p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/kuwait-city/raw-materials')}>
           <div className="flex items-center space-x-4">
             <div className="p-3 bg-blue-100 rounded-lg">
               <Package className="h-8 w-8 text-blue-600" />
@@ -752,7 +752,7 @@ const DowntownRestaurant: React.FC = () => {
             </div>
           </div>
         </div>
-        <div className="card p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/downtown-restaurant/finished-goods')}>
+        <div className="card p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/kuwait-city/finished-goods')}>
           <div className="flex items-center space-x-4">
             <div className="p-3 bg-green-100 rounded-lg">
               <Package className="h-8 w-8 text-green-600" />
@@ -763,7 +763,7 @@ const DowntownRestaurant: React.FC = () => {
             </div>
           </div>
         </div>
-        <div className="card p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/downtown-restaurant/sales-orders')}>
+        <div className="card p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/kuwait-city/sales-orders')}>
           <div className="flex items-center space-x-4">
             <div className="p-3 bg-purple-100 rounded-lg">
               <ShoppingCart className="h-8 w-8 text-purple-600" />
@@ -810,7 +810,7 @@ const DowntownRestaurant: React.FC = () => {
           </button>
           {currentSection === 'raw-materials' && (
             <button
-              onClick={() => navigate('/downtown-restaurant/request-raw-materials')}
+              onClick={() => navigate('/kuwait-city/request-raw-materials')}
               className="btn-primary flex items-center"
             >
               <Truck className="h-4 w-4 mr-2" />
@@ -819,7 +819,7 @@ const DowntownRestaurant: React.FC = () => {
           )}
           {currentSection === 'finished-goods' && (
             <button
-              onClick={() => navigate('/downtown-restaurant/request-finished-goods')}
+              onClick={() => navigate('/kuwait-city/request-finished-goods')}
               className="btn-primary flex items-center"
             >
               <Truck className="h-4 w-4 mr-2" />

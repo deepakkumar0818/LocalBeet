@@ -206,7 +206,7 @@ const Mall360RequestRawMaterials: React.FC = () => {
         }
         
         alert('Transfer order created successfully!')
-        navigate('/mall-food-court/raw-materials')
+        navigate('/360-mall/raw-materials')
       } else {
         throw new Error(response.message || 'Failed to create transfer order')
       }

@@ -86,11 +86,16 @@ function App() {
         <Route path="/central-kitchen/finished-goods" element={<CentralKitchenFinishedGoods />} />
         <Route path="/central-kitchen/make-finished-good" element={<CentralKitchenMakeFinishedGood />} />
         <Route path="/central-kitchen/create-transfer" element={<CentralKitchenCreateTransfer />} />
-        <Route path="/downtown-restaurant" element={<DowntownRestaurant />} />
-        <Route path="/downtown-restaurant/raw-materials" element={<DowntownRestaurant />} />
-        <Route path="/downtown-restaurant/finished-goods" element={<DowntownRestaurant />} />
-        <Route path="/downtown-restaurant/request-raw-materials" element={<KuwaitCityRequestRawMaterials />} />
-        <Route path="/downtown-restaurant/request-finished-goods" element={<KuwaitCityRequestFinishedGoods />} />
+        <Route path="/kuwait-city" element={<DowntownRestaurant />} />
+        <Route path="/kuwait-city/raw-materials" element={<DowntownRestaurant />} />
+        <Route path="/kuwait-city/finished-goods" element={<DowntownRestaurant />} />
+        <Route path="/kuwait-city/request-raw-materials" element={<KuwaitCityRequestRawMaterials />} />
+        <Route path="/kuwait-city/request-finished-goods" element={<KuwaitCityRequestFinishedGoods />} />
+        <Route path="/360-mall" element={<MarinaWalkCafe />} />
+        <Route path="/360-mall/raw-materials" element={<MarinaWalkCafe />} />
+        <Route path="/360-mall/finished-goods" element={<MarinaWalkCafe />} />
+        <Route path="/360-mall/request-raw-materials" element={<Mall360RequestRawMaterials />} />
+        <Route path="/360-mall/request-finished-goods" element={<Mall360RequestFinishedGoods />} />
         <Route path="/marina-walk-cafe" element={<MarinaWalkCafe />} />
         <Route path="/marina-walk-cafe/raw-materials" element={<MarinaWalkCafe />} />
         <Route path="/marina-walk-cafe/finished-goods" element={<MarinaWalkCafe />} />
@@ -101,18 +106,28 @@ function App() {
         <Route path="/mall-food-court/finished-goods" element={<MallFoodCourt />} />
         <Route path="/mall-food-court/request-raw-materials" element={<Mall360RequestRawMaterials />} />
         <Route path="/mall-food-court/request-finished-goods" element={<Mall360RequestFinishedGoods />} />
+        {/* Vibes Complex routes */}
+        <Route path="/vibes-complex" element={<MallFoodCourt />} />
+        <Route path="/vibes-complex/raw-materials" element={<MallFoodCourt />} />
+        <Route path="/vibes-complex/finished-goods" element={<MallFoodCourt />} />
+        <Route path="/vibes-complex/request-raw-materials" element={<VibesComplexRequestRawMaterials />} />
+        <Route path="/vibes-complex/request-finished-goods" element={<VibesComplexRequestFinishedGoods />} />
+        {/* Back-compat old drive-thru paths still render Taiba component */}
         <Route path="/drive-thru-express" element={<DriveThruExpress />} />
         <Route path="/drive-thru-express/raw-materials" element={<DriveThruExpress />} />
         <Route path="/drive-thru-express/finished-goods" element={<DriveThruExpress />} />
         <Route path="/drive-thru-express/request-raw-materials" element={<TaibaHospitalRequestRawMaterials />} />
         <Route path="/drive-thru-express/request-finished-goods" element={<TaibaHospitalRequestFinishedGoods />} />
+        {/* Primary Taiba Hospital routes */}
+        <Route path="/taiba-hospital" element={<DriveThruExpress />} />
+        <Route path="/taiba-hospital/raw-materials" element={<DriveThruExpress />} />
+        <Route path="/taiba-hospital/finished-goods" element={<DriveThruExpress />} />
+        <Route path="/taiba-hospital/request-raw-materials" element={<TaibaHospitalRequestRawMaterials />} />
+        <Route path="/taiba-hospital/request-finished-goods" element={<TaibaHospitalRequestFinishedGoods />} />
         <Route path="/raw-material-forecast" element={<RawMaterialForecast />} />
         <Route path="/raw-material-forecast/add" element={<AddForecast />} />
         <Route path="/sales-orders" element={<SalesOrders />} />
         <Route path="/sales-orders/add" element={<AddSalesOrder />} />
-        <Route path="/downtown-restaurant/sales-orders" element={<SalesOrders />} />
-        <Route path="/downtown-restaurant/sales-orders/add" element={<AddSalesOrder />} />
-        <Route path="/downtown-restaurant/pos-sales/create-order" element={<POSCreateOrder />} />
         <Route path="/kuwait-city/sales-orders" element={<SalesOrders />} />
         <Route path="/kuwait-city/sales-orders/add" element={<AddSalesOrder />} />
         <Route path="/kuwait-city/pos-sales/create-order" element={<POSCreateOrder />} />
@@ -131,6 +146,9 @@ function App() {
         <Route path="/drive-thru-express/sales-orders" element={<SalesOrders />} />
         <Route path="/drive-thru-express/sales-orders/add" element={<AddSalesOrder />} />
         <Route path="/drive-thru-express/pos-sales/create-order" element={<POSCreateOrder />} />
+        <Route path="/taiba-hospital/sales-orders" element={<SalesOrders />} />
+        <Route path="/taiba-hospital/sales-orders/add" element={<AddSalesOrder />} />
+        <Route path="/taiba-hospital/pos-sales/create-order" element={<POSCreateOrder />} />
         <Route path="/taiba-hospital/sales-orders" element={<SalesOrders />} />
         <Route path="/taiba-hospital/sales-orders/add" element={<AddSalesOrder />} />
         <Route path="/taiba-hospital/pos-sales/create-order" element={<POSCreateOrder />} />

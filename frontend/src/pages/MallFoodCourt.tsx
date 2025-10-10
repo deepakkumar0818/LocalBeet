@@ -88,14 +88,14 @@ const MallFoodCourt: React.FC = () => {
   const [sortBy] = useState('materialName')
   const [sortOrder] = useState<'asc' | 'desc'>('asc')
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('360 Mall')
+  const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Vibes Complex')
 
   // Filter notifications based on current section
   const getFilteredNotifications = () => {
     const currentSection = getCurrentSection()
     
-    console.log(`🔔 360 Mall: Current section: ${currentSection}`)
-    console.log(`🔔 360 Mall: All notifications:`, notifications)
+    console.log(`🔔 Vibes Complex: Current section: ${currentSection}`)
+    console.log(`🔔 Vibes Complex: All notifications:`, notifications)
     
     let filtered = []
     if (currentSection === 'raw-materials') {
@@ -115,7 +115,7 @@ const MallFoodCourt: React.FC = () => {
       filtered = notifications
     }
     
-    console.log(`🔔 360 Mall: Filtered notifications for ${currentSection}:`, filtered)
+    console.log(`🔔 Vibes Complex: Filtered notifications for ${currentSection}:`, filtered)
     return filtered
   }
 
@@ -136,16 +136,16 @@ const MallFoodCourt: React.FC = () => {
 
   // Debug notifications when they change
   useEffect(() => {
-    console.log(`🔔 360 Mall: Notifications updated:`, notifications)
-    console.log(`🔔 360 Mall: Number of notifications: ${notifications.length}`)
+    console.log(`🔔 Vibes Complex: Notifications updated:`, notifications)
+    console.log(`🔔 Vibes Complex: Number of notifications: ${notifications.length}`)
     if (notifications.length > 0) {
-      console.log(`🔔 360 Mall: First notification:`, notifications[0])
+      console.log(`🔔 Vibes Complex: First notification:`, notifications[0])
     }
   }, [notifications])
 
   // Debug when component mounts
   useEffect(() => {
-    console.log(`🔔 360 Mall: Component mounted, loading notifications for: "360 Mall"`)
+    console.log(`🔔 Vibes Complex: Component mounted, loading notifications for: "Vibes Complex"`)
   }, [])
 
   // Reload inventory when filters change
@@ -164,7 +164,7 @@ const MallFoodCourt: React.FC = () => {
       )
       
       if (hasNewTransferNotifications) {
-        console.log('New transfer notification detected for 360 Mall, refreshing inventory...')
+        console.log('New transfer notification detected for Vibes Complex, refreshing inventory...')
         loadInventory()
       }
     }
@@ -173,7 +173,7 @@ const MallFoodCourt: React.FC = () => {
   // Auto-refresh notifications every 5 seconds to catch new approvals
   useEffect(() => {
     const interval = setInterval(() => {
-      console.log('🔄 360 Mall: Auto-refreshing notifications...')
+      console.log('🔄 Vibes Complex: Auto-refreshing notifications...')
       refreshNotifications()
     }, 5000) // Refresh every 5 seconds
 
@@ -185,15 +185,15 @@ const MallFoodCourt: React.FC = () => {
       setLoading(true)
       setError(null)
       
-      // Get 360 Mall outlet
+      // Get Vibes Complex outlet
       const outletsResponse = await apiService.getOutlets({ limit: 1000 })
       if (outletsResponse.success) {
-        const mallFoodCourt = outletsResponse.data.find(outlet => outlet.outletCode === 'OUT-003')
-        if (mallFoodCourt) {
-          setOutlet(mallFoodCourt)
+        const vibesComplex = outletsResponse.data.find(outlet => outlet.outletName === 'Vibes Complex')
+        if (vibesComplex) {
+          setOutlet(vibesComplex)
           await loadInventory()
         } else {
-          setError('360 Mall not found')
+          setError('Vibes Complex not found')
         }
       } else {
         setError('Failed to load outlet data')
@@ -208,11 +208,11 @@ const MallFoodCourt: React.FC = () => {
 
   const loadInventory = async () => {
     try {
-      console.log('🔍 Loading 360 Mall inventory from dedicated database')
+      console.log('🔍 Loading Vibes Complex inventory from dedicated database')
       console.log('   Search params:', { searchTerm, filterCategory, filterStatus, sortBy, sortOrder })
       
-      // Load raw materials from 360 Mall dedicated database
-      const rawMaterialsResponse = await apiService.get360MallRawMaterials({
+      // Load raw materials from Vibes Complex dedicated database
+      const rawMaterialsResponse = await apiService.getVibeComplexRawMaterials({
         limit: 1000,
         search: searchTerm,
         subCategory: filterCategory,
@@ -227,16 +227,16 @@ const MallFoodCourt: React.FC = () => {
       })
 
       if (rawMaterialsResponse.success) {
-        console.log('✅ Loaded 360 Mall Raw Materials:', rawMaterialsResponse.data?.length || 0, 'items')
+        console.log('✅ Loaded Vibes Complex Raw Materials:', rawMaterialsResponse.data?.length || 0, 'items')
         console.log('   First few items:', rawMaterialsResponse.data?.slice(0, 3))
         
         if (rawMaterialsResponse.data && rawMaterialsResponse.data.length > 0) {
           // Transform the data to match the expected interface
           const transformedRawMaterials: OutletInventoryItem[] = rawMaterialsResponse.data.map((item: any) => ({
             id: item._id || item.id,
-            outletId: '360-mall',
-            outletCode: 'OUT-003',
-            outletName: '360 Mall',
+            outletId: outlet?._id || outlet?.id || '',
+            outletCode: outlet?.outletCode || 'OUT-003',
+            outletName: outlet?.outletName || 'Vibes Complex',
             materialId: item._id,
             materialCode: item.materialCode,
             materialName: item.materialName,
@@ -261,17 +261,17 @@ const MallFoodCourt: React.FC = () => {
           
           setInventoryItems(transformedRawMaterials)
         } else {
-          console.log('No raw materials inventory found for 360 Mall')
+          console.log('No raw materials inventory found for Vibes Complex')
           setInventoryItems([])
-          setError('No raw materials inventory found. Please add some raw materials to 360 Mall.')
+          setError('No raw materials inventory found. Please add some raw materials to Vibes Complex.')
         }
       } else {
         console.error('Failed to load raw materials inventory:', (rawMaterialsResponse as any).error || 'API Error')
         setError(`Failed to load inventory from server: ${(rawMaterialsResponse as any).error || 'Unknown error'}`)
       }
 
-      // Load finished goods from 360 Mall dedicated database
-      const finishedGoodsResponse = await apiService.get360MallFinishedProducts({
+      // Load finished goods from Vibes Complex dedicated database
+      const finishedGoodsResponse = await apiService.getVibeComplexFinishedProducts({
         limit: 1000,
         search: searchTerm,
         subCategory: filterCategory,
@@ -281,15 +281,15 @@ const MallFoodCourt: React.FC = () => {
       })
 
       if (finishedGoodsResponse.success) {
-        console.log('Loaded 360 Mall Finished Products:', finishedGoodsResponse.data)
+        console.log('Loaded Vibes Complex Finished Products:', finishedGoodsResponse.data)
         
         if (finishedGoodsResponse.data && finishedGoodsResponse.data.length > 0) {
           // Transform the data to match the expected interface
           const transformedFinishedGoods: FinishedGoodInventoryItem[] = finishedGoodsResponse.data.map((item: any) => ({
             id: item._id || item.id,
-            outletId: '360-mall',
-            outletCode: 'OUT-003',
-            outletName: '360 Mall',
+            outletId: outlet?._id || outlet?.id || '',
+            outletCode: outlet?.outletCode || 'OUT-003',
+            outletName: outlet?.outletName || 'Vibes Complex',
             productId: item._id,
             productCode: item.productCode,
             productName: item.productName,
@@ -320,7 +320,7 @@ const MallFoodCourt: React.FC = () => {
           
           setFinishedGoodInventoryItems(transformedFinishedGoods)
         } else {
-          console.log('No finished goods inventory found for 360 Mall')
+          console.log('No finished goods inventory found for Vibes Complex')
           setFinishedGoodInventoryItems([])
         }
       } else {
@@ -351,7 +351,7 @@ const MallFoodCourt: React.FC = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading 360 Mall...</p>
+          <p className="mt-4 text-gray-600">Loading Vibes Complex...</p>
         </div>
       </div>
     )
@@ -440,7 +440,7 @@ const MallFoodCourt: React.FC = () => {
             id: `rm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             outletId: outlet?.id || 'mall-food-court-001',
             outletCode: outlet?.outletCode || 'OUT-003',
-            outletName: outlet?.outletName || '360 Mall',
+            outletName: outlet?.outletName || 'Vibes Complex',
             materialId: materialData.materialCode,
             materialCode: materialData.materialCode,
             materialName: materialData.materialName,
@@ -694,7 +694,7 @@ const MallFoodCourt: React.FC = () => {
             <ShoppingBag className="h-8 w-8 text-orange-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">360 Mall</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{outlet?.outletName || 'Vibes Complex'}</h1>
             <p className="text-gray-600">
               {currentSection === 'raw-materials' ? 'Raw Materials Inventory' :
                currentSection === 'finished-goods' ? 'Finished Goods Inventory' :
@@ -714,7 +714,7 @@ const MallFoodCourt: React.FC = () => {
           </button>
           {currentSection === 'raw-materials' && (
             <button
-              onClick={() => navigate('/mall-food-court/request-raw-materials')}
+              onClick={() => navigate('/vibes-complex/request-raw-materials')}
               className="btn-primary flex items-center"
             >
               <Truck className="h-4 w-4 mr-2" />
@@ -723,7 +723,7 @@ const MallFoodCourt: React.FC = () => {
           )}
           {currentSection === 'finished-goods' && (
             <button
-              onClick={() => navigate('/mall-food-court/request-finished-goods')}
+              onClick={() => navigate('/vibes-complex/request-finished-goods')}
               className="btn-primary flex items-center"
             >
               <Truck className="h-4 w-4 mr-2" />

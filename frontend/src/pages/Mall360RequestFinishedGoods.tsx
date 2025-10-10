@@ -206,7 +206,7 @@ const Mall360RequestFinishedGoods: React.FC = () => {
         }
         
         alert('Transfer order created successfully!')
-        navigate('/mall-food-court/finished-goods')
+        navigate('/360-mall/finished-goods')
       } else {
         throw new Error(response.message || 'Failed to create transfer order')
       }

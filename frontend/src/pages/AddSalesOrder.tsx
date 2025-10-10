@@ -102,12 +102,13 @@ const AddSalesOrder: React.FC = () => {
       
       // Resolve real outlet from API instead of hardcoded ids
       const slugToName: Record<string, string> = {
-        'downtown-restaurant': 'Kuwait City',
+        'kuwait-city': 'Kuwait City',
+        '360-mall': '360 Mall',
         'marina-walk-cafe': '360 Mall',
-        'mall-food-court': 'Vibes Complex',
         'vibes-complex': 'Vibes Complex',
-        'drive-thru-express': 'Taiba Hospital',
+        'mall-food-court': 'Vibes Complex',
         'taiba-hospital': 'Taiba Hospital',
+        'drive-thru-express': 'Taiba Hospital',
       }
       const targetName = slugToName[outletSlug] || outletSlug
 
