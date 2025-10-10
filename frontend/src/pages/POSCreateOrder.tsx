@@ -56,16 +56,15 @@ interface OrderType {
 // Helper function to get outlet name from slug
 function getOutletNameFromSlug(slug: string): string {
   // Map URL slug to ACTUAL outlet names stored in DB
-  // Use names seen in /outlets list: 'Kuwait City', 'Marina Walk Cafe', 'Mall Food Court', 'Drive-Thru Express'
+  // Use names seen in /outlets list: 'Kuwait City', '360 Mall', 'Vibes Complex', 'Taiba Hospital'
   const slugMap: Record<string, string> = {
     'kuwait-city': 'Kuwait City',
-    'downtown-restaurant': 'Kuwait City',
-    '360-mall': 'Marina Walk Cafe',
-    'marina-walk-cafe': 'Marina Walk Cafe',
-    'vibes-complex': 'Mall Food Court',
-    'mall-food-court': 'Mall Food Court',
-    'taiba-hospital': 'Drive-Thru Express',
-    'drive-thru-express': 'Drive-Thru Express'
+    '360-mall': '360 Mall',
+    'marina-walk-cafe': '360 Mall',
+    'vibes-complex': 'Vibes Complex',
+    'mall-food-court': 'Vibes Complex',
+    'taiba-hospital': 'Taiba Hospital',
+    'drive-thru-express': 'Taiba Hospital'
   }
   return slugMap[slug.toLowerCase()] || 'Kuwait City'
 }
@@ -157,13 +156,13 @@ const POSCreateOrder: React.FC = () => {
       if (outletName === 'Kuwait City') {
         console.log('loadProducts - Calling getKuwaitCityFinishedProducts')
         response = await apiService.getKuwaitCityFinishedProducts({ limit: 1000 })
-      } else if (outletName === 'Marina Walk Cafe') {
+      } else if (outletName === '360 Mall') {
         console.log('loadProducts - Calling get360MallFinishedProducts')
         response = await apiService.get360MallFinishedProducts({ limit: 1000 })
-      } else if (outletName === 'Mall Food Court') {
+      } else if (outletName === 'Vibes Complex') {
         console.log('loadProducts - Calling getVibeComplexFinishedProducts')
         response = await apiService.getVibeComplexFinishedProducts({ limit: 1000 })
-      } else if (outletName === 'Drive-Thru Express') {
+      } else if (outletName === 'Taiba Hospital') {
         console.log('loadProducts - Calling getTaibaKitchenFinishedProducts')
         response = await apiService.getTaibaKitchenFinishedProducts({ limit: 1000 })
       } else {
@@ -368,7 +367,7 @@ const POSCreateOrder: React.FC = () => {
         orderItems: orderItems,
         recipeItems: recipeItems,
         orderSummary: {
-          subtotal: getSubtotal(),
+        subtotal: getSubtotal(),
           taxAmount: getTaxAmount(),
           discountAmount: getDiscountAmount(),
           totalAmount: getTotal(),
@@ -395,11 +394,11 @@ const POSCreateOrder: React.FC = () => {
         if (response.success) {
           const orderNumber = response.data.orderNumber
           alert(`Order ${orderNumber} created successfully!\nTotal: $${getTotal().toFixed(2)}\n\nPlease refresh the sales orders page to see the new order.`)
-          
-          // Clear cart and reset form
-          setCart([])
+      
+      // Clear cart and reset form
+      setCart([])
           setCustomer({ name: '', phone: '', email: '' })
-          setDiscount(0)
+      setDiscount(0)
           
           // Reload products to reflect updated stock
           await loadProducts()
@@ -518,8 +517,8 @@ const POSCreateOrder: React.FC = () => {
                   <p className="text-sm">Check back later or contact admin</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {filteredProducts.map(product => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {filteredProducts.map(product => (
                   <div
                     key={product._id}
                     className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
@@ -528,15 +527,15 @@ const POSCreateOrder: React.FC = () => {
                     role="button"
                     tabIndex={0}
                   >
-                      <div className="flex justify-between items-start mb-2">
+                    <div className="flex justify-between items-start mb-2">
                         <h4 className="font-medium text-gray-900">{product.productName}</h4>
                         <span className="text-green-600 font-semibold">${product.unitPrice.toFixed(2)}</span>
-                      </div>
+                    </div>
                       <p className="text-sm text-gray-600 mb-2">Code: {product.productCode}</p>
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                          {product.category}
-                        </span>
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        {product.category}
+                      </span>
                         <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
                           Stock: {product.currentStock} {product.unitOfMeasure}
                         </span>
@@ -569,10 +568,10 @@ const POSCreateOrder: React.FC = () => {
                         {r.productDescription && <div className="text-xs text-gray-400 mt-1">{r.productDescription}</div>}
                         <div className="mt-3">
                           <button className="text-indigo-600 text-sm font-medium">Add to Cart</button>
-                        </div>
-                      </div>
-                    ))}
+                    </div>
                   </div>
+                ))}
+              </div>
                 )
               )}
             </div>
@@ -608,14 +607,14 @@ const POSCreateOrder: React.FC = () => {
                   {cart.map(item => (
                     item.kind === 'finished' && item.product ? (
                       <div key={item.product._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex-1">
+                      <div className="flex-1">
                           <h4 className="font-medium text-sm">{item.product.productName}</h4>
                           <p className="text-xs text-gray-600">${item.product.unitPrice.toFixed(2)} each</p>
                           <p className="text-xs text-gray-500">Stock: {item.product.currentStock} {item.product.unitOfMeasure}</p>
-                        </div>
-                        <div className="flex items-center space-x-2">
+                      </div>
+                      <div className="flex items-center space-x-2">
                           <button onClick={() => updateQuantity(item.product!._id, item.quantity - 1)} className="p-1 hover:bg-gray-200 rounded"><Minus className="h-3 w-3" /></button>
-                          <span className="w-8 text-center text-sm">{item.quantity}</span>
+                        <span className="w-8 text-center text-sm">{item.quantity}</span>
                           <button onClick={() => updateQuantity(item.product!._id, item.quantity + 1)} className="p-1 hover:bg-gray-200 rounded"><Plus className="h-3 w-3" /></button>
                           <button onClick={() => removeFromCart(item.product!._id)} className="p-1 text-red-600 hover:bg-red-50 rounded ml-2"><Trash2 className="h-3 w-3" /></button>
                         </div>
@@ -626,15 +625,15 @@ const POSCreateOrder: React.FC = () => {
                         <div className="flex-1">
                           <h4 className="font-medium text-sm">{item.recipe.productName} <span className="text-xs text-gray-500">(Recipe)</span></h4>
                           <p className="text-xs text-gray-600">{item.recipe.totalCost ? `$${item.recipe.totalCost.toFixed(2)} each` : 'Cost not set'}</p>
-                        </div>
+                      </div>
                         <div className="flex items-center space-x-2">
                           <button onClick={() => updateRecipeQuantity(`recipe-${item.recipe!.bomCode}`, item.quantity - 1)} className="p-1 hover:bg-gray-200 rounded"><Minus className="h-3 w-3" /></button>
                           <span className="w-8 text-center text-sm">{item.quantity}</span>
                           <button onClick={() => updateRecipeQuantity(`recipe-${item.recipe!.bomCode}`, item.quantity + 1)} className="p-1 hover:bg-gray-200 rounded"><Plus className="h-3 w-3" /></button>
                           <button onClick={() => removeRecipeFromCart(item.recipe!.bomCode)} className="p-1 text-red-600 hover:bg-red-50 rounded ml-2"><Trash2 className="h-3 w-3" /></button>
-                        </div>
-                        <div className="text-right ml-4"><p className="font-medium text-sm">${item.subtotal.toFixed(2)}</p></div>
                       </div>
+                        <div className="text-right ml-4"><p className="font-medium text-sm">${item.subtotal.toFixed(2)}</p></div>
+                    </div>
                     ) : null
                   ))}
                 </div>
@@ -697,8 +696,8 @@ const POSCreateOrder: React.FC = () => {
                   <div className="space-y-2">
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        type="text"
+                  <input
+                    type="text"
                         placeholder="Customer name *"
                         value={customer.name}
                         onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
@@ -708,9 +707,9 @@ const POSCreateOrder: React.FC = () => {
                     </div>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        type="tel"
-                        placeholder="Phone number"
+                  <input
+                    type="tel"
+                    placeholder="Phone number"
                         value={customer.phone}
                         onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
                         className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"

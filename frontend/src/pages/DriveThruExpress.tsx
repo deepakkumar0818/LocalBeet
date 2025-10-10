@@ -179,12 +179,12 @@ const DriveThruExpress: React.FC = () => {
       setLoading(true)
       setError(null)
       
-      // Get Taiba Hospital outlet
+      // Get Taiba Hospital outlet (by name to avoid code mismatches)
       const outletsResponse = await apiService.getOutlets({ limit: 1000 })
       if (outletsResponse.success) {
-        const driveThru = outletsResponse.data.find(outlet => outlet.outletCode === 'OUT-004')
-        if (driveThru) {
-          setOutlet(driveThru)
+        const taiba = outletsResponse.data.find(o => o.outletName === 'Taiba Hospital')
+        if (taiba) {
+          setOutlet(taiba)
           await loadInventory()
         } else {
           setError('Taiba Hospital not found')

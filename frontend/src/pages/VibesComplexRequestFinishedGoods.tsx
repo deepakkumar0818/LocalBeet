@@ -9,8 +9,8 @@ const VibesComplexRequestFinishedGoods: React.FC = () => {
   const [finishedGoods, setFinishedGoods] = useState<any[]>([])
   const [formData, setFormData] = useState({
     transferNumber: '',
-    fromWarehouseId: 'Vibe Complex',
-    fromWarehouseName: 'Vibe Complex',
+    fromWarehouseId: 'Vibes Complex',
+    fromWarehouseName: 'Vibes Complex',
     toWarehouseId: 'Central Kitchen',
     toWarehouseName: 'Central Kitchen',
     transferDate: '',
@@ -153,7 +153,7 @@ const VibesComplexRequestFinishedGoods: React.FC = () => {
 
     try {
       const transferOrderData = {
-        fromOutlet: 'Vibe Complex',
+        fromOutlet: 'Vibes Complex',
         toOutlet: 'Central Kitchen',
         transferDate: formData.transferDate,
         priority: formData.priority,
@@ -169,7 +169,7 @@ const VibesComplexRequestFinishedGoods: React.FC = () => {
           notes: item.remarks
         })),
         notes: formData.notes,
-        requestedBy: 'Vibe Complex Manager'
+        requestedBy: 'Vibes Complex Manager'
       }
 
       const response = await apiService.createTransferOrder(transferOrderData)
@@ -185,11 +185,11 @@ const VibesComplexRequestFinishedGoods: React.FC = () => {
           ).join(', ')
           
           const notificationData = {
-            title: `Transfer Request from Vibe Complex - ${itemType}`,
-            message: `Transfer order #${transferOrderData.fromOutlet}-${Date.now()} from Vibe Complex. Items: ${itemDetails}`,
+            title: `Transfer Request from Vibes Complex - ${itemType}`,
+            message: `Transfer order #${transferOrderData.fromOutlet}-${Date.now()} from Vibes Complex. Items: ${itemDetails}`,
             type: `transfer_request_${itemType.toLowerCase().replace(' ', '_')}`,
             targetOutlet: 'Central Kitchen',
-            sourceOutlet: 'Vibe Complex',
+            sourceOutlet: 'Vibes Complex',
             transferOrderId: response.data._id || response.data.id,
             itemType: itemType,
             priority: formData.priority === 'Urgent' ? 'high' : 'normal'

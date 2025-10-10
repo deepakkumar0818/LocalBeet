@@ -62,9 +62,9 @@ const navigation: NavigationItem[] = [
         icon: Store, 
         hasDropdown: true,
         children: [
-          { name: 'POS Sales', href: '/downtown-restaurant/sales-orders', icon: ShoppingCart },
-          { name: 'Raw Material Inventory', href: '/downtown-restaurant/raw-materials', icon: Package },
-          { name: 'Finished Goods Inventory', href: '/downtown-restaurant/finished-goods', icon: Layers },
+          { name: 'POS Sales', href: '/kuwait-city/sales-orders', icon: ShoppingCart },
+          { name: 'Raw Material Inventory', href: '/kuwait-city/raw-materials', icon: Package },
+          { name: 'Finished Goods Inventory', href: '/kuwait-city/finished-goods', icon: Layers },
         ]
       },
       { 
@@ -72,9 +72,9 @@ const navigation: NavigationItem[] = [
         icon: ShoppingBag, 
         hasDropdown: true,
         children: [
-          { name: 'POS Sales', href: '/mall-food-court/sales-orders', icon: ShoppingCart },
-          { name: 'Raw Material Inventory', href: '/mall-food-court/raw-materials', icon: Package },
-          { name: 'Finished Goods Inventory', href: '/mall-food-court/finished-goods', icon: Layers },
+          { name: 'POS Sales', href: '/360-mall/sales-orders', icon: ShoppingCart },
+          { name: 'Raw Material Inventory', href: '/360-mall/raw-materials', icon: Package },
+          { name: 'Finished Goods Inventory', href: '/360-mall/finished-goods', icon: Layers },
         ]
       },
       { 
@@ -82,9 +82,9 @@ const navigation: NavigationItem[] = [
         icon: Coffee, 
         hasDropdown: true,
         children: [
-          { name: 'POS Sales', href: '/marina-walk-cafe/sales-orders', icon: ShoppingCart },
-          { name: 'Raw Material Inventory', href: '/marina-walk-cafe/raw-materials', icon: Package },
-          { name: 'Finished Goods Inventory', href: '/marina-walk-cafe/finished-goods', icon: Layers },
+          { name: 'POS Sales', href: '/vibes-complex/sales-orders', icon: ShoppingCart },
+          { name: 'Raw Material Inventory', href: '/vibes-complex/raw-materials', icon: Package },
+          { name: 'Finished Goods Inventory', href: '/vibes-complex/finished-goods', icon: Layers },
         ]
       },
       { 
@@ -92,9 +92,9 @@ const navigation: NavigationItem[] = [
         icon: Car, 
         hasDropdown: true,
         children: [
-          { name: 'POS Sales', href: '/drive-thru-express/sales-orders', icon: ShoppingCart },
-          { name: 'Raw Material Inventory', href: '/drive-thru-express/raw-materials', icon: Package },
-          { name: 'Finished Goods Inventory', href: '/drive-thru-express/finished-goods', icon: Layers },
+          { name: 'POS Sales', href: '/taiba-hospital/sales-orders', icon: ShoppingCart },
+          { name: 'Raw Material Inventory', href: '/taiba-hospital/raw-materials', icon: Package },
+          { name: 'Finished Goods Inventory', href: '/taiba-hospital/finished-goods', icon: Layers },
         ]
       },
     ]

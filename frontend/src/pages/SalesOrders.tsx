@@ -75,8 +75,8 @@ const SalesOrders: React.FC = () => {
   // Detect outlet from URL
   const getOutletFromPath = () => {
     const path = location.pathname;
-    // Check for outlet-specific paths
-    if (path.includes('/kuwait-city/') || path.includes('/downtown-restaurant/')) return 'Kuwait City';
+    // Check for outlet-specific paths - use actual DB names
+    if (path.includes('/kuwait-city/')) return 'Kuwait City';
     if (path.includes('/360-mall/') || path.includes('/marina-walk-cafe/')) return '360 Mall';
     if (path.includes('/vibes-complex/') || path.includes('/mall-food-court/')) return 'Vibes Complex';
     if (path.includes('/taiba-hospital/') || path.includes('/drive-thru-express/')) return 'Taiba Hospital';

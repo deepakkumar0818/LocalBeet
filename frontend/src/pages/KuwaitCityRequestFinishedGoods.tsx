@@ -206,7 +206,7 @@ const KuwaitCityRequestFinishedGoods: React.FC = () => {
         }
         
         alert('Transfer order created successfully!')
-        navigate('/downtown-restaurant/finished-goods')
+        navigate('/kuwait-city/finished-goods')
       } else {
         throw new Error(response.message || 'Failed to create transfer order')
       }
@@ -237,7 +237,7 @@ const KuwaitCityRequestFinishedGoods: React.FC = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <button
-            onClick={() => navigate('/downtown-restaurant/finished-goods')}
+            onClick={() => navigate('/kuwait-city/finished-goods')}
             className="flex items-center text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="h-5 w-5 mr-2" />
@@ -492,7 +492,7 @@ const KuwaitCityRequestFinishedGoods: React.FC = () => {
           <div className="flex justify-end space-x-4 pt-6 border-t">
             <button
               type="button"
-              onClick={() => navigate('/downtown-restaurant/finished-goods')}
+              onClick={() => navigate('/kuwait-city/finished-goods')}
               className="btn-secondary flex items-center"
             >
               <X className="h-4 w-4 mr-2" />
