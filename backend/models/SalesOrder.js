@@ -71,6 +71,8 @@ const salesOrderSchema = new mongoose.Schema({
       trim: true,
     },
   }],
+  // Optional: store recipe lines in the same order for display
+  // We will also push recipe items into orderItems at creation time with category 'Recipe'
   orderSummary: {
     subtotal: {
       type: Number,
