@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
     
     // Get paginated results
     const materials = await RawMaterial.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({ materialName: 1 })  // Sort alphabetically by material name (A to Z)
       .skip(skip)
       .limit(parseInt(limit));
 

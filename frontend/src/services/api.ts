@@ -2281,6 +2281,80 @@ class ApiService {
     }
   }
 
+  // Notifications API
+  async getNotifications(outletName: string, type?: string, limit?: number) {
+    console.log(`🔔 API Service: getNotifications called for outlet: "${outletName}"`);
+    console.log(`🔔 API Service: Constructed endpoint: "/notifications${outletName ? `/${encodeURIComponent(outletName)}` : ''}"`);
+    
+    try {
+      const queryParams = new URLSearchParams();
+      if (type) queryParams.append('type', type);
+      if (limit) queryParams.append('limit', limit.toString());
+      
+      const queryString = queryParams.toString();
+      const endpoint = `/notifications/${encodeURIComponent(outletName)}${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await this.request<{
+        success: boolean;
+        data: any[];
+      }>(endpoint);
+      
+      console.log('🔔 API Service: getNotifications response:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ API Service: getNotifications failed:', error);
+      throw error;
+    }
+  }
+
+  async createNotification(data: {
+    title: string;
+    message: string;
+    type: string;
+    targetOutlet: string;
+    sourceOutlet?: string;
+    transferOrderId?: string;
+    itemType?: string;
+    priority?: string;
+  }) {
+    console.log('🔔 API Service: createNotification called with data:', data);
+    
+    try {
+      const response = await this.request<{
+        success: boolean;
+        message: string;
+        data: any;
+      }>('/notifications', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      
+      console.log('🔔 API Service: createNotification response:', response);
+      return response;
+    } catch (error) {
+      console.error('🔔 API Service: createNotification error:', error);
+      throw error;
+    }
+  }
+
+  async markNotificationAsRead(notificationId: string) {
+    return this.request<{ success: boolean; message: string }>(`/notifications/${notificationId}/read`, {
+      method: 'PUT',
+    });
+  }
+
+  async markAllNotificationsAsRead(outletName: string) {
+    return this.request<{ success: boolean; message: string }>(`/notifications/${encodeURIComponent(outletName)}/mark-all-read`, {
+      method: 'PUT',
+    });
+  }
+
+  async clearAllNotifications(outletName: string) {
+    return this.request<{ success: boolean; message: string }>(`/notifications/clear-all/${encodeURIComponent(outletName)}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Zoho Sync API
   async syncWithZoho() {
     console.log('🔄 API Service: Starting Zoho sync for Central Kitchen...');

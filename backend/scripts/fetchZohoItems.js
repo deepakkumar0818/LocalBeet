@@ -224,8 +224,8 @@ async function main() {
     console.log('');
     console.log('📝 Next Steps:');
     console.log('   1. Review the raw data in backend/data/zoho_items_raw.json');
-    console.log('   2. Run: node backend/scripts/syncZohoToCentralKitchen.js');
-    console.log('   3. Or run: npm run sync:zoho');
+    console.log('   2. Use "Sync Inventory" button in Ingredient Master module UI');
+    console.log('   3. Items will be synced to Raw Materials Master database');
     
     return response;
   } catch (error) {

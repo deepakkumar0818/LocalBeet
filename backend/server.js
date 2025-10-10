@@ -42,8 +42,7 @@ app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/central-kitchen/raw-materials', require('./routes/centralKitchenRawMaterials'));
 app.use('/api/central-kitchen/finished-products', require('./routes/centralKitchenFinishedProducts'));
 
-// Zoho Sync routes
-app.use('/api/sync-zoho', require('./routes/syncZoho'));
+// Zoho Sync routes (Ingredient Master only)
 app.use('/api/sync-zoho', require('./routes/syncZohoRawMaterials'));
 
 // Ingredient Master Transfer routes

@@ -40,12 +40,13 @@ export const useNotifications = (outletName?: string) => {
             message: notif.message,
             type: notif.type === 'transfer_rejection' ? 'error' : 
                   notif.type === 'transfer_acceptance' ? 'success' : 
+                  notif.type === 'transfer_completed' ? 'success' :
                   (notif.priority === 'high' ? 'warning' : 'info'),
             timestamp: new Date(notif.timestamp),
             read: notif.read,
             outlet: outletName,
             transferOrderId: notif.transferOrderId,
-            isTransferOrder: true,
+            isTransferOrder: notif.type === 'transfer_completed' || notif.isTransferOrder || false,
             itemType: notif.itemType,
             priority: notif.priority
           }
