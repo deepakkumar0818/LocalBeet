@@ -14,6 +14,13 @@ interface RawMaterialItem {
   description: string
   unitPrice: number
   currentStock: number
+  locationStocks?: {
+    centralKitchen: number
+    kuwaitCity: number
+    mall360: number
+    vibesComplex: number
+    taibaKitchen: number
+  }
   minimumStock: number
   maximumStock: number
   reorderPoint: number
@@ -91,9 +98,29 @@ const RawMaterials: React.FC = () => {
   const handleSyncWithZoho = async () => {
     setSyncing(true)
     try {
+      console.log('🔄 Starting Zoho Inventory Sync...')
       const response = await apiService.syncWithZohoRawMaterials()
       
+      console.log('📊 ZOHO SYNC API RESPONSE:')
+      console.log('='.repeat(60))
+      console.log('Full Response:', response)
+      console.log('='.repeat(60))
+      console.log('Success:', response.success)
+      console.log('Message:', response.message)
+      console.log('Data:', response.data)
+      console.log('='.repeat(60))
+      
       if (response.success) {
+        console.log('✅ Sync Details:')
+        console.log('   • Total items processed:', response.data.totalItems)
+        console.log('   • Items with SKU:', response.data.itemsWithSKU)
+        console.log('   • Items without SKU (skipped):', response.data.itemsWithoutSKU)
+        console.log('   • New items added:', response.data.addedItems)
+        console.log('   • Items updated:', response.data.updatedItems)
+        console.log('   • Errors:', response.data.errorItems)
+        console.log('   • Sync timestamp:', response.data.syncTimestamp)
+        console.log('='.repeat(60))
+        
         showAlert(
           'Sync Completed Successfully!',
           `📊 Sync Results:\n• Total items processed: ${response.data.totalItems}\n• Items with SKU: ${response.data.itemsWithSKU}\n• Items without SKU (skipped): ${response.data.itemsWithoutSKU}\n• New items added: ${response.data.addedItems}\n• Items updated: ${response.data.updatedItems}\n• Errors: ${response.data.errorItems}\n\n🕒 Sync completed at: ${new Date(response.data.syncTimestamp).toLocaleString()}`,
@@ -101,9 +128,11 @@ const RawMaterials: React.FC = () => {
         )
         await loadRawMaterials() // Refresh inventory
       } else {
+        console.error('❌ Sync failed:', response.message)
         showAlert('Sync Failed', response.message || 'Unknown error occurred during sync', 'error')
       }
     } catch (error) {
+      console.error('💥 Sync Error:', error)
       showAlert(
         'Sync Failed',
         `Failed to sync with Zoho: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -111,6 +140,7 @@ const RawMaterials: React.FC = () => {
       )
     } finally {
       setSyncing(false)
+      console.log('🏁 Sync process completed')
     }
   }
 
@@ -353,7 +383,12 @@ const RawMaterials: React.FC = () => {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Stock</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-purple-50">Central Kitchen</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50">Kuwait City</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50">360 Mall</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-orange-50">Vibes Complex</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-pink-50">Taiba Kitchen</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Stock</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -362,7 +397,7 @@ const RawMaterials: React.FC = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredMaterials.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center">
+                  <td colSpan={14} className="px-4 py-12 text-center">
                     <div className="flex flex-col items-center justify-center space-y-4">
                       <div className="text-gray-400">
                         <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -411,7 +446,24 @@ const RawMaterials: React.FC = () => {
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                         KWD {material.unitPrice ? Number(material.unitPrice).toFixed(3) : '0.000'}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+                      {/* Location Stocks */}
+                      <td className="px-3 py-4 whitespace-nowrap text-center text-sm font-semibold text-purple-900 bg-purple-50">
+                        {material.locationStocks?.centralKitchen || 0}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-center text-sm font-semibold text-blue-900 bg-blue-50">
+                        {material.locationStocks?.kuwaitCity || 0}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-center text-sm font-semibold text-green-900 bg-green-50">
+                        {material.locationStocks?.mall360 || 0}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-center text-sm font-semibold text-orange-900 bg-orange-50">
+                        {material.locationStocks?.vibesComplex || 0}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-center text-sm font-semibold text-pink-900 bg-pink-50">
+                        {material.locationStocks?.taibaKitchen || 0}
+                      </td>
+                      {/* Total Stock */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">
                         {material.currentStock}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm">

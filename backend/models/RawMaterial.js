@@ -59,12 +59,41 @@ const rawMaterialSchema = new mongoose.Schema({
     default: 0
   },
   
-  // Stock management
+  // Stock management - Overall total
   currentStock: {
     type: Number,
     required: true,
     min: 0,
     default: 0
+  },
+  
+  // Location-wise stock tracking
+  locationStocks: {
+    centralKitchen: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    kuwaitCity: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    mall360: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    vibesComplex: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    taibaKitchen: {
+      type: Number,
+      min: 0,
+      default: 0
+    }
   },
   
   minimumStock: {

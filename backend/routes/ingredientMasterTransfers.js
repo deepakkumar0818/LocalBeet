@@ -95,13 +95,44 @@ router.post('/create-transfer', async (req, res) => {
       for (const item of items) {
         console.log(`📦 Processing item: ${item.itemCode} - ${item.itemName} (${item.quantity} ${item.unitOfMeasure})`);
         
-        // Subtract from Ingredient Master
+        // Subtract from Ingredient Master and update location stocks
         const ingredientMasterItem = await RawMaterial.findOne({ materialCode: item.itemCode });
         if (ingredientMasterItem) {
-          console.log(`Ingredient Master BEFORE: ${ingredientMasterItem.materialCode} - Stock: ${ingredientMasterItem.currentStock}`);
+          console.log(`Ingredient Master BEFORE: ${ingredientMasterItem.materialCode} - Total: ${ingredientMasterItem.currentStock}, CK: ${ingredientMasterItem.locationStocks?.centralKitchen || 0}`);
+          
+          // Determine which location stock to update based on destination
+          let locationKey = '';
+          if (toOutlet === 'Central Kitchen') {
+            locationKey = 'centralKitchen';
+          } else if (toOutlet.toLowerCase().includes('kuwait')) {
+            locationKey = 'kuwaitCity';
+          } else if (toOutlet.toLowerCase().includes('360') || toOutlet.toLowerCase().includes('mall')) {
+            locationKey = 'mall360';
+          } else if (toOutlet.toLowerCase().includes('vibe') || toOutlet.toLowerCase().includes('complex')) {
+            locationKey = 'vibesComplex';
+          } else if (toOutlet.toLowerCase().includes('taiba')) {
+            locationKey = 'taibaKitchen';
+          }
+          
+          // Subtract from total stock
           ingredientMasterItem.currentStock -= item.quantity;
+          
+          // Subtract from Central Kitchen location (as Ingredient Master items are stored in CK)
+          if (ingredientMasterItem.locationStocks && ingredientMasterItem.locationStocks.centralKitchen) {
+            ingredientMasterItem.locationStocks.centralKitchen -= item.quantity;
+          }
+          
+          // Add to destination location stock
+          if (locationKey && ingredientMasterItem.locationStocks) {
+            if (!ingredientMasterItem.locationStocks[locationKey]) {
+              ingredientMasterItem.locationStocks[locationKey] = 0;
+            }
+            ingredientMasterItem.locationStocks[locationKey] += item.quantity;
+          }
+          
           await ingredientMasterItem.save();
-          console.log(`Ingredient Master AFTER: ${ingredientMasterItem.materialCode} - Stock: ${ingredientMasterItem.currentStock}`);
+          console.log(`Ingredient Master AFTER: ${ingredientMasterItem.materialCode} - Total: ${ingredientMasterItem.currentStock}`);
+          console.log(`   CK: ${ingredientMasterItem.locationStocks?.centralKitchen || 0}, ${toOutlet}: ${ingredientMasterItem.locationStocks?.[locationKey] || 0}`);
         } else {
           console.log(`⚠️  Ingredient Master item not found: ${item.itemCode}`);
         }
