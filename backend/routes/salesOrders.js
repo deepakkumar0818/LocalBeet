@@ -180,7 +180,8 @@ router.post('/', async (req, res) => {
     const {
       outletId,
       customerInfo,
-      orderItems,
+      orderItems = [],
+      recipeItems = [],
       orderSummary,
       orderStatus,
       orderTiming,
@@ -191,18 +192,21 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     // Basic validation
-    if (!outletId || !customerInfo || !orderItems || orderItems.length === 0) {
+    if (!outletId || !customerInfo || ((orderItems?.length || 0) === 0 && (recipeItems?.length || 0) === 0)) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Required fields: outletId, customerInfo, orderItems' 
+        message: 'Required fields: outletId, customerInfo, and at least one of orderItems or recipeItems' 
       });
     }
 
-    // Get outlet information (fallback by code/name if id is not found)
+    // Get outlet information - PREFER outletId lock to avoid wrong outlet decrements
     let outlet = null;
     try {
-      if (mongoose.Types.ObjectId.isValid(outletId)) {
+      if (outletId && mongoose.Types.ObjectId.isValid(outletId)) {
         outlet = await Outlet.findById(outletId);
+        if (!outlet) {
+          return res.status(400).json({ success:false, message:'Invalid outletId. Outlet not found.'});
+        }
       }
       if (!outlet) {
         // Accept either provided code/name or infer from common slugs
@@ -229,19 +233,7 @@ router.post('/', async (req, res) => {
       }
     } catch (_) {}
     if (!outlet) {
-      // Create a virtual outlet object if not found in database
-      const outletName = req.body.outletName || 'Unknown Outlet';
-      const outletCode = req.body.outletCode || 'UNKNOWN';
-      
-      outlet = {
-        _id: new mongoose.Types.ObjectId(),
-        outletCode: outletCode,
-        outletName: outletName,
-        outletType: 'Restaurant',
-        status: 'Active'
-      };
-      
-      console.log(`Creating virtual outlet: ${outletName} (${outletCode})`);
+      return res.status(400).json({ success:false, message:'Outlet not found. Provide a valid outletId or outletName.'});
     }
 
     // Generate order number - unique per outlet per day
@@ -260,13 +252,14 @@ router.post('/', async (req, res) => {
       orderNumber = `SO-${outlet.outletCode}-${Date.now().toString().slice(-6)}`;
     }
 
+    // We will prepare combined order items later
     const newSalesOrder = new SalesOrder({
       orderNumber,
       outletId: outlet._id,
       outletCode: outlet.outletCode,
       outletName: outlet.outletName,
       customerInfo,
-      orderItems,
+      orderItems: [],
       orderSummary: orderSummary || {},
       orderStatus: orderStatus || 'Pending',
       orderTiming: orderTiming || {},
@@ -302,7 +295,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ success: false, message: `Unsupported outlet for stock decrement: ${outlet.outletName}` });
     }
 
-    // Validate availability and decrement
+    // Validate availability and decrement (finished goods)
     for (const item of orderItems) {
       const code = item.productCode;
       if (!code) {
@@ -320,7 +313,7 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // If all validations pass, decrement in DB
+    // If all validations pass, decrement finished goods in DB
     for (const item of orderItems) {
       const code = item.productCode;
       const productDoc = await OutletFinishedProductModel.findOne({ productCode: code });
@@ -336,6 +329,76 @@ router.post('/', async (req, res) => {
       productDoc.updatedBy = createdBy || 'admin';
       await productDoc.save();
     }
+
+    // Handle recipe items: aggregate required raw materials and decrement
+    const BillOfMaterials = require('../models/BillOfMaterials');
+    let OutletRawMaterialModel = null;
+    try {
+      if (outletNameLc.includes('kuwait')) {
+        const conn = await connectKuwaitCityDB();
+        try { OutletRawMaterialModel = getKuwaitCityModels(conn).KuwaitCityRawMaterial; } catch (e) { OutletRawMaterialModel = initializeKuwaitCityModels(conn).KuwaitCityRawMaterial; }
+      } else if (outletNameLc.includes('360') || outletNameLc.includes('mall')) {
+        const conn = await connectMall360DB();
+        try { OutletRawMaterialModel = getMall360Models(conn).Mall360RawMaterial; } catch (e) { OutletRawMaterialModel = initializeMall360Models(conn).Mall360RawMaterial; }
+      } else if (outletNameLc.includes('vibe') || outletNameLc.includes('complex')) {
+        const conn = await connectVibeComplexDB();
+        try { OutletRawMaterialModel = getVibeComplexModels(conn).VibeComplexRawMaterial; } catch (e) { OutletRawMaterialModel = initializeVibeComplexModels(conn).VibeComplexRawMaterial; }
+      } else if (outletNameLc.includes('taiba')) {
+        const conn = await connectTaibaKitchenDB();
+        try { OutletRawMaterialModel = getTaibaKitchenModels(conn).TaibaKitchenRawMaterial; } catch (e) { OutletRawMaterialModel = initializeTaibaKitchenModels(conn).TaibaKitchenRawMaterial; }
+      }
+    } catch (e) {
+      return res.status(500).json({ success:false, message:'Failed to initialize outlet raw material models', error: e.message });
+    }
+
+    const requiredByMaterial = {};
+    for (const r of (recipeItems || [])) {
+      if (!r.bomCode || !r.productName || !r.quantity) {
+        return res.status(400).json({ success:false, message:'Each recipeItem requires bomCode, productName, quantity' });
+      }
+      const bom = await BillOfMaterials.findOne({ bomCode: r.bomCode });
+      if (!bom) {
+        return res.status(404).json({ success:false, message:`BOM not found: ${r.bomCode}` });
+      }
+      for (const i of bom.items) {
+        const qty = (Number(i.quantity) || 0) * Number(r.quantity);
+        requiredByMaterial[i.materialCode] = (requiredByMaterial[i.materialCode] || 0) + qty;
+      }
+    }
+
+    for (const [code, totalNeeded] of Object.entries(requiredByMaterial)) {
+      const rm = await OutletRawMaterialModel.findOne({ materialCode: code });
+      if (!rm) {
+        return res.status(404).json({ success:false, message:`Raw material ${code} not found in ${outlet.outletName}` });
+      }
+      if (rm.currentStock < totalNeeded) {
+        return res.status(400).json({ success:false, message:`Insufficient raw material ${code}. Available: ${rm.currentStock}, Required: ${totalNeeded}` });
+      }
+    }
+
+    for (const [code, totalNeeded] of Object.entries(requiredByMaterial)) {
+      const rm = await OutletRawMaterialModel.findOne({ materialCode: code });
+      rm.currentStock = rm.currentStock - totalNeeded;
+      if (rm.currentStock <= 0) {
+        rm.status = 'Out of Stock';
+      } else if (rm.currentStock <= (rm.reorderPoint || 0)) {
+        rm.status = 'Low Stock';
+      }
+      rm.updatedBy = createdBy || 'admin';
+      await rm.save();
+    }
+
+    // Build combined orderItems for storage/display
+    const recipeDisplayItems = (recipeItems || []).map(r => ({
+      productId: new mongoose.Types.ObjectId(), // placeholder for recipe line
+      productCode: r.bomCode,
+      productName: r.productName,
+      category: 'Recipe',
+      quantity: r.quantity,
+      unitPrice: Number(r.unitPrice || 0),
+      totalPrice: Number(r.unitPrice || 0) * Number(r.quantity || 0)
+    }));
+    newSalesOrder.orderItems = [...(orderItems || []), ...recipeDisplayItems];
 
     // Save with simple retry if duplicate order number occurs
     let savedSalesOrder;

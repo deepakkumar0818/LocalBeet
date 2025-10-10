@@ -29,8 +29,12 @@ interface Product {
   isActive: boolean
 }
 
+interface Recipe { id?: string; bomCode: string; productName: string; productDescription?: string; totalCost?: number }
+type CartKind = 'finished' | 'recipe'
 interface CartItem {
-  product: Product
+  kind: CartKind
+  product?: Product
+  recipe?: Recipe
   quantity: number
   subtotal: number
 }
@@ -51,15 +55,17 @@ interface OrderType {
 
 // Helper function to get outlet name from slug
 function getOutletNameFromSlug(slug: string): string {
+  // Map URL slug to ACTUAL outlet names stored in DB
+  // Use names seen in /outlets list: 'Kuwait City', 'Marina Walk Cafe', 'Mall Food Court', 'Drive-Thru Express'
   const slugMap: Record<string, string> = {
     'kuwait-city': 'Kuwait City',
     'downtown-restaurant': 'Kuwait City',
-    '360-mall': '360 Mall',
-    'marina-walk-cafe': '360 Mall',
-    'vibes-complex': 'Vibes Complex',
-    'mall-food-court': 'Vibes Complex',
-    'taiba-hospital': 'Taiba Hospital',
-    'drive-thru-express': 'Taiba Hospital'
+    '360-mall': 'Marina Walk Cafe',
+    'marina-walk-cafe': 'Marina Walk Cafe',
+    'vibes-complex': 'Mall Food Court',
+    'mall-food-court': 'Mall Food Court',
+    'taiba-hospital': 'Drive-Thru Express',
+    'drive-thru-express': 'Drive-Thru Express'
   }
   return slugMap[slug.toLowerCase()] || 'Kuwait City'
 }
@@ -78,6 +84,8 @@ const POSCreateOrder: React.FC = () => {
   console.log('POSCreateOrder - Outlet Name:', outletName)
   
   const [products, setProducts] = useState<Product[]>([])
+  const [recipes, setRecipes] = useState<Recipe[]>([])
+  const [activeTab, setActiveTab] = useState<'finished'|'recipe'>('finished')
   const [cart, setCart] = useState<CartItem[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
@@ -115,6 +123,7 @@ const POSCreateOrder: React.FC = () => {
     
     loadOutletData()
     loadProducts()
+    loadRecipes()
     loadExistingOrders()
   }, [outletName, location.pathname])
 
@@ -148,13 +157,13 @@ const POSCreateOrder: React.FC = () => {
       if (outletName === 'Kuwait City') {
         console.log('loadProducts - Calling getKuwaitCityFinishedProducts')
         response = await apiService.getKuwaitCityFinishedProducts({ limit: 1000 })
-      } else if (outletName === '360 Mall') {
+      } else if (outletName === 'Marina Walk Cafe') {
         console.log('loadProducts - Calling get360MallFinishedProducts')
         response = await apiService.get360MallFinishedProducts({ limit: 1000 })
-      } else if (outletName === 'Vibes Complex') {
+      } else if (outletName === 'Mall Food Court') {
         console.log('loadProducts - Calling getVibeComplexFinishedProducts')
         response = await apiService.getVibeComplexFinishedProducts({ limit: 1000 })
-      } else if (outletName === 'Taiba Hospital') {
+      } else if (outletName === 'Drive-Thru Express') {
         console.log('loadProducts - Calling getTaibaKitchenFinishedProducts')
         response = await apiService.getTaibaKitchenFinishedProducts({ limit: 1000 })
       } else {
@@ -178,6 +187,22 @@ const POSCreateOrder: React.FC = () => {
       setProducts([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadRecipes = async () => {
+    try {
+      // Show all recipes regardless of status (Draft/Active) so POS can test/use them
+      const res = await apiService.getBillOfMaterials({ limit: 1000, sortBy: 'productName', sortOrder: 'asc' })
+      if (res.success && Array.isArray(res.data)) {
+        const mapped: Recipe[] = res.data.map((r:any)=>({ id: r.id||r._id, bomCode: r.bomCode, productName: r.productName, productDescription: r.productDescription, totalCost: r.totalCost }))
+        setRecipes(mapped)
+      } else {
+        setRecipes([])
+      }
+    } catch (e) {
+      console.error('Error loading recipes:', e)
+      setRecipes([])
     }
   }
 
@@ -212,7 +237,7 @@ const POSCreateOrder: React.FC = () => {
 
   const addToCart = (product: Product) => {
     // Check if product has enough stock
-    const existingItem = cart.find(item => item.product._id === product._id)
+    const existingItem = cart.find(item => item.kind==='finished' && item.product && item.product._id === product._id)
     const currentQuantity = existingItem ? existingItem.quantity : 0
     
     if (currentQuantity >= product.currentStock) {
@@ -222,33 +247,46 @@ const POSCreateOrder: React.FC = () => {
     
     if (existingItem) {
       setCart(cart.map(item =>
-        item.product._id === product._id
+        (item.kind==='finished' && item.product && item.product._id === product._id)
           ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * product.unitPrice }
           : item
       ))
     } else {
-      setCart([...cart, { product, quantity: 1, subtotal: product.unitPrice }])
+      setCart([...cart, { kind:'finished', product, quantity: 1, subtotal: product.unitPrice }])
+    }
+  }
+
+  const addRecipeToCart = (recipe: Recipe) => {
+    const existing = cart.find(ci => ci.kind==='recipe' && ci.recipe && ci.recipe.bomCode === recipe.bomCode)
+    if (existing) {
+      setCart(prev => prev.map(ci => (ci.kind==='recipe' && ci.recipe && ci.recipe.bomCode===recipe.bomCode) ? { ...ci, quantity: ci.quantity+1, subtotal: (ci.quantity+1) * (ci.recipe.totalCost||0) } : ci))
+    } else {
+      setCart(prev => [...prev, { kind:'recipe', recipe, quantity:1, subtotal: recipe.totalCost||0 }])
     }
   }
 
   const updateQuantity = (productId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
-      removeFromCart(productId)
+      setCart(prev => prev.filter(ci => !(ci.kind==='finished' && ci.product && ci.product._id===productId)))
       return
     }
     
     // Check stock availability
-    const cartItem = cart.find(item => item.product._id === productId)
+    const cartItem = cart.find(item => item.kind==='finished' && item.product && item.product._id === productId)
     if (cartItem && newQuantity > cartItem.product.currentStock) {
       alert(`Only ${cartItem.product.currentStock} ${cartItem.product.unitOfMeasure} available in stock`)
       return
     }
     
     setCart(cart.map(item =>
-      item.product._id === productId
+      (item.kind==='finished' && item.product && item.product._id === productId)
         ? { ...item, quantity: newQuantity, subtotal: newQuantity * item.product.unitPrice }
         : item
     ))
+  }
+
+  const removeRecipeFromCart = (bomCode: string) => {
+    setCart(prev => prev.filter(ci => !(ci.kind==='recipe' && ci.recipe && ci.recipe.bomCode === bomCode)))
   }
 
   const removeFromCart = (productId: string) => {
@@ -282,25 +320,45 @@ const POSCreateOrder: React.FC = () => {
       return
     }
 
+    // Ensure outlet is resolved. If not, try once more.
+    if (!outlet) {
+      await loadOutletData()
+    }
+    if (!outlet) {
+      alert('Unable to resolve outlet for this order. Please reload the page and try again.')
+      return
+    }
+
     setLoading(true)
     
     try {
-      // Prepare order items for API
-      const orderItems = cart.map(item => ({
-        productId: item.product._id,
-        productCode: item.product.productCode,
-        productName: item.product.productName,
-        category: item.product.category,
+      // Prepare order items for API (finished goods)
+      const finishedCartItems = cart.filter(ci => ci.kind==='finished' && ci.product)
+      const orderItems = finishedCartItems.map(item => ({
+        productId: item.product!._id,
+        productCode: item.product!.productCode,
+        productName: item.product!.productName,
+        category: item.product!.category,
         quantity: item.quantity,
-        unitPrice: item.product.unitPrice,
+        unitPrice: item.product!.unitPrice,
         totalPrice: item.subtotal
+      }))
+
+      // Prepare recipe items for API
+      const recipeCartItems = cart.filter(ci => ci.kind==='recipe' && ci.recipe)
+      const recipeItems = recipeCartItems.map(item => ({
+        bomCode: item.recipe!.bomCode,
+        productName: item.recipe!.productName,
+        quantity: item.quantity,
+        unitPrice: item.recipe!.totalCost || 0
       }))
 
       // Prepare sales order data
       const salesOrderData = {
-        outletId: outlet?._id || outlet?.id || `outlet-${outletSlug}`,
-        outletCode: outlet?.outletCode || outletSlug.toUpperCase(),
+        outletId: outlet?._id || outlet?.id,
+        outletCode: outlet?.outletCode,
         outletName: outletName,
+        outletSlug: outletSlug,
         customerInfo: {
           customerName: customer.name,
           customerPhone: customer.phone,
@@ -308,6 +366,7 @@ const POSCreateOrder: React.FC = () => {
           orderType: orderType
         },
         orderItems: orderItems,
+        recipeItems: recipeItems,
         orderSummary: {
           subtotal: getSubtotal(),
           taxAmount: getTaxAmount(),
@@ -401,57 +460,18 @@ const POSCreateOrder: React.FC = () => {
           </div>
         </div>
 
-        {/* Recent Orders Section */}
-        {existingOrders.length > 0 && (
-          <div key={`recent-orders-${outletName}`} className="card p-4 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Recent Orders</h3>
-              <button
-                onClick={() => {
-                  const outletPathMap: Record<string, string> = {
-                    'Kuwait City': 'kuwait-city',
-                    '360 Mall': '360-mall', 
-                    'Vibes Complex': 'vibes-complex',
-                    'Taiba Hospital': 'taiba-hospital'
-                  }
-                  const outletPath = outletPathMap[outletName] || outletSlug
-                  navigate(`/${outletPath}/sales-orders`)
-                }}
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-              >
-                View All Orders →
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {existingOrders.slice(0, 6).map((order) => (
-                <div key={order._id} className="border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-medium text-sm">{order.orderNumber}</span>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      order.orderStatus === 'Completed' ? 'bg-green-100 text-green-800' :
-                      order.orderStatus === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
-                      {order.orderStatus}
-                    </span>
-                  </div>
-                  <div className="text-sm text-gray-600 mb-1">
-                    {order.customerInfo?.customerName || 'Unknown Customer'}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {order.orderItems?.length || 0} items • ${order.orderSummary?.totalAmount?.toFixed(2) || '0.00'}
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1">
-                    {new Date(order.orderTiming?.orderDate || order.createdAt).toLocaleString()}
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* Tab Switcher */}
+        <div className="mb-4">
+          <div className="inline-flex rounded-md shadow-sm overflow-hidden" role="group">
+            <button onClick={() => setActiveTab('finished')} className={`px-4 py-2 text-sm font-medium border ${activeTab==='finished' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'}`}>Finished Goods</button>
+            <button onClick={() => setActiveTab('recipe')} className={`px-4 py-2 text-sm font-medium border -ml-px ${activeTab==='recipe' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'}`}>Recipes</button>
           </div>
-        )}
+        </div>
+
+        {/* Recent Orders Section removed per requirement - orders are shown on outer page */}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Products Section */}
+          {/* Products / Recipes Section */}
           <div className="lg:col-span-2 space-y-6">
             {/* Search and Filters */}
             <div className="card p-4">
@@ -468,6 +488,7 @@ const POSCreateOrder: React.FC = () => {
                     />
                   </div>
                 </div>
+                {activeTab==='finished' && (
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
@@ -477,18 +498,20 @@ const POSCreateOrder: React.FC = () => {
                     <option key={category} value={category}>{category}</option>
                   ))}
                 </select>
+                )}
               </div>
             </div>
 
-            {/* Products Grid */}
+            {/* Products/Recipes Grid */}
             <div className="card p-4">
-              <h3 className="text-lg font-semibold mb-4">Available Products</h3>
+              <h3 className="text-lg font-semibold mb-4">{activeTab==='finished' ? 'Available Products' : 'Available Recipes'}</h3>
               {loading ? (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                   <p className="mt-2 text-gray-600">Loading products...</p>
                 </div>
-              ) : filteredProducts.length === 0 ? (
+              ) : activeTab==='finished' ? (
+                filteredProducts.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
                   <p>No products available</p>
@@ -524,6 +547,33 @@ const POSCreateOrder: React.FC = () => {
                     </div>
                   ))}
                 </div>
+              )
+              ) : (
+                recipes.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No recipes available</p>
+                    <p className="text-sm">Add recipes in Recipe Master (BOM)</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {recipes.filter(r => r.productName.toLowerCase().includes(searchTerm.toLowerCase()) || r.bomCode.toLowerCase().includes(searchTerm.toLowerCase())).map(r => (
+                      <div key={r.bomCode} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                        onClick={() => addRecipeToCart(r)}
+                        onKeyDown={(e)=> e.key==='Enter' && addRecipeToCart(r)} role="button" tabIndex={0}>
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-medium text-gray-900">{r.productName}</h4>
+                          <span className="text-green-600 font-semibold">{r.totalCost ? `$${r.totalCost.toFixed(2)}` : 'Recipe'}</span>
+                        </div>
+                        <div className="text-sm text-gray-500">Code: {r.bomCode}</div>
+                        {r.productDescription && <div className="text-xs text-gray-400 mt-1">{r.productDescription}</div>}
+                        <div className="mt-3">
+                          <button className="text-indigo-600 text-sm font-medium">Add to Cart</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
               )}
             </div>
           </div>
@@ -556,37 +606,36 @@ const POSCreateOrder: React.FC = () => {
               ) : (
                 <div className="space-y-3">
                   {cart.map(item => (
-                    <div key={item.product._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-sm">{item.product.productName}</h4>
-                        <p className="text-xs text-gray-600">${item.product.unitPrice.toFixed(2)} each</p>
-                        <p className="text-xs text-gray-500">Stock: {item.product.currentStock} {item.product.unitOfMeasure}</p>
+                    item.kind === 'finished' && item.product ? (
+                      <div key={item.product._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-sm">{item.product.productName}</h4>
+                          <p className="text-xs text-gray-600">${item.product.unitPrice.toFixed(2)} each</p>
+                          <p className="text-xs text-gray-500">Stock: {item.product.currentStock} {item.product.unitOfMeasure}</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button onClick={() => updateQuantity(item.product!._id, item.quantity - 1)} className="p-1 hover:bg-gray-200 rounded"><Minus className="h-3 w-3" /></button>
+                          <span className="w-8 text-center text-sm">{item.quantity}</span>
+                          <button onClick={() => updateQuantity(item.product!._id, item.quantity + 1)} className="p-1 hover:bg-gray-200 rounded"><Plus className="h-3 w-3" /></button>
+                          <button onClick={() => removeFromCart(item.product!._id)} className="p-1 text-red-600 hover:bg-red-50 rounded ml-2"><Trash2 className="h-3 w-3" /></button>
+                        </div>
+                        <div className="text-right ml-4"><p className="font-medium text-sm">${item.subtotal.toFixed(2)}</p></div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => updateQuantity(item.product._id, item.quantity - 1)}
-                          className="p-1 hover:bg-gray-200 rounded"
-                        >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                        <span className="w-8 text-center text-sm">{item.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item.product._id, item.quantity + 1)}
-                          className="p-1 hover:bg-gray-200 rounded"
-                        >
-                          <Plus className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => removeFromCart(item.product._id)}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded ml-2"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
+                    ) : item.kind === 'recipe' && item.recipe ? (
+                      <div key={`recipe-${item.recipe.bomCode}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-sm">{item.recipe.productName} <span className="text-xs text-gray-500">(Recipe)</span></h4>
+                          <p className="text-xs text-gray-600">{item.recipe.totalCost ? `$${item.recipe.totalCost.toFixed(2)} each` : 'Cost not set'}</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button onClick={() => updateRecipeQuantity(`recipe-${item.recipe!.bomCode}`, item.quantity - 1)} className="p-1 hover:bg-gray-200 rounded"><Minus className="h-3 w-3" /></button>
+                          <span className="w-8 text-center text-sm">{item.quantity}</span>
+                          <button onClick={() => updateRecipeQuantity(`recipe-${item.recipe!.bomCode}`, item.quantity + 1)} className="p-1 hover:bg-gray-200 rounded"><Plus className="h-3 w-3" /></button>
+                          <button onClick={() => removeRecipeFromCart(item.recipe!.bomCode)} className="p-1 text-red-600 hover:bg-red-50 rounded ml-2"><Trash2 className="h-3 w-3" /></button>
+                        </div>
+                        <div className="text-right ml-4"><p className="font-medium text-sm">${item.subtotal.toFixed(2)}</p></div>
                       </div>
-                      <div className="text-right ml-4">
-                        <p className="font-medium text-sm">${item.subtotal.toFixed(2)}</p>
-                      </div>
-                    </div>
+                    ) : null
                   ))}
                 </div>
               )}
