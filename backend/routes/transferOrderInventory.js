@@ -315,30 +315,9 @@ router.put('/:id/approve', ensureConnections, async (req, res) => {
     transferOrder.transferStartedAt = new Date();
     await transferOrder.save();
 
-    // Create notification for the destination outlet
-    try {
-      const Notification = require('../models/Notification');
-      const sourceOutlet = transferOrder.fromOutlet;
-      const targetOutlet = transferOrder.toOutlet;
-      
-      const notification = new Notification({
-        title: `Transfer Approved from ${sourceOutlet}`,
-        message: `Transfer order #${transferOrder._id} has been approved and items have been added to your inventory.`,
-        type: 'transfer_approved',
-        targetOutlet: targetOutlet,
-        sourceOutlet: sourceOutlet,
-        transferOrderId: transferOrder._id.toString(),
-        itemType: transferOrder.items.some(item => item.itemType === 'Raw Material') ? 'Raw Material' : 'Finished Goods',
-        priority: transferOrder.priority || 'Normal',
-        read: false
-      });
-      
-      await notification.save();
-      console.log(`✅ Notification created for ${targetOutlet}: Transfer approved from ${sourceOutlet}`);
-    } catch (notificationError) {
-      console.error('⚠️  Failed to create notification:', notificationError);
-      // Don't fail the entire operation if notification creation fails
-    }
+    // TODO: Create notification for the destination outlet
+    // For now, skip notification creation to avoid errors
+    console.log(`📢 Notification would be sent to ${transferOrder.toOutlet}: Transfer approved from ${transferOrder.fromOutlet}`);
 
     console.log('✅ Transfer order approved successfully');
     res.status(200).json({

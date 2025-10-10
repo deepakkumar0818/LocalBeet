@@ -52,7 +52,7 @@ router.post('/create-transfer', async (req, res) => {
       transferDate: new Date(transferDate || new Date()),
       priority: priority || 'Normal',
       notes: notes || '',
-      totalValue: totalValue,
+      totalAmount: totalValue, // This is the required field
       items: items.map(item => ({
         itemCode: item.itemCode,
         itemName: item.itemName,
@@ -65,7 +65,8 @@ router.post('/create-transfer', async (req, res) => {
         totalValue: item.totalValue || 0,
         notes: item.notes || ''
       })),
-      status: 'Pending',
+      status: 'Approved', // Auto-approve Ingredient Master transfers
+      requestedBy: 'Ingredient Master', // This is the required field
       createdBy: 'Ingredient Master',
       updatedBy: 'Ingredient Master'
     });
@@ -75,24 +76,170 @@ router.post('/create-transfer', async (req, res) => {
     console.log(`✅ Transfer order created: ${transferOrder._id}`);
     console.log(`📦 Items: ${items.length}, Total Value: KWD ${totalValue.toFixed(3)}`);
 
-    // Create initial notification for the destination outlet
+    // Auto-approve and update inventory since this is from Ingredient Master
     try {
-      const Notification = require('../models/Notification');
+      console.log('🚀 Auto-approving transfer and updating inventory...');
       
-      const notification = new Notification({
-        title: `New Transfer Request from Ingredient Master`,
-        message: `Transfer order #${transferOrder._id} has been created with ${items.length} item(s). Total value: KWD ${totalValue.toFixed(3)}`,
-        type: 'transfer_request',
+      // Update transfer order with approval details
+      transferOrder.approvedBy = 'Ingredient Master Auto-Approval';
+      transferOrder.transferStartedAt = new Date();
+      await transferOrder.save();
+
+      // Update inventory for each item
+      const connectDB = require('../config/database');
+      const RawMaterial = require('../models/RawMaterial');
+      
+      // Ensure main database connection
+      await connectDB();
+      
+      for (const item of items) {
+        console.log(`📦 Processing item: ${item.itemCode} - ${item.itemName} (${item.quantity} ${item.unitOfMeasure})`);
+        
+        // Subtract from Ingredient Master
+        const ingredientMasterItem = await RawMaterial.findOne({ materialCode: item.itemCode });
+        if (ingredientMasterItem) {
+          console.log(`Ingredient Master BEFORE: ${ingredientMasterItem.materialCode} - Stock: ${ingredientMasterItem.currentStock}`);
+          ingredientMasterItem.currentStock -= item.quantity;
+          await ingredientMasterItem.save();
+          console.log(`Ingredient Master AFTER: ${ingredientMasterItem.materialCode} - Stock: ${ingredientMasterItem.currentStock}`);
+        } else {
+          console.log(`⚠️  Ingredient Master item not found: ${item.itemCode}`);
+        }
+        
+        // Add to destination outlet
+        console.log(`📦 Adding items to ${toOutlet} inventory`);
+        
+        if (toOutlet === 'Central Kitchen') {
+          // Add to Central Kitchen Raw Materials
+          const { connectCentralKitchenDB } = require('../config/centralKitchenDB');
+          const { initializeCentralKitchenModels } = require('../models/centralKitchenModels');
+          
+          const centralKitchenConnection = await connectCentralKitchenDB();
+          const centralKitchenModels = initializeCentralKitchenModels(centralKitchenConnection);
+          
+          const centralKitchenItem = await centralKitchenModels.CentralKitchenRawMaterial.findOne({ materialCode: item.itemCode });
+          if (centralKitchenItem) {
+            console.log(`Central Kitchen BEFORE: ${centralKitchenItem.materialCode} - Stock: ${centralKitchenItem.currentStock}`);
+            centralKitchenItem.currentStock += item.quantity;
+            await centralKitchenItem.save();
+            console.log(`Central Kitchen AFTER: ${centralKitchenItem.materialCode} - Stock: ${centralKitchenItem.currentStock}`);
+          } else {
+            console.log(`Creating new Central Kitchen item: ${item.itemCode}`);
+            const newCentralKitchenItem = new centralKitchenModels.CentralKitchenRawMaterial({
+              materialCode: item.itemCode,
+              materialName: item.itemName,
+              parentCategory: 'Raw Materials',
+              subCategory: item.subCategory || item.category || 'General',
+              unitOfMeasure: item.unitOfMeasure,
+              currentStock: item.quantity,
+              unitPrice: item.unitPrice,
+              minimumStock: 10,
+              maximumStock: 1000,
+              reorderPoint: 20,
+              status: 'Active',
+              isActive: true,
+              createdBy: 'System',
+              updatedBy: 'System'
+            });
+            await newCentralKitchenItem.save();
+            console.log(`New Central Kitchen item created: ${newCentralKitchenItem.materialCode} - Stock: ${newCentralKitchenItem.currentStock}`);
+          }
+        } else {
+          // Add to outlet Raw Materials (4 outlets)
+          let outletModels;
+          let RawMaterialModel;
+          
+          if (toOutlet.toLowerCase().includes('kuwait')) {
+            const connectKuwaitCityDB = require('../config/kuwaitCityDB');
+            const { initializeKuwaitCityModels } = require('../models/kuwaitCityModels');
+            const kuwaitCityConnection = await connectKuwaitCityDB();
+            outletModels = initializeKuwaitCityModels(kuwaitCityConnection);
+            RawMaterialModel = outletModels.KuwaitCityRawMaterial;
+          } else if (toOutlet.toLowerCase().includes('360') || toOutlet.toLowerCase().includes('mall')) {
+            const connectMall360DB = require('../config/mall360DB');
+            const { initializeMall360Models } = require('../models/mall360Models');
+            const mall360Connection = await connectMall360DB();
+            outletModels = initializeMall360Models(mall360Connection);
+            RawMaterialModel = outletModels.Mall360RawMaterial;
+          } else if (toOutlet.toLowerCase().includes('vibe') || toOutlet.toLowerCase().includes('complex')) {
+            const connectVibeComplexDB = require('../config/vibeComplexDB');
+            const { initializeVibeComplexModels } = require('../models/vibeComplexModels');
+            const vibeComplexConnection = await connectVibeComplexDB();
+            outletModels = initializeVibeComplexModels(vibeComplexConnection);
+            RawMaterialModel = outletModels.VibeComplexRawMaterial;
+          } else if (toOutlet.toLowerCase().includes('taiba')) {
+            const connectTaibaKitchenDB = require('../config/taibaKitchenDB');
+            const { initializeTaibaKitchenModels } = require('../models/taibaKitchenModels');
+            const taibaKitchenConnection = await connectTaibaKitchenDB();
+            outletModels = initializeTaibaKitchenModels(taibaKitchenConnection);
+            RawMaterialModel = outletModels.TaibaKitchenRawMaterial;
+          } else {
+            throw new Error(`Unknown destination outlet: ${toOutlet}`);
+          }
+          
+          if (!RawMaterialModel) {
+            throw new Error(`Raw material model not found for destination outlet: ${toOutlet}`);
+          }
+          
+          let outletItem = await RawMaterialModel.findOne({ materialCode: item.itemCode });
+          if (outletItem) {
+            console.log(`${toOutlet} BEFORE: ${outletItem.materialCode} - Stock: ${outletItem.currentStock}`);
+            outletItem.currentStock += item.quantity;
+            await outletItem.save();
+            console.log(`${toOutlet} AFTER: ${outletItem.materialCode} - Stock: ${outletItem.currentStock}`);
+          } else {
+            console.log(`Creating new ${toOutlet} item: ${item.itemCode}`);
+            outletItem = new RawMaterialModel({
+              materialCode: item.itemCode,
+              materialName: item.itemName,
+              category: item.category || 'General',
+              subCategory: item.subCategory || 'General',
+              unitOfMeasure: item.unitOfMeasure,
+              currentStock: item.quantity,
+              unitPrice: item.unitPrice,
+              minimumStock: 10,
+              maximumStock: 1000,
+              reorderPoint: 20,
+              status: 'Active',
+              isActive: true,
+              createdBy: 'System',
+              updatedBy: 'System'
+            });
+            await outletItem.save();
+            console.log(`New ${toOutlet} item created: ${outletItem.materialCode} - Stock: ${outletItem.currentStock}`);
+          }
+        }
+      }
+      
+      console.log('✅ Inventory updated successfully');
+      
+    } catch (inventoryError) {
+      console.error('⚠️  Error updating inventory:', inventoryError);
+      // Don't fail the transfer creation if inventory update fails
+    }
+
+    // Create notification for the destination outlet
+    try {
+      console.log(`📢 Creating notification for ${toOutlet}...`);
+      
+      // Create notification data
+      const notificationData = {
+        title: `Items Received from Ingredient Master`,
+        message: `Transfer completed: ${items.length} item(s) have been added to your inventory from Ingredient Master. Total value: KWD ${totalValue.toFixed(3)}`,
+        type: 'transfer_completed',
         targetOutlet: toOutlet,
         sourceOutlet: 'Ingredient Master',
         transferOrderId: transferOrder._id.toString(),
-        itemType: items.some(item => item.itemType === 'Raw Material') ? 'Raw Material' : 'Finished Goods',
-        priority: priority || 'Normal',
-        read: false
-      });
+        itemType: 'Raw Material',
+        priority: 'normal'
+      };
       
-      await notification.save();
-      console.log(`✅ Notification created for ${toOutlet}: New transfer request from Ingredient Master`);
+      // Use the shared notification service
+      const notificationService = require('../services/notificationService');
+      const notification = notificationService.createNotification(notificationData);
+      
+      console.log(`✅ Notification created for ${toOutlet}: Items received from Ingredient Master`);
+      
     } catch (notificationError) {
       console.error('⚠️  Failed to create notification:', notificationError);
       // Don't fail the entire operation if notification creation fails
@@ -100,13 +247,13 @@ router.post('/create-transfer', async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Transfer order created successfully',
+      message: 'Transfer completed successfully - items moved from Ingredient Master to destination outlet',
       data: {
         transferOrderId: transferOrder._id,
         status: transferOrder.status,
         fromOutlet: transferOrder.fromOutlet,
         toOutlet: transferOrder.toOutlet,
-        totalValue: transferOrder.totalValue,
+        totalValue: transferOrder.totalAmount,
         itemCount: transferOrder.items.length,
         createdAt: transferOrder.createdAt
       }

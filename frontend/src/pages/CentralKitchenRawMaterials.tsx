@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Package, TrendingDown, AlertTriangle, RefreshCw, Upload, RotateCcw } from 'lucide-react'
+import { Package, TrendingDown, AlertTriangle, RefreshCw, Upload } from 'lucide-react'
 import { apiService } from '../services/api'
 import { useConfirmation } from '../hooks/useConfirmation'
 import ConfirmationModal from '../components/ConfirmationModal'
@@ -67,18 +67,27 @@ const CentralKitchenRawMaterials: React.FC = () => {
   const [showTransferOrderModal, setShowTransferOrderModal] = useState(false)
   const [selectedTransferOrder, setSelectedTransferOrder] = useState<TransferOrder | null>(null)
   const [transferOrderLoading, setTransferOrderLoading] = useState(false)
-  const [syncing, setSyncing] = useState(false)
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Central Kitchen')
   
-  // Filter notifications to only show Raw Material transfer requests from any outlet
+  // Filter notifications to show Raw Material transfer requests and items received from Ingredient Master
   const rawMaterialNotifications = notifications.filter(notification => 
-    notification.isTransferOrder && 
-    (notification.itemType === 'Raw Material' || notification.itemType === 'Mixed') &&
-    (notification.title?.includes('Transfer Request from Kuwait City') || 
-     notification.title?.includes('Transfer Request from 360 Mall') ||
-     notification.title?.includes('Transfer Request from Vibe Complex') ||
-     notification.title?.includes('Transfer Request from Taiba Hospital'))
+    (notification.isTransferOrder && 
+     (notification.itemType === 'Raw Material' || notification.itemType === 'Mixed') &&
+     (notification.title?.includes('Transfer Request from Kuwait City') || 
+      notification.title?.includes('Transfer Request from 360 Mall') ||
+      notification.title?.includes('Transfer Request from Vibe Complex') ||
+      notification.title?.includes('Transfer Request from Taiba Hospital'))) ||
+    (notification.title?.includes('Items Received from Ingredient Master') &&
+     notification.type === 'success')  // Fixed: frontend maps transfer_completed to success
   )
+
+  // Debug logging for notifications
+  useEffect(() => {
+    console.log('🔔 Central Kitchen: All notifications:', notifications)
+    console.log('🔔 Central Kitchen: Filtered notifications:', rawMaterialNotifications)
+    console.log('🔔 Central Kitchen: Number of all notifications:', notifications.length)
+    console.log('🔔 Central Kitchen: Number of filtered notifications:', rawMaterialNotifications.length)
+  }, [notifications, rawMaterialNotifications])
 
   useEffect(() => {
     loadCentralKitchenData()
@@ -541,31 +550,6 @@ const CentralKitchenRawMaterials: React.FC = () => {
     }
   }
 
-  const handleSyncWithZoho = async () => {
-    setSyncing(true)
-    try {
-      console.log('🔄 Starting Zoho sync...')
-      const response = await apiService.syncWithZoho()
-      
-      if (response.success) {
-        showAlert(
-          'Sync Completed Successfully!',
-          `📊 Sync Results:\n• Total items processed: ${response.data.totalItems}\n• New items added: ${response.data.addedItems}\n• Items updated: ${response.data.updatedItems}\n• Errors: ${response.data.errorItems}\n\n🕒 Sync completed at: ${new Date(response.data.syncTimestamp).toLocaleString()}`,
-          'success'
-        )
-        
-        // Refresh the inventory data after successful sync
-        await loadCentralKitchenData()
-      } else {
-        showAlert('Sync Failed', response.message || 'Unknown error occurred during sync', 'error')
-      }
-    } catch (error) {
-      console.error('❌ Zoho sync failed:', error)
-      showAlert('Sync Failed', `Failed to sync with Zoho: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
-    } finally {
-      setSyncing(false)
-    }
-  }
 
   // Calculate summary statistics
   const totalItems = inventoryItems.length
@@ -622,15 +606,6 @@ const CentralKitchenRawMaterials: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-3">
-          <button
-            onClick={handleSyncWithZoho}
-            disabled={syncing}
-            className={`flex items-center ${syncing ? 'btn-disabled' : 'btn-primary'}`}
-            title="Sync inventory with Zoho"
-          >
-            <RotateCcw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Syncing...' : 'Sync Inventory'}
-          </button>
           <button
             onClick={loadCentralKitchenData}
             className="btn-secondary flex items-center"

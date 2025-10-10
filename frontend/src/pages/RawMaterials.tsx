@@ -51,8 +51,15 @@ const RawMaterials: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterStockStatus, setFilterStockStatus] = useState('')
 
+  // Load materials on component mount only
   useEffect(() => {
     loadRawMaterials()
+  }, [])
+
+  // Handle search and filter changes without reloading the page
+  useEffect(() => {
+    // Apply filters to already loaded materials instead of reloading
+    // This prevents page reload on every keystroke
   }, [searchTerm, filterCategory, filterStatus])
 
   const loadRawMaterials = async () => {
@@ -60,11 +67,10 @@ const RawMaterials: React.FC = () => {
       setLoading(true)
       console.log('📦 Loading Ingredient Master from main database')
       
+      // Load all materials without filters - filtering will be done on frontend
       const response = await apiService.getRawMaterials({
-        limit: 1000,
-        search: searchTerm,
-        category: filterCategory,
-        status: filterStatus
+        limit: 1000
+        // Removed search, category, and status filters to prevent API calls on every keystroke
       })
 
       if (response.success && response.data) {

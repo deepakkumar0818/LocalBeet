@@ -10,10 +10,7 @@
     "seed": "node scripts/seedRawMaterials.js",
     "seed:360mall": "node scripts/seed360MallFromKuwaitCity.js",
     "zoho:token": "node scripts/getZohoAccessToken.js",
-    "zoho:fetch": "node scripts/fetchZohoItems.js",
-    "zoho:sync": "node scripts/syncZohoToCentralKitchen.js",
-    "zoho:sync-dry": "node scripts/syncZohoToCentralKitchen.js --dry-run",
-    "sync:zoho": "node scripts/syncZohoToCentralKitchen.js"
+    "zoho:fetch": "node scripts/fetchZohoItems.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
