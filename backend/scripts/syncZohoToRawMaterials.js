@@ -53,7 +53,8 @@ const LOCATION_MAPPING = {
   'TLB 360 RNA': 'mall360',
   'TLB Vibes': 'vibesComplex',
   'TLB City': 'kuwaitCity',
-  'TLB Jabriya': 'taibaKitchen'
+  'Clinic': 'taibaKitchen',
+  'Head Office': 'centralKitchen' // Map Head Office to Central Kitchen for now
 };
 
 /**
@@ -97,24 +98,28 @@ function mapZohoItemToRawMaterial(zohoItem) {
   // Process location-specific stock data
   if (zohoItem.locations && Array.isArray(zohoItem.locations)) {
     console.log(`📍 Processing locations for ${zohoItem.name} (${materialCode}):`);
+    console.log(`   Available mappings: ${Object.keys(LOCATION_MAPPING).join(', ')}`);
     
     zohoItem.locations.forEach((location, index) => {
       const locationName = location.location_name;
       const stockOnHand = parseFloat(location.location_stock_on_hand || 0);
       
-      console.log(`  ${index + 1}. ${locationName}: ${stockOnHand} ${mappedUnit}`);
+      console.log(`  ${index + 1}. Zoho Location: "${locationName}" | Stock: ${stockOnHand} ${mappedUnit}`);
       
       // Map Zoho location to our database location
       const ourLocationKey = LOCATION_MAPPING[locationName];
+      console.log(`     → Looking for mapping: "${locationName}"`);
+      console.log(`     → Found mapping: ${ourLocationKey || 'NOT FOUND'}`);
+      
       if (ourLocationKey && stockOnHand > 0) {
         locationStocks[ourLocationKey] = stockOnHand;
         totalStock += stockOnHand;
-        console.log(`     → Mapped to ${ourLocationKey}: ${stockOnHand}`);
+        console.log(`     ✅ Mapped to ${ourLocationKey}: ${stockOnHand}`);
       } else if (stockOnHand > 0) {
         // If location not in mapping, add to Central Kitchen as fallback
         locationStocks.centralKitchen += stockOnHand;
         totalStock += stockOnHand;
-        console.log(`     → Unknown location, added to Central Kitchen: ${stockOnHand}`);
+        console.log(`     ⚠️  Unknown location "${locationName}", added to Central Kitchen: ${stockOnHand}`);
       }
     });
     
@@ -123,7 +128,10 @@ function mapZohoItemToRawMaterial(zohoItem) {
     // Fallback: use total stock if no location breakdown
     totalStock = parseFloat(zohoItem.stock_on_hand || zohoItem.available_stock || 0);
     locationStocks.centralKitchen = totalStock;
-    console.log(`📍 No location data found for ${zohoItem.name}, using total stock: ${totalStock}`);
+    console.log(`📍 NO LOCATION DATA FOUND for ${zohoItem.name}`);
+    console.log(`   • zohoItem.locations: ${zohoItem.locations ? 'exists but empty' : 'undefined/null'}`);
+    console.log(`   • Using total stock from Zoho: ${totalStock} ${mappedUnit}`);
+    console.log(`   • All stock will be added to Central Kitchen as fallback`);
   }
   
   return {
@@ -281,10 +289,14 @@ async function syncZohoToRawMaterials(dryRun = false, closeConnection = true) {
           console.log(`   Previous total stock: ${existingItem.currentStock || 0}`);
           console.log(`   Adding Zoho stock: ${mappedItem.currentStock || 0}`);
           console.log(`   New total stock: ${newTotalStock}`);
-          console.log(`   Location breakdown:`);
-          Object.entries(newLocationStocks).forEach(([location, stock]) => {
-            if (stock > 0) {
-              console.log(`     ${location}: ${stock}`);
+          console.log(`   Location-wise updates:`);
+          
+          // Show detailed location breakdown
+          Object.entries(newLocationStocks).forEach(([location, newStock]) => {
+            const previousStock = previousLocationStocks[location] || 0;
+            const zohoStock = mappedItem.locationStocks[location] || 0;
+            if (previousStock > 0 || zohoStock > 0) {
+              console.log(`     ${location}: ${previousStock} (existing) + ${zohoStock} (Zoho) = ${newStock} (new)`);
             }
           });
           
@@ -307,8 +319,7 @@ async function syncZohoToRawMaterials(dryRun = false, closeConnection = true) {
           );
 
           console.log(`🔄 Updated: ${mappedItem.materialName} (${mappedItem.materialCode})`);
-          console.log(`   Previous Total: ${previousStock} + Zoho: ${zohoStock} = New Total: ${newTotalStock}`);
-          console.log(`   Central Kitchen: ${previousCKStock} + ${zohoStock} = ${newCKStock}`);
+          console.log(`   Previous Total: ${existingItem.currentStock || 0} + Zoho: ${mappedItem.currentStock || 0} = New Total: ${newTotalStock}`);
           console.log(`   Category: ${mappedItem.subCategory} | Unit: ${mappedItem.unitOfMeasure} | Price: ${mappedItem.unitPrice}`);
           updatedCount++;
           continue;
@@ -319,7 +330,14 @@ async function syncZohoToRawMaterials(dryRun = false, closeConnection = true) {
         await newItem.save();
 
         console.log(`✅ Added: ${mappedItem.materialName} (${mappedItem.materialCode})`);
-        console.log(`   Category: ${mappedItem.subCategory} | Unit: ${mappedItem.unitOfMeasure} | Price: ${mappedItem.unitPrice} | Stock: ${mappedItem.currentStock}`);
+        console.log(`   Category: ${mappedItem.subCategory} | Unit: ${mappedItem.unitOfMeasure} | Price: ${mappedItem.unitPrice}`);
+        console.log(`   Total Stock: ${mappedItem.currentStock}`);
+        console.log(`   Location breakdown:`);
+        Object.entries(mappedItem.locationStocks).forEach(([location, stock]) => {
+          if (stock > 0) {
+            console.log(`     ${location}: ${stock}`);
+          }
+        });
         successCount++;
 
       } catch (itemError) {

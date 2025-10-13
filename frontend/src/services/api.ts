@@ -109,6 +109,24 @@ class ApiService {
     });
   }
 
+  async syncWithZohoRawMaterials() {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: {
+        totalItems: number;
+        itemsWithSKU: number;
+        itemsWithoutSKU: number;
+        addedItems: number;
+        updatedItems: number;
+        errorItems: number;
+        syncTimestamp: string;
+      };
+    }>('/sync-zoho/raw-materials', {
+      method: 'POST'
+    });
+  }
+
   // Central Kitchen API
   async getCentralKitchens() {
     return this.request<{
