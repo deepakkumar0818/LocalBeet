@@ -88,20 +88,22 @@ const MarinaWalkCafe: React.FC = () => {
   const [sortBy] = useState('materialName')
   const [sortOrder] = useState<'asc' | 'desc'>('asc')
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('360 Mall')
+  const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Vibes Complex')
 
   // Debug notifications when they change
   useEffect(() => {
-    console.log(`🔔 360 Mall: Notifications updated:`, notifications)
-    console.log(`🔔 360 Mall: Number of notifications: ${notifications.length}`)
+    console.log(`🔔 Vibes Complex: Notifications updated:`, notifications)
+    console.log(`🔔 Vibes Complex: Number of notifications: ${notifications.length}`)
     if (notifications.length > 0) {
-      console.log(`🔔 360 Mall: First notification:`, notifications[0])
+      console.log(`🔔 Vibes Complex: First notification:`, notifications[0])
     }
   }, [notifications])
 
   // Debug when component mounts
   useEffect(() => {
-    console.log(`🔔 Vibes Complex: Component mounted, loading notifications for: "Vibe Complex"`)
+    console.log(`🔔 Vibes Complex: Component mounted, loading notifications for: "Vibes Complex"`)
+    console.log(`🔔 Vibes Complex: Current URL path: ${location.pathname}`)
+    console.log(`🔔 Vibes Complex: Component file: MarinaWalkCafe.tsx`)
   }, [])
 
   // Determine current section based on URL
@@ -153,7 +155,11 @@ const MarinaWalkCafe: React.FC = () => {
     if (notifications.length > 0) {
       // Check if there are any new transfer notifications from Central Kitchen
       const hasNewTransferNotifications = notifications.some(notif => 
-        !notif.read && notif.title?.includes('Transfer from Central Kitchen')
+        !notif.read && (
+          notif.title?.includes('Items Received from Central Kitchen') ||
+          notif.title?.includes('Transfer from Central Kitchen') ||
+          notif.title?.includes('Items Received from Ingredient Master')
+        )
       )
       
       if (hasNewTransferNotifications) {
@@ -166,7 +172,7 @@ const MarinaWalkCafe: React.FC = () => {
   // Auto-refresh notifications every 5 seconds to catch new approvals
   useEffect(() => {
     const interval = setInterval(() => {
-      console.log('🔄 360 Mall: Auto-refreshing notifications...')
+      console.log('🔄 Vibes Complex: Auto-refreshing notifications...')
       refreshNotifications()
     }, 5000) // Refresh every 5 seconds
 
@@ -185,15 +191,15 @@ const MarinaWalkCafe: React.FC = () => {
       setLoading(true)
       setError(null)
       
-      // Get 360 Mall outlet
+      // Get Vibes Complex outlet
       const outletsResponse = await apiService.getOutlets({ limit: 1000 })
       if (outletsResponse.success) {
-        const mall360 = outletsResponse.data.find(outlet => outlet.outletName === '360 Mall')
-        if (mall360) {
-          setOutlet(mall360)
+        const vibesComplex = outletsResponse.data.find(outlet => outlet.outletName === 'Vibes Complex')
+        if (vibesComplex) {
+          setOutlet(vibesComplex)
           await loadInventory()
         } else {
-          setError('360 Mall not found')
+          setError('Vibes Complex not found')
         }
       } else {
         setError('Failed to load outlet data')
@@ -208,10 +214,10 @@ const MarinaWalkCafe: React.FC = () => {
 
   const loadInventory = async () => {
     try {
-      console.log('Loading 360 Mall inventory from dedicated database')
+      console.log('Loading Vibes Complex inventory from dedicated database')
       
-      // Load raw materials from 360 Mall dedicated database
-      const rawMaterialsResponse = await apiService.get360MallRawMaterials({
+      // Load raw materials from Vibes Complex dedicated database
+      const rawMaterialsResponse = await apiService.getVibesComplexRawMaterials({
         limit: 1000,
         search: searchTerm,
         subCategory: filterCategory,
@@ -221,7 +227,7 @@ const MarinaWalkCafe: React.FC = () => {
       })
 
       if (rawMaterialsResponse.success) {
-        console.log('Loaded 360 Mall Raw Materials:', rawMaterialsResponse.data)
+        console.log('Loaded Vibes Complex Raw Materials:', rawMaterialsResponse.data)
         
         if (rawMaterialsResponse.data && rawMaterialsResponse.data.length > 0) {
           // Transform the data to match the expected interface
@@ -229,7 +235,7 @@ const MarinaWalkCafe: React.FC = () => {
             id: item._id || item.id,
             outletId: outlet?._id || outlet?.id || '',
             outletCode: outlet?.outletCode || '',
-            outletName: outlet?.outletName || '360 Mall',
+            outletName: outlet?.outletName || 'Vibes Complex',
             materialId: item._id,
             materialCode: item.materialCode,
             materialName: item.materialName,
@@ -263,8 +269,8 @@ const MarinaWalkCafe: React.FC = () => {
         setError(`Failed to load inventory from server: ${(rawMaterialsResponse as any).error || 'Unknown error'}`)
       }
 
-      // Load finished goods from 360 Mall dedicated database
-      const finishedGoodsResponse = await apiService.get360MallFinishedProducts({
+      // Load finished goods from Vibes Complex dedicated database
+      const finishedGoodsResponse = await apiService.getVibesComplexFinishedProducts({
         limit: 1000,
         search: searchTerm,
         subCategory: filterCategory,
@@ -274,7 +280,7 @@ const MarinaWalkCafe: React.FC = () => {
       })
 
       if (finishedGoodsResponse.success) {
-        console.log('Loaded 360 Mall Finished Products:', finishedGoodsResponse.data)
+        console.log('Loaded Vibes Complex Finished Products:', finishedGoodsResponse.data)
         
         if (finishedGoodsResponse.data && finishedGoodsResponse.data.length > 0) {
           // Transform the data to match the expected interface
@@ -282,7 +288,7 @@ const MarinaWalkCafe: React.FC = () => {
             id: item._id || item.id,
             outletId: outlet?._id || outlet?.id || '',
             outletCode: outlet?.outletCode || '',
-            outletName: outlet?.outletName || '360 Mall',
+            outletName: outlet?.outletName || 'Vibes Complex',
             productId: item._id,
             productCode: item.productCode,
             productName: item.productName,
@@ -313,7 +319,7 @@ const MarinaWalkCafe: React.FC = () => {
           
           setFinishedGoodInventoryItems(transformedFinishedGoods)
         } else {
-          console.log('No finished goods inventory found for Vibe Complex')
+          console.log('No finished goods inventory found for Vibes Complex')
           setFinishedGoodInventoryItems([])
         }
       } else {
@@ -819,7 +825,7 @@ const MarinaWalkCafe: React.FC = () => {
             <Coffee className="h-8 w-8 text-green-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{outlet?.outletName || '360 Mall'}</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{outlet?.outletName || 'Vibes Complex'}</h1>
             <p className="text-gray-600">
               {currentSection === 'raw-materials' ? 'Raw Materials Inventory' :
                currentSection === 'finished-goods' ? 'Finished Goods Inventory' :
@@ -839,7 +845,7 @@ const MarinaWalkCafe: React.FC = () => {
           </button>
           {currentSection === 'raw-materials' && (
             <button
-              onClick={() => navigate('/360-mall/request-raw-materials')}
+              onClick={() => navigate('/vibes-complex/request-raw-materials')}
               className="btn-primary flex items-center"
             >
               <Truck className="h-4 w-4 mr-2" />
@@ -848,7 +854,7 @@ const MarinaWalkCafe: React.FC = () => {
           )}
           {currentSection === 'finished-goods' && (
             <button
-              onClick={() => navigate('/360-mall/request-finished-goods')}
+              onClick={() => navigate('/vibes-complex/request-finished-goods')}
               className="btn-primary flex items-center"
             >
               <Truck className="h-4 w-4 mr-2" />

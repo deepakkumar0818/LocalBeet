@@ -65,6 +65,8 @@ app.use('/api/taiba-kitchen/raw-materials', require('./routes/taibaKitchenRawMat
 app.use('/api/taiba-kitchen/finished-products', require('./routes/taibaKitchenFinishedProducts'));
 
 app.use('/api/central-kitchen', require('./routes/centralKitchen'));
+app.use('/api/central-kitchen/raw-materials', require('./routes/centralKitchenRawMaterials'));
+app.use('/api/central-kitchen/finished-products', require('./routes/centralKitchenFinishedProducts'));
 app.use('/api/central-kitchen-inventory', require('./routes/centralKitchenInventory'));
 app.use('/api/transfers', require('./routes/transfers'));
 app.use('/api/transfer-orders', require('./routes/transferOrders'));

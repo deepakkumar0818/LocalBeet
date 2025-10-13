@@ -146,10 +146,18 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET a single transfer order by ID
+// GET a single transfer order by ID or transfer number
 router.get('/:id', async (req, res) => {
   try {
-    const transferOrder = await TransferOrder.findById(req.params.id);
+    let transferOrder;
+    
+    // Check if the ID looks like a transfer number (starts with TR-)
+    if (req.params.id.startsWith('TR-')) {
+      transferOrder = await TransferOrder.findOne({ transferNumber: req.params.id });
+    } else {
+      // Otherwise, treat it as a MongoDB ObjectId
+      transferOrder = await TransferOrder.findById(req.params.id);
+    }
     
     if (!transferOrder) {
       return res.status(404).json({ 

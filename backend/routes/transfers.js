@@ -60,6 +60,9 @@ router.post('/create', async (req, res) => {
 
     console.log('Creating transfer:', { fromOutlet, toOutlet, items: items.length });
 
+    // Calculate total value if not provided
+    const calculatedTotalValue = totalValue || items.reduce((sum, item) => sum + (item.quantity * (item.unitPrice || 0)), 0);
+
     // Validate required fields
     if (!fromOutlet || !toOutlet || !items || items.length === 0) {
       return res.status(400).json({
@@ -71,6 +74,9 @@ router.post('/create', async (req, res) => {
     // Get the appropriate models based on outlet
     const getOutletModels = (outletName) => {
       switch (outletName.toLowerCase()) {
+        case 'central kitchen':
+        case 'central-kitchen':
+          return centralKitchenModels;
         case 'kuwait city':
         case 'kuwait-city':
           return kuwaitCityModels;
@@ -90,7 +96,25 @@ router.post('/create', async (req, res) => {
       }
     };
 
-    const outletModels = getOutletModels(toOutlet);
+    // Determine transfer direction and get appropriate models
+    const isFromCentralKitchen = fromOutlet.toLowerCase().includes('central kitchen');
+    const isToCentralKitchen = toOutlet.toLowerCase().includes('central kitchen');
+    
+    let sourceModels, destinationModels;
+    
+    if (isFromCentralKitchen) {
+      // Transfer FROM Central Kitchen TO outlet
+      sourceModels = centralKitchenModels;
+      destinationModels = getOutletModels(toOutlet);
+    } else if (isToCentralKitchen) {
+      // Transfer FROM outlet TO Central Kitchen
+      sourceModels = getOutletModels(fromOutlet);
+      destinationModels = centralKitchenModels;
+    } else {
+      // Transfer between outlets (not supported yet)
+      throw new Error('Transfers between outlets (not involving Central Kitchen) are not yet supported');
+    }
+
     const transferResults = [];
     const errors = [];
 
@@ -102,20 +126,22 @@ router.post('/create', async (req, res) => {
         if (itemType === 'Raw Material') {
           // Handle Raw Material transfer
           await handleRawMaterialTransfer(
-            centralKitchenModels,
-            outletModels,
+            sourceModels,
+            destinationModels,
             itemCode,
             quantity,
-            itemNotes
+            itemNotes,
+            isFromCentralKitchen
           );
         } else if (itemType === 'Finished Goods') {
           // Handle Finished Goods transfer
           await handleFinishedGoodsTransfer(
-            centralKitchenModels,
-            outletModels,
+            sourceModels,
+            destinationModels,
             itemCode,
             quantity,
-            itemNotes
+            itemNotes,
+            isFromCentralKitchen
           );
         }
 
@@ -137,54 +163,84 @@ router.post('/create', async (req, res) => {
 
     // Create Transfer Order record
     let transferOrder;
+    const transferOrderData = {
+      transferNumber: `TR-${Date.now()}`, // Generate transfer number
+      fromOutlet,
+      toOutlet,
+      transferDate: transferDate ? new Date(transferDate) : new Date(),
+      priority,
+      items: items.map(item => ({
+        itemType: item.itemType,
+        itemCode: item.itemCode,
+        itemName: item.itemName || item.itemCode,
+        category: item.category || '',
+        subCategory: item.subCategory || '',
+        unitOfMeasure: item.unitOfMeasure || 'pcs',
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalValue: item.quantity * item.unitPrice,
+        notes: item.notes || ''
+      })),
+      totalAmount: calculatedTotalValue,
+      status: errors.length > 0 ? 'Failed' : 'Pending',
+      requestedBy: 'System User',
+      transferResults: transferResults.map(result => ({
+        itemCode: result.itemCode,
+        itemType: result.itemType,
+        quantity: result.quantity,
+        status: errors.find(e => e.itemCode === result.itemCode) ? 'failed' : 'success', // Use valid enum values
+        error: errors.find(e => e.itemCode === result.itemCode)?.error
+      })),
+      notes: notes || '',
+      createdBy: 'Transfer System',
+      updatedBy: 'Transfer System'
+    };
+
     try {
       // Ensure main database is connected
       await connectDB();
       
-      const transferOrderData = {
-        transferNumber: `TR-${Date.now()}`, // Generate transfer number
-        fromOutlet,
-        toOutlet,
-        transferDate: transferDate ? new Date(transferDate) : new Date(),
-        priority,
-        items: items.map(item => ({
-          itemType: item.itemType,
-          itemCode: item.itemCode,
-          itemName: item.itemName || item.itemCode,
-          category: item.category || '',
-          subCategory: item.subCategory || '',
-          unitOfMeasure: item.unitOfMeasure || 'pcs',
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          totalValue: item.quantity * item.unitPrice,
-          notes: item.notes || ''
-        })),
-        totalAmount: totalValue,
-        status: errors.length > 0 ? 'Failed' : 'Pending',
-        requestedBy: 'System User',
-        transferResults: transferResults.map(result => ({
-          itemCode: result.itemCode,
-          itemType: result.itemType,
-          quantity: result.quantity,
-          status: errors.find(e => e.itemCode === result.itemCode) ? 'failed' : 'success', // Use valid enum values
-          error: errors.find(e => e.itemCode === result.itemCode)?.error
-        })),
-        notes: notes || '',
-        createdBy: 'Transfer System',
-        updatedBy: 'Transfer System'
-      };
-
       transferOrder = await TransferOrder.create(transferOrderData);
       console.log('✅ Transfer Order created successfully:', transferOrder.transferNumber);
       console.log('   Status:', transferOrder.status);
       console.log('   From:', transferOrder.fromOutlet);
       console.log('   To:', transferOrder.toOutlet);
       console.log('   Total Amount:', transferOrder.totalAmount);
+      console.log('   Database ID:', transferOrder._id);
     } catch (orderError) {
       console.error('❌ Error creating transfer order:', orderError);
       console.error('   Error details:', orderError.message);
       console.error('   Transfer data:', JSON.stringify(transferOrderData, null, 2));
-      // Continue with response even if order creation fails
+      // Continue with response even if order creation fails, but log the issue
+      console.warn('⚠️ Continuing without transfer order record');
+    }
+
+    // Create notification for the destination outlet
+    try {
+      console.log(`📢 Creating notification for ${toOutlet}...`);
+      
+      // Create notification data
+      const itemDetails = items.map(item => `${item.itemName || item.itemCode} (${item.quantity} ${item.unitOfMeasure || 'pcs'})`).join(', ');
+      const notificationData = {
+        title: `Items Received from ${fromOutlet}`,
+        message: `Transfer completed: ${itemDetails} have been added to your inventory from ${fromOutlet}. Total value: KWD ${calculatedTotalValue.toFixed(3)}`,
+        type: 'transfer_completed',
+        targetOutlet: toOutlet,
+        sourceOutlet: fromOutlet,
+        transferOrderId: transferOrder?._id?.toString(),
+        itemType: items[0]?.itemType || 'Mixed',
+        priority: 'normal'
+      };
+      
+      // Use the persistent notification service
+      const notificationService = require('../services/persistentNotificationService');
+      const notification = await notificationService.createNotification(notificationData);
+      
+      console.log(`✅ Notification created for ${toOutlet}: Items received from ${fromOutlet}`);
+      
+    } catch (notificationError) {
+      console.error('⚠️  Failed to create notification:', notificationError);
+      // Don't fail the entire operation if notification creation fails
     }
 
     if (errors.length > 0) {
@@ -198,7 +254,7 @@ router.post('/create', async (req, res) => {
           transferDate,
           priority,
           items: transferResults,
-          totalValue,
+          totalValue: calculatedTotalValue,
           notes,
           createdAt: new Date().toISOString(),
           errors
@@ -219,7 +275,7 @@ router.post('/create', async (req, res) => {
         transferDate,
         priority,
         items: transferResults,
-        totalValue,
+        totalValue: calculatedTotalValue,
         notes,
         createdAt: new Date().toISOString()
       }
@@ -236,49 +292,47 @@ router.post('/create', async (req, res) => {
 });
 
 // Helper function to handle Raw Material transfers
-async function handleRawMaterialTransfer(centralKitchenModels, outletModels, itemCode, quantity, notes) {
+async function handleRawMaterialTransfer(sourceModels, destinationModels, itemCode, quantity, notes, isFromCentralKitchen = true) {
   console.log(`\n🔄 Starting Raw Material Transfer for ${itemCode}`);
   console.log(`   Quantity: ${quantity}`);
+  console.log(`   Direction: ${isFromCentralKitchen ? 'FROM Central Kitchen TO outlet' : 'FROM outlet TO Central Kitchen'}`);
   
-  const CentralKitchenRawMaterial = centralKitchenModels.CentralKitchenRawMaterial;
-  
-  // Get the correct Raw Material model based on the outlet
-  let OutletRawMaterial;
-  let outletName = 'Unknown';
-  if (outletModels.KuwaitCityRawMaterial) {
-    OutletRawMaterial = outletModels.KuwaitCityRawMaterial;
-    outletName = 'Kuwait City';
-  } else if (outletModels.Mall360RawMaterial) {
-    OutletRawMaterial = outletModels.Mall360RawMaterial;
-    outletName = '360 Mall';
-  } else if (outletModels.VibeComplexRawMaterial) {
-    OutletRawMaterial = outletModels.VibeComplexRawMaterial;
-    outletName = 'Vibe Complex';
-  } else if (outletModels.TaibaKitchenRawMaterial) {
-    OutletRawMaterial = outletModels.TaibaKitchenRawMaterial;
-    outletName = 'Taiba Kitchen';
-  } else {
-    throw new Error('No valid Raw Material model found for the outlet');
-  }
-  
-  console.log(`   Target Outlet: ${outletName}`);
+  // Get source and destination models
+  const SourceRawMaterial = sourceModels.CentralKitchenRawMaterial || 
+    sourceModels.KuwaitCityRawMaterial || 
+    sourceModels.Mall360RawMaterial || 
+    sourceModels.VibeComplexRawMaterial || 
+    sourceModels.TaibaKitchenRawMaterial;
+    
+  const DestinationRawMaterial = destinationModels.CentralKitchenRawMaterial || 
+    destinationModels.KuwaitCityRawMaterial || 
+    destinationModels.Mall360RawMaterial || 
+    destinationModels.VibeComplexRawMaterial || 
+    destinationModels.TaibaKitchenRawMaterial;
 
-  // Find the item in Central Kitchen
-  const centralKitchenItem = await CentralKitchenRawMaterial.findOne({ materialCode: itemCode });
-  if (!centralKitchenItem) {
-    throw new Error(`Raw Material ${itemCode} not found in Central Kitchen`);
+  if (!SourceRawMaterial) {
+    throw new Error('No valid source Raw Material model found');
+  }
+  if (!DestinationRawMaterial) {
+    throw new Error('No valid destination Raw Material model found');
+  }
+
+  // Find the item in source location
+  const sourceItem = await SourceRawMaterial.findOne({ materialCode: itemCode });
+  if (!sourceItem) {
+    throw new Error(`Raw Material ${itemCode} not found in source location`);
   }
 
   // Check if sufficient stock is available
-  console.log(`   Central Kitchen Stock: ${centralKitchenItem.currentStock}`);
-  if (centralKitchenItem.currentStock < quantity) {
-    throw new Error(`Insufficient stock in Central Kitchen. Available: ${centralKitchenItem.currentStock}, Required: ${quantity}`);
+  console.log(`   Source Stock: ${sourceItem.currentStock}`);
+  if (sourceItem.currentStock < quantity) {
+    throw new Error(`Insufficient stock in source location. Available: ${sourceItem.currentStock}, Required: ${quantity}`);
   }
 
-  // Subtract from Central Kitchen stock
-  console.log(`   ⬇️ Reducing Central Kitchen stock by ${quantity}`);
-  await CentralKitchenRawMaterial.findByIdAndUpdate(
-    centralKitchenItem._id,
+  // Subtract from source stock
+  console.log(`   ⬇️ Reducing source stock by ${quantity}`);
+  await SourceRawMaterial.findByIdAndUpdate(
+    sourceItem._id,
     { 
       $inc: { currentStock: -quantity },
       updatedBy: 'Transfer System'
@@ -286,86 +340,96 @@ async function handleRawMaterialTransfer(centralKitchenModels, outletModels, ite
     { new: true }
   );
 
-  // Find or create the item in the outlet
-  let outletItem = await OutletRawMaterial.findOne({ materialCode: itemCode });
+  // Find or create the item in the destination location
+  let destinationItem = await DestinationRawMaterial.findOne({ materialCode: itemCode });
   
-  if (outletItem) {
-    // Add to existing outlet stock
-    console.log(`   ⬆️ Adding ${quantity} to existing ${outletName} stock (current: ${outletItem.currentStock})`);
-    const updated = await OutletRawMaterial.findByIdAndUpdate(
-      outletItem._id,
+  if (destinationItem) {
+    // Add to existing destination stock
+    console.log(`   ⬆️ Adding ${quantity} to existing destination stock (current: ${destinationItem.currentStock})`);
+    const updated = await DestinationRawMaterial.findByIdAndUpdate(
+      destinationItem._id,
       { 
         $inc: { currentStock: quantity },
         updatedBy: 'Transfer System'
       },
       { new: true }
     );
-    console.log(`   ✅ Updated ${outletName} stock to: ${updated.currentStock}`);
+    console.log(`   ✅ Updated destination stock to: ${updated.currentStock}`);
   } else {
-    // Create new item in outlet with the transferred quantity
-    console.log(`   🆕 Creating new item in ${outletName} with quantity: ${quantity}`);
-    const newOutletItem = {
-      materialCode: centralKitchenItem.materialCode,
-      materialName: centralKitchenItem.materialName,
-      category: centralKitchenItem.category,
-      subCategory: centralKitchenItem.subCategory,
-      unitOfMeasure: centralKitchenItem.unitOfMeasure,
-      description: centralKitchenItem.description,
-      unitPrice: centralKitchenItem.unitPrice,
+    // Create new item in destination with the transferred quantity
+    console.log(`   🆕 Creating new item in destination with quantity: ${quantity}`);
+    const newDestinationItem = {
+      materialCode: sourceItem.materialCode,
+      materialName: sourceItem.materialName,
+      category: sourceItem.category,
+      subCategory: sourceItem.subCategory,
+      unitOfMeasure: sourceItem.unitOfMeasure,
+      description: sourceItem.description,
+      unitPrice: sourceItem.unitPrice,
       currentStock: quantity,
-      minimumStock: centralKitchenItem.minimumStock,
-      maximumStock: centralKitchenItem.maximumStock,
-      reorderPoint: centralKitchenItem.reorderPoint,
-      supplierId: centralKitchenItem.supplierId,
-      supplierName: centralKitchenItem.supplierName,
-      storageRequirements: centralKitchenItem.storageRequirements,
-      shelfLife: centralKitchenItem.shelfLife,
-      isActive: centralKitchenItem.isActive,
-      status: quantity > centralKitchenItem.minimumStock ? 'In Stock' : 'Low Stock',
-      notes: notes || centralKitchenItem.notes,
+      minimumStock: sourceItem.minimumStock,
+      maximumStock: sourceItem.maximumStock,
+      reorderPoint: sourceItem.reorderPoint,
+      supplierId: sourceItem.supplierId,
+      supplierName: sourceItem.supplierName,
+      storageRequirements: sourceItem.storageRequirements,
+      shelfLife: sourceItem.shelfLife,
+      isActive: sourceItem.isActive,
+      status: quantity > sourceItem.minimumStock ? 'In Stock' : 'Low Stock',
+      notes: notes || sourceItem.notes,
       createdBy: 'Transfer System',
       updatedBy: 'Transfer System'
     };
 
-    const created = await OutletRawMaterial.create(newOutletItem);
-    console.log(`   ✅ Created new item in ${outletName}:`, created.materialCode, 'with stock:', created.currentStock);
+    const created = await DestinationRawMaterial.create(newDestinationItem);
+    console.log(`   ✅ Created new item in destination:`, created.materialCode, 'with stock:', created.currentStock);
   }
 
-  console.log(`✅ Successfully transferred ${quantity} ${itemCode} (Raw Material) from Central Kitchen to ${outletName}`);
+  console.log(`✅ Successfully transferred ${quantity} ${itemCode} (Raw Material) from source to destination`);
 }
 
 // Helper function to handle Finished Goods transfers
-async function handleFinishedGoodsTransfer(centralKitchenModels, outletModels, itemCode, quantity, notes) {
-  const CentralKitchenFinishedProduct = centralKitchenModels.CentralKitchenFinishedProduct;
+async function handleFinishedGoodsTransfer(sourceModels, destinationModels, itemCode, quantity, notes, isFromCentralKitchen = true) {
+  console.log(`\n🔄 Starting Finished Goods Transfer for ${itemCode}`);
+  console.log(`   Quantity: ${quantity}`);
+  console.log(`   Direction: ${isFromCentralKitchen ? 'FROM Central Kitchen TO outlet' : 'FROM outlet TO Central Kitchen'}`);
   
-  // Get the correct Finished Product model based on the outlet
-  let OutletFinishedProduct;
-  if (outletModels.KuwaitCityFinishedProduct) {
-    OutletFinishedProduct = outletModels.KuwaitCityFinishedProduct;
-  } else if (outletModels.Mall360FinishedProduct) {
-    OutletFinishedProduct = outletModels.Mall360FinishedProduct;
-  } else if (outletModels.VibeComplexFinishedProduct) {
-    OutletFinishedProduct = outletModels.VibeComplexFinishedProduct;
-  } else if (outletModels.TaibaKitchenFinishedProduct) {
-    OutletFinishedProduct = outletModels.TaibaKitchenFinishedProduct;
-  } else {
-    throw new Error('No valid Finished Product model found for the outlet');
+  // Get source and destination models
+  const SourceFinishedProduct = sourceModels.CentralKitchenFinishedProduct || 
+    sourceModels.KuwaitCityFinishedProduct || 
+    sourceModels.Mall360FinishedProduct || 
+    sourceModels.VibeComplexFinishedProduct || 
+    sourceModels.TaibaKitchenFinishedProduct;
+    
+  const DestinationFinishedProduct = destinationModels.CentralKitchenFinishedProduct || 
+    destinationModels.KuwaitCityFinishedProduct || 
+    destinationModels.Mall360FinishedProduct || 
+    destinationModels.VibeComplexFinishedProduct || 
+    destinationModels.TaibaKitchenFinishedProduct;
+
+  if (!SourceFinishedProduct) {
+    throw new Error('No valid source Finished Product model found');
+  }
+  if (!DestinationFinishedProduct) {
+    throw new Error('No valid destination Finished Product model found');
   }
 
-  // Find the item in Central Kitchen
-  const centralKitchenItem = await CentralKitchenFinishedProduct.findOne({ productCode: itemCode });
-  if (!centralKitchenItem) {
-    throw new Error(`Finished Product ${itemCode} not found in Central Kitchen`);
+  // Find the item in source location
+  const sourceItem = await SourceFinishedProduct.findOne({ productCode: itemCode });
+  if (!sourceItem) {
+    throw new Error(`Finished Product ${itemCode} not found in source location`);
   }
 
   // Check if sufficient stock is available
-  if (centralKitchenItem.currentStock < quantity) {
-    throw new Error(`Insufficient stock in Central Kitchen. Available: ${centralKitchenItem.currentStock}, Required: ${quantity}`);
+  console.log(`   Source Stock: ${sourceItem.currentStock}`);
+  if (sourceItem.currentStock < quantity) {
+    throw new Error(`Insufficient stock in source location. Available: ${sourceItem.currentStock}, Required: ${quantity}`);
   }
 
-  // Subtract from Central Kitchen stock
-  await CentralKitchenFinishedProduct.findByIdAndUpdate(
-    centralKitchenItem._id,
+  // Subtract from source stock
+  console.log(`   ⬇️ Reducing source stock by ${quantity}`);
+  await SourceFinishedProduct.findByIdAndUpdate(
+    sourceItem._id,
     { 
       $inc: { currentStock: -quantity },
       updatedBy: 'Transfer System'
@@ -373,50 +437,150 @@ async function handleFinishedGoodsTransfer(centralKitchenModels, outletModels, i
     { new: true }
   );
 
-  // Find or create the item in the outlet
-  let outletItem = await OutletFinishedProduct.findOne({ productCode: itemCode });
+  // Find or create the item in the destination location
+  let destinationItem = await DestinationFinishedProduct.findOne({ productCode: itemCode });
   
-  if (outletItem) {
-    // Add to existing outlet stock
-    await OutletFinishedProduct.findByIdAndUpdate(
-      outletItem._id,
+  if (destinationItem) {
+    // Add to existing destination stock
+    console.log(`   ⬆️ Adding ${quantity} to existing destination stock (current: ${destinationItem.currentStock})`);
+    const updated = await DestinationFinishedProduct.findByIdAndUpdate(
+      destinationItem._id,
       { 
         $inc: { currentStock: quantity },
         updatedBy: 'Transfer System'
       },
       { new: true }
     );
+    console.log(`   ✅ Updated destination stock to: ${updated.currentStock}`);
   } else {
-    // Create new item in outlet with the transferred quantity
-    const newOutletItem = {
-      productCode: centralKitchenItem.productCode,
-      productName: centralKitchenItem.productName,
-      salesDescription: centralKitchenItem.salesDescription,
-      category: centralKitchenItem.category,
-      subCategory: centralKitchenItem.subCategory,
-      unitOfMeasure: centralKitchenItem.unitOfMeasure,
-      unitPrice: centralKitchenItem.unitPrice,
-      costPrice: centralKitchenItem.costPrice,
+    // Create new item in destination with the transferred quantity
+    console.log(`   🆕 Creating new item in destination with quantity: ${quantity}`);
+    const newDestinationItem = {
+      productCode: sourceItem.productCode,
+      productName: sourceItem.productName,
+      salesDescription: sourceItem.salesDescription,
+      category: sourceItem.category,
+      subCategory: sourceItem.subCategory,
+      unitOfMeasure: sourceItem.unitOfMeasure,
+      unitPrice: sourceItem.unitPrice,
+      costPrice: sourceItem.costPrice,
       currentStock: quantity,
-      minimumStock: centralKitchenItem.minimumStock,
-      maximumStock: centralKitchenItem.maximumStock,
-      reorderPoint: centralKitchenItem.reorderPoint,
-      productionTime: centralKitchenItem.productionTime,
-      shelfLife: centralKitchenItem.shelfLife,
-      storageRequirements: centralKitchenItem.storageRequirements,
-      dietaryRestrictions: centralKitchenItem.dietaryRestrictions,
-      allergens: centralKitchenItem.allergens,
-      isActive: centralKitchenItem.isActive,
-      status: centralKitchenItem.currentStock > centralKitchenItem.minimumStock ? 'In Stock' : 'Low Stock',
-      notes: notes || centralKitchenItem.notes,
+      minimumStock: sourceItem.minimumStock,
+      maximumStock: sourceItem.maximumStock,
+      reorderPoint: sourceItem.reorderPoint,
+      productionTime: sourceItem.productionTime,
+      shelfLife: sourceItem.shelfLife,
+      storageRequirements: sourceItem.storageRequirements,
+      dietaryRestrictions: sourceItem.dietaryRestrictions,
+      allergens: sourceItem.allergens,
+      isActive: sourceItem.isActive,
+      status: quantity > sourceItem.minimumStock ? 'In Stock' : 'Low Stock',
+      notes: notes || sourceItem.notes,
       createdBy: 'Transfer System',
       updatedBy: 'Transfer System'
     };
 
-    await OutletFinishedProduct.create(newOutletItem);
+    const created = await DestinationFinishedProduct.create(newDestinationItem);
+    console.log(`   ✅ Created new item in destination:`, created.productCode, 'with stock:', created.currentStock);
   }
 
-  console.log(`Successfully transferred ${quantity} ${itemCode} (Finished Goods) from Central Kitchen to outlet`);
+  console.log(`✅ Successfully transferred ${quantity} ${itemCode} (Finished Goods) from source to destination`);
 }
+
+// POST /api/transfers/create - Create a new transfer order
+router.post('/create', async (req, res) => {
+  try {
+    const { 
+      fromOutlet, 
+      toOutlet, 
+      transferDate, 
+      priority, 
+      items, 
+      notes,
+      requestedBy
+    } = req.body;
+
+    console.log('🔄 Creating transfer order:', { fromOutlet, toOutlet, items: items?.length || 0 });
+
+    // Validate required fields
+    if (!fromOutlet || !toOutlet || !items || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: fromOutlet, toOutlet, and items are required'
+      });
+    }
+
+    // Calculate totalValue for each item
+    const itemsWithTotalValue = items.map(item => ({
+      ...item,
+      totalValue: item.quantity * item.unitPrice
+    }));
+
+    // Create transfer order
+    const transferOrder = new TransferOrder({
+      transferNumber: `TR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-6)}`,
+      fromOutlet: fromOutlet, // String, not object
+      toOutlet: toOutlet, // String, not object
+      transferDate: transferDate || new Date(),
+      priority: priority || 'Normal',
+      status: 'Pending',
+      items: itemsWithTotalValue,
+      totalAmount: itemsWithTotalValue.reduce((sum, item) => sum + item.totalValue, 0),
+      requestedBy: requestedBy || 'System',
+      notes: notes || ''
+    });
+
+    const savedTransferOrder = await transferOrder.save();
+    console.log('✅ Transfer order created:', savedTransferOrder._id);
+
+    res.status(201).json({
+      success: true,
+      message: 'Transfer order created successfully',
+      data: savedTransferOrder
+    });
+
+  } catch (error) {
+    console.error('❌ Error creating transfer order:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create transfer order',
+      error: error.message
+    });
+  }
+});
+
+// Helper functions
+const getOutletCode = (outletName) => {
+  const outletCodes = {
+    'Central Kitchen': 'CK-001',
+    'Kuwait City': 'OUT-001',
+    '360 Mall': 'OUT-003',
+    'Vibe Complex': 'OUT-002',
+    'Taiba Hospital': 'OUT-004'
+  };
+  return outletCodes[outletName] || 'N/A';
+};
+
+const getOutletType = (outletName) => {
+  const outletTypes = {
+    'Central Kitchen': 'Central Kitchen',
+    'Kuwait City': 'Restaurant',
+    '360 Mall': 'Food Court',
+    'Vibe Complex': 'Cafe',
+    'Taiba Hospital': 'Drive-Thru'
+  };
+  return outletTypes[outletName] || 'Outlet';
+};
+
+const getOutletLocation = (outletName) => {
+  const outletLocations = {
+    'Central Kitchen': 'Kuwait City, Kuwait',
+    'Kuwait City': 'Downtown Kuwait City',
+    '360 Mall': '360 Mall, Kuwait',
+    'Vibe Complex': 'Vibe Complex, Kuwait',
+    'Taiba Hospital': 'Taiba Hospital, Kuwait'
+  };
+  return outletLocations[outletName] || 'Kuwait';
+};
 
 module.exports = router;

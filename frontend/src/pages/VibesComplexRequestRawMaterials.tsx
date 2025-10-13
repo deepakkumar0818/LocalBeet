@@ -190,7 +190,7 @@ const VibesComplexRequestRawMaterials: React.FC = () => {
           const notificationData = {
             title: `Transfer Request from Vibes Complex - ${itemType}`,
             message: `Transfer order #${transferOrderData.fromOutlet}-${Date.now()} from Vibes Complex. Items: ${itemDetails}`,
-            type: `transfer_request_${itemType.toLowerCase().replace(' ', '_')}`,
+            type: 'transfer_request',
             targetOutlet: 'Central Kitchen',
             sourceOutlet: 'Vibes Complex',
             transferOrderId: response.data._id || response.data.id,

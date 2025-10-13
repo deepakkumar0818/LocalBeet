@@ -190,7 +190,7 @@ const KuwaitCityRequestFinishedGoods: React.FC = () => {
           const notificationData = {
             title: `Transfer Request from Kuwait City - ${itemType}`,
             message: `Transfer order #${transferOrderData.fromOutlet}-${Date.now()} from Kuwait City. Items: ${itemDetails}`,
-            type: `transfer_request_${itemType.toLowerCase().replace(' ', '_')}`,
+            type: 'transfer_request',
             targetOutlet: 'Central Kitchen',
             sourceOutlet: 'Kuwait City',
             transferOrderId: response.data._id || response.data.id,

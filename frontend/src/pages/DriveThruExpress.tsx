@@ -157,7 +157,11 @@ const DriveThruExpress: React.FC = () => {
   useEffect(() => {
     if (notifications.length > 0) {
       const hasNewTransferNotifications = notifications.some(notif => 
-        !notif.read && notif.title?.includes('Transfer from Central Kitchen')
+        !notif.read && (
+          notif.title?.includes('Items Received from Central Kitchen') ||
+          notif.title?.includes('Transfer from Central Kitchen') ||
+          notif.title?.includes('Items Received from Ingredient Master')
+        )
       )
       
       if (hasNewTransferNotifications) {
