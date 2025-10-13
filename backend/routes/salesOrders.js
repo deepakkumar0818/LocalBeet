@@ -236,21 +236,12 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ success:false, message:'Outlet not found. Provide a valid outletId or outletName.'});
     }
 
-    // Generate order number - unique per outlet per day
-    const today = new Date();
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-    let orderNumber;
-    try {
-    const count = await SalesOrder.countDocuments({ 
-        outletCode: outlet.outletCode,
-        'orderTiming.orderDate': { $gte: startOfDay, $lt: endOfDay }
-      });
-      orderNumber = `SO-${outlet.outletCode}-${String(count + 1).padStart(4, '0')}`;
-    } catch (_) {
-      // Fallback to timestamp-based identifier to avoid collisions
-      orderNumber = `SO-${outlet.outletCode}-${Date.now().toString().slice(-6)}`;
-    }
+    // Generate robust unique order number per outlet using timestamp + random suffix
+    const nowTs = new Date();
+    const ymd = `${nowTs.getFullYear()}${String(nowTs.getMonth() + 1).padStart(2, '0')}${String(nowTs.getDate()).padStart(2, '0')}`;
+    const hms = `${String(nowTs.getHours()).padStart(2, '0')}${String(nowTs.getMinutes()).padStart(2, '0')}${String(nowTs.getSeconds()).padStart(2, '0')}`;
+    const rand = Math.floor(Math.random() * 900) + 100; // 3-digit random
+    let orderNumber = `SO-${outlet.outletCode}-${ymd}${hms}-${rand}`;
 
     // We will prepare combined order items later
     const newSalesOrder = new SalesOrder({
@@ -406,12 +397,8 @@ router.post('/', async (req, res) => {
       savedSalesOrder = await newSalesOrder.save();
     } catch (e) {
       if (e && e.code === 11000) {
-        // regenerate once and retry
-        const retryCount = await SalesOrder.countDocuments({
-          outletCode: outlet.outletCode,
-          'orderTiming.orderDate': { $gte: startOfDay, $lt: endOfDay }
-        });
-        newSalesOrder.orderNumber = `SO-${outlet.outletCode}-${String(retryCount + 1).padStart(4, '0')}`;
+        // In the unlikely event of a collision, append another random suffix and retry once
+        newSalesOrder.orderNumber = `${newSalesOrder.orderNumber}-${Math.floor(Math.random()*900+100)}`;
         savedSalesOrder = await newSalesOrder.save();
       } else {
         throw e;
