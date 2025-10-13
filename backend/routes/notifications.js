@@ -1,14 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const notificationService = require('../services/notificationService');
+const notificationService = require('../services/persistentNotificationService');
 
 // GET notifications for a specific outlet
-router.get('/:outletName', (req, res) => {
+router.get('/:outletName', async (req, res) => {
   try {
     const { outletName } = req.params;
     const { type, limit = 50 } = req.query;
     
-    const filteredNotifications = notificationService.getNotifications(outletName, type, parseInt(limit));
+    console.log(`🔔 API Route: Getting notifications for outlet: "${outletName}"`);
+    console.log(`🔔 API Route: Query params:`, { type, limit });
+    
+    const filteredNotifications = await notificationService.getNotifications(outletName, type, parseInt(limit));
+    
+    console.log(`🔔 API Route: Found ${filteredNotifications.length} notifications for "${outletName}"`);
     
     res.json({
       success: true,
@@ -25,9 +30,13 @@ router.get('/:outletName', (req, res) => {
 });
 
 // POST create a new notification
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
-    const notification = notificationService.createNotification(req.body);
+    console.log('🔔 API Route: POST /notifications - Request body:', req.body);
+    
+    const notification = await notificationService.createNotification(req.body);
+    
+    console.log('🔔 API Route: Notification created successfully:', notification);
     
     res.status(201).json({
       success: true,
@@ -35,7 +44,8 @@ router.post('/', (req, res) => {
       data: notification
     });
   } catch (error) {
-    console.error('Error creating notification:', error);
+    console.error('❌ API Route: Error creating notification:', error);
+    console.error('❌ API Route: Error details:', error.message);
     res.status(500).json({
       success: false,
       message: 'Failed to create notification',
@@ -45,41 +55,10 @@ router.post('/', (req, res) => {
 });
 
 // PUT mark notification as read
-router.put('/:id/read', (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const notificationIndex = notifications.findIndex(notif => notif.id === id);
-    if (notificationIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Notification not found'
-      });
-    }
-    
-    notifications[notificationIndex].read = true;
-    notifications[notificationIndex].readAt = new Date().toISOString();
-    
-    res.json({
-      success: true,
-      message: 'Notification marked as read',
-      data: notifications[notificationIndex]
-    });
-  } catch (error) {
-    console.error('Error marking notification as read:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to mark notification as read',
-      error: error.message
-    });
-  }
-});
-
-// PUT mark notification as read
-router.put('/:notificationId/read', (req, res) => {
+router.put('/:notificationId/read', async (req, res) => {
   try {
     const { notificationId } = req.params;
-    const success = notificationService.markAsRead(notificationId);
+    const success = await notificationService.markNotificationAsRead(notificationId);
     
     if (success) {
       res.json({
@@ -103,21 +82,23 @@ router.put('/:notificationId/read', (req, res) => {
 });
 
 // PUT mark all notifications as read for an outlet
-router.put('/mark-all-read/:outletName', (req, res) => {
+router.put('/mark-all-read', async (req, res) => {
   try {
-    const { outletName } = req.params;
-    const notifications = notificationService.getAllNotifications();
+    const { outlet } = req.body;
     
-    notifications.forEach(notification => {
-      if (notification.targetOutlet === outletName && !notification.read) {
-        notification.read = true;
-        notification.readAt = new Date().toISOString();
-      }
-    });
+    if (!outlet) {
+      return res.status(400).json({
+        success: false,
+        message: 'Outlet name is required'
+      });
+    }
+    
+    const count = await notificationService.markAllNotificationsAsRead(outlet);
     
     res.json({
       success: true,
-      message: 'All notifications marked as read'
+      message: `Marked ${count} notifications as read`,
+      count: count
     });
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
@@ -130,15 +111,23 @@ router.put('/mark-all-read/:outletName', (req, res) => {
 });
 
 // DELETE clear all notifications for an outlet
-router.delete('/clear-all/:outletName', (req, res) => {
+router.delete('/clear-all', async (req, res) => {
   try {
-    const { outletName } = req.params;
-    const clearedCount = notificationService.clearAllNotifications(outletName);
+    const { outlet } = req.body;
+    
+    if (!outlet) {
+      return res.status(400).json({
+        success: false,
+        message: 'Outlet name is required'
+      });
+    }
+    
+    const count = await notificationService.clearAllNotifications(outlet);
     
     res.json({
       success: true,
-      message: `All notifications cleared for ${outletName}`,
-      clearedCount: clearedCount
+      message: `Cleared ${count} notifications`,
+      count: count
     });
   } catch (error) {
     console.error('Error clearing notifications:', error);

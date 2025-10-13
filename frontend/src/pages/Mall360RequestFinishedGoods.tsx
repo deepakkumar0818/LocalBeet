@@ -190,7 +190,7 @@ const Mall360RequestFinishedGoods: React.FC = () => {
           const notificationData = {
             title: `Transfer Request from 360 Mall - ${itemType}`,
             message: `Transfer order #${transferOrderData.fromOutlet}-${Date.now()} from 360 Mall. Items: ${itemDetails}`,
-            type: `transfer_request_${itemType.toLowerCase().replace(' ', '_')}`,
+            type: 'transfer_request',
             targetOutlet: 'Central Kitchen',
             sourceOutlet: '360 Mall',
             transferOrderId: response.data._id || response.data.id,

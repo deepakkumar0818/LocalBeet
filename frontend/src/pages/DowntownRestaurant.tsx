@@ -134,16 +134,20 @@ const DowntownRestaurant: React.FC = () => {
     }
   }, [loading, searchTerm, filterCategory, filterStatus, sortBy, sortOrder])
 
-  // Refresh inventory when notifications change (e.g., when transfer orders are accepted)
+  // Refresh inventory when notifications change (e.g., when transfer orders are accepted or completed)
   useEffect(() => {
     if (notifications.length > 0) {
-      // Check if there are any new transfer acceptance notifications
-      const hasNewAcceptanceNotifications = notifications.some(notif => 
-        !notif.read && notif.type === 'success' && notif.title?.includes('Transfer Order Accepted')
+      // Check if there are any new transfer notifications
+      const hasNewTransferNotifications = notifications.some(notif => 
+        !notif.read && notif.type === 'success' && (
+          notif.title?.includes('Transfer Order Accepted') ||
+          notif.title?.includes('Items Received from Central Kitchen') ||
+          notif.title?.includes('Items Received from Ingredient Master')
+        )
       )
       
-      if (hasNewAcceptanceNotifications) {
-        console.log('New transfer acceptance notification detected, refreshing inventory...')
+      if (hasNewTransferNotifications) {
+        console.log('New transfer notification detected, refreshing inventory...')
         loadInventory()
       }
     }

@@ -91,9 +91,9 @@ function App() {
         <Route path="/kuwait-city/finished-goods" element={<DowntownRestaurant />} />
         <Route path="/kuwait-city/request-raw-materials" element={<KuwaitCityRequestRawMaterials />} />
         <Route path="/kuwait-city/request-finished-goods" element={<KuwaitCityRequestFinishedGoods />} />
-        <Route path="/360-mall" element={<MarinaWalkCafe />} />
-        <Route path="/360-mall/raw-materials" element={<MarinaWalkCafe />} />
-        <Route path="/360-mall/finished-goods" element={<MarinaWalkCafe />} />
+        <Route path="/360-mall" element={<MallFoodCourt />} />
+        <Route path="/360-mall/raw-materials" element={<MallFoodCourt />} />
+        <Route path="/360-mall/finished-goods" element={<MallFoodCourt />} />
         <Route path="/360-mall/request-raw-materials" element={<Mall360RequestRawMaterials />} />
         <Route path="/360-mall/request-finished-goods" element={<Mall360RequestFinishedGoods />} />
         <Route path="/marina-walk-cafe" element={<MarinaWalkCafe />} />
@@ -102,14 +102,18 @@ function App() {
         <Route path="/marina-walk-cafe/request-raw-materials" element={<VibesComplexRequestRawMaterials />} />
         <Route path="/marina-walk-cafe/request-finished-goods" element={<VibesComplexRequestFinishedGoods />} />
         <Route path="/mall-food-court" element={<MallFoodCourt />} />
+        <Route path="/360-mall/raw-materials" element={<MallFoodCourt />} />
+        <Route path="/360-mall/finished-goods" element={<MallFoodCourt />} />
+        <Route path="/360-mall/request-raw-materials" element={<Mall360RequestRawMaterials />} />
+        <Route path="/360-mall/request-finished-goods" element={<Mall360RequestFinishedGoods />} />
         <Route path="/mall-food-court/raw-materials" element={<MallFoodCourt />} />
         <Route path="/mall-food-court/finished-goods" element={<MallFoodCourt />} />
         <Route path="/mall-food-court/request-raw-materials" element={<Mall360RequestRawMaterials />} />
         <Route path="/mall-food-court/request-finished-goods" element={<Mall360RequestFinishedGoods />} />
         {/* Vibes Complex routes */}
-        <Route path="/vibes-complex" element={<MallFoodCourt />} />
-        <Route path="/vibes-complex/raw-materials" element={<MallFoodCourt />} />
-        <Route path="/vibes-complex/finished-goods" element={<MallFoodCourt />} />
+        <Route path="/vibes-complex" element={<MarinaWalkCafe />} />
+        <Route path="/vibes-complex/raw-materials" element={<MarinaWalkCafe />} />
+        <Route path="/vibes-complex/finished-goods" element={<MarinaWalkCafe />} />
         <Route path="/vibes-complex/request-raw-materials" element={<VibesComplexRequestRawMaterials />} />
         <Route path="/vibes-complex/request-finished-goods" element={<VibesComplexRequestFinishedGoods />} />
         {/* Back-compat old drive-thru paths still render Taiba component */}

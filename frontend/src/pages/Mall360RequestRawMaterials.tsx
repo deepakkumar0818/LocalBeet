@@ -177,6 +177,8 @@ const Mall360RequestRawMaterials: React.FC = () => {
       const response = await apiService.createTransferOrder(transferOrderData)
 
       if (response.success) {
+        console.log('🔔 360 Mall: Transfer order created successfully:', response.data)
+        
         // Send notification to Central Kitchen
         try {
           const itemTypes = formData.items.map(() => 'Raw Material')
@@ -190,7 +192,7 @@ const Mall360RequestRawMaterials: React.FC = () => {
           const notificationData = {
             title: `Transfer Request from 360 Mall - ${itemType}`,
             message: `Transfer order #${transferOrderData.fromOutlet}-${Date.now()} from 360 Mall. Items: ${itemDetails}`,
-            type: `transfer_request_${itemType.toLowerCase().replace(' ', '_')}`,
+            type: 'transfer_request',
             targetOutlet: 'Central Kitchen',
             sourceOutlet: '360 Mall',
             transferOrderId: response.data._id || response.data.id,
@@ -198,11 +200,19 @@ const Mall360RequestRawMaterials: React.FC = () => {
             priority: formData.priority === 'Urgent' ? 'high' : 'normal'
           }
           
+          console.log('🔔 360 Mall: Attempting to create notification:', notificationData)
           const notificationResponse = await apiService.createNotification(notificationData)
-          console.log('Notification sent to Central Kitchen:', notificationResponse)
+          console.log('🔔 360 Mall: Notification response:', notificationResponse)
+          
+          if (notificationResponse.success) {
+            console.log('✅ 360 Mall: Notification sent to Central Kitchen successfully!')
+          } else {
+            console.error('❌ 360 Mall: Failed to send notification:', notificationResponse)
+          }
           
         } catch (notificationError) {
-          console.error('Failed to send notification to Central Kitchen:', notificationError)
+          console.error('❌ 360 Mall: Error sending notification to Central Kitchen:', notificationError)
+          console.error('❌ 360 Mall: Notification error details:', notificationError.message)
         }
         
         alert('Transfer order created successfully!')

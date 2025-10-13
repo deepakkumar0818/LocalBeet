@@ -265,9 +265,9 @@ router.post('/create-transfer', async (req, res) => {
         priority: 'normal'
       };
       
-      // Use the shared notification service
-      const notificationService = require('../services/notificationService');
-      const notification = notificationService.createNotification(notificationData);
+      // Use the persistent notification service
+      const notificationService = require('../services/persistentNotificationService');
+      const notification = await notificationService.createNotification(notificationData);
       
       console.log(`✅ Notification created for ${toOutlet}: Items received from Ingredient Master`);
       

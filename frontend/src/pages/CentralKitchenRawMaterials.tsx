@@ -44,7 +44,7 @@ interface Outlet {
 
 const CentralKitchenRawMaterials: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { confirmation, showAlert, closeConfirmation } = useConfirmation()
+  const { confirmation, closeConfirmation } = useConfirmation()
   const [outlet, setOutlet] = useState<Outlet | null>(null)
   const [inventoryItems, setInventoryItems] = useState<OutletInventoryItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -75,7 +75,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
      (notification.itemType === 'Raw Material' || notification.itemType === 'Mixed') &&
      (notification.title?.includes('Transfer Request from Kuwait City') || 
       notification.title?.includes('Transfer Request from 360 Mall') ||
-      notification.title?.includes('Transfer Request from Vibe Complex') ||
+      notification.title?.includes('Transfer Request from Vibes Complex') ||
       notification.title?.includes('Transfer Request from Taiba Hospital'))) ||
     (notification.title?.includes('Items Received from Ingredient Master') &&
      notification.type === 'success')  // Fixed: frontend maps transfer_completed to success
@@ -88,6 +88,16 @@ const CentralKitchenRawMaterials: React.FC = () => {
     console.log('🔔 Central Kitchen: Number of all notifications:', notifications.length)
     console.log('🔔 Central Kitchen: Number of filtered notifications:', rawMaterialNotifications.length)
   }, [notifications, rawMaterialNotifications])
+
+  // Auto-refresh notifications every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('🔄 Central Kitchen Raw Materials: Auto-refreshing notifications...')
+      refreshNotifications()
+    }, 5000)
+    
+    return () => clearInterval(interval)
+  }, [refreshNotifications])
 
   useEffect(() => {
     loadCentralKitchenData()
@@ -260,9 +270,6 @@ const CentralKitchenRawMaterials: React.FC = () => {
     })
   }
 
-
-
-
   const handleImport = () => {
     fileInputRef.current?.click()
   }
@@ -369,11 +376,16 @@ const CentralKitchenRawMaterials: React.FC = () => {
 
   const handleViewTransferOrder = async (transferOrderId: string) => {
     try {
-      console.log('handleViewTransferOrder called with transferOrderId:', transferOrderId)
+      console.log('🔍 Central Kitchen Raw Materials: handleViewTransferOrder called with transferOrderId:', transferOrderId)
       setTransferOrderLoading(true)
-      const transferOrder = await getTransferOrderDetails(transferOrderId)
-      setSelectedTransferOrder(transferOrder)
-      setShowTransferOrderModal(true)
+      const response = await apiService.getTransferOrderById(transferOrderId)
+      if (response.success) {
+        setSelectedTransferOrder(response.data)
+        setShowTransferOrderModal(true)
+        console.log('✅ Central Kitchen Raw Materials: Transfer order modal opened successfully')
+      } else {
+        throw new Error(response.message || 'Failed to load transfer order')
+      }
     } catch (error) {
       console.error('Error loading transfer order:', error)
       alert('Failed to load transfer order details')
@@ -389,83 +401,38 @@ const CentralKitchenRawMaterials: React.FC = () => {
       
       // Get transfer order details to determine item type and create notification
       console.log('Fetching transfer order details...')
-      const transferOrder = await getTransferOrderDetails(transferOrderId)
+      const response = await apiService.getTransferOrderById(transferOrderId)
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch transfer order')
+      }
+      const transferOrder = response.data
       console.log('Transfer order details:', transferOrder)
       
-      // Update inventory first (requires pending status), then update status
-      console.log('Updating transfer order inventory...')
-      let statusResponse, inventoryResponse
+      // Approve transfer order (handles inventory updates and notifications automatically)
+      console.log('Approving transfer order...')
+      let approvalResponse
       
       try {
-        inventoryResponse = await apiService.updateTransferOrderInventory(transferOrderId, 'approve')
-        console.log('Inventory update response:', inventoryResponse)
-      } catch (error) {
-        console.error('Inventory update failed:', error)
-        throw new Error(`Inventory update failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      }
-      
-      try {
-        statusResponse = await apiService.updateTransferOrderStatus(transferOrderId, {
-          status: 'Approved',
+        approvalResponse = await apiService.approveTransferOrder(transferOrderId, {
           approvedBy: 'Central Kitchen Manager',
           notes: 'Transfer order approved by Central Kitchen'
         })
-        console.log('Status update response:', statusResponse)
+        console.log('Approval response:', approvalResponse)
       } catch (error) {
-        console.error('Status update failed:', error)
-        throw new Error(`Status update failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        console.error('Approval failed:', error)
+        throw new Error(`Approval failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
 
-      if (statusResponse.success && inventoryResponse.success) {
-        // Send notification back to the requesting outlet
-        const itemType = transferOrder.items[0]?.itemType || 'Mixed'
-        const itemDetails = transferOrder.items.map(item => 
-          `${item.itemName} (${item.quantity} ${item.unitOfMeasure || 'pcs'})`
-        ).join(', ')
-        
-        // Determine target outlet based on transfer order source
-        const targetOutlet = typeof transferOrder.fromOutlet === 'string' ? transferOrder.fromOutlet : (transferOrder.fromOutlet as any)?.outletName || transferOrder.fromOutlet?.name || 'Unknown Outlet'
-        
-        console.log(`🔍 Transfer Order Details:`, {
-          transferOrderId,
-          fromOutlet: transferOrder.fromOutlet,
-          fromOutletType: typeof transferOrder.fromOutlet,
-          fromOutletString: JSON.stringify(transferOrder.fromOutlet),
-          toOutlet: transferOrder.toOutlet,
-          targetOutlet,
-          targetOutletType: typeof targetOutlet,
-          fullTransferOrder: transferOrder
-        })
-        console.log(`Creating acceptance notification for ${targetOutlet}...`)
-        
-        if (!targetOutlet) {
-          console.error('❌ ERROR: targetOutlet is undefined! Transfer order fromOutlet:', transferOrder.fromOutlet);
-          alert('Error: Cannot determine target outlet for notification');
-          return;
-        }
-        const notificationData = {
-          title: 'Transfer Order Accepted',
-          message: `Transfer order #${transferOrder.transferNumber} has been accepted. Items transferred: ${itemDetails}`,
-          type: 'transfer_acceptance',
-          targetOutlet: targetOutlet,
-          sourceOutlet: 'Central Kitchen',
-          transferOrderId: transferOrderId,
-          itemType: itemType,
-          priority: 'normal'
-        }
-        
-        console.log('🔔 Creating notification with data:', notificationData)
-        const notificationResponse = await apiService.createNotification(notificationData)
-        console.log('🔔 Notification response:', notificationResponse)
-        
-        alert(`Transfer order accepted and notification sent to ${targetOutlet}`)
+      if (approvalResponse.success) {
+        // Backend automatically handles inventory updates and notifications
+        alert(`Transfer order accepted successfully!`)
         setShowTransferOrderModal(false)
         setSelectedTransferOrder(null)
         
         // Mark notification as read
         markAsRead(transferOrderId)
       } else {
-        throw new Error(`Failed to update transfer order status. Status: ${statusResponse.success}, Inventory: ${inventoryResponse.success}`)
+        throw new Error(`Failed to approve transfer order: ${approvalResponse.message}`)
       }
       
     } catch (error) {
@@ -484,7 +451,11 @@ const CentralKitchenRawMaterials: React.FC = () => {
       
       // Get transfer order details to determine item type and create notification
       console.log('Fetching transfer order details...')
-      const transferOrder = await getTransferOrderDetails(transferOrderId)
+      const response = await apiService.getTransferOrderById(transferOrderId)
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch transfer order')
+      }
+      const transferOrder = response.data
       console.log('Transfer order details:', transferOrder)
       
       // Update inventory first (requires pending status), then update status
@@ -512,18 +483,20 @@ const CentralKitchenRawMaterials: React.FC = () => {
       }
 
       if (statusResponse.success && inventoryResponse.success) {
-        // Send notification back to Kuwait City
+        // Send notification back to requesting outlet
         const itemType = transferOrder.items[0]?.itemType || 'Mixed'
         const itemDetails = transferOrder.items.map(item => 
           `${item.itemName} (${item.quantity} ${item.unitOfMeasure || 'pcs'})`
         ).join(', ')
         
-        console.log('Creating notification for Kuwait City...')
+        // Determine target outlet based on transfer order source
+        const targetOutlet = typeof transferOrder.fromOutlet === 'string' ? transferOrder.fromOutlet : (transferOrder.fromOutlet as any)?.outletName || transferOrder.fromOutlet?.name || 'Unknown Outlet'
+        console.log('Creating notification for', targetOutlet, '...')
         const notificationResponse = await apiService.createNotification({
           title: 'Transfer Order Rejected',
           message: `Transfer order #${transferOrder.transferNumber} has been rejected. Requested items: ${itemDetails}`,
           type: 'transfer_rejection',
-          targetOutlet: 'Kuwait City',
+          targetOutlet: targetOutlet,
           sourceOutlet: 'Central Kitchen',
           transferOrderId: transferOrderId,
           itemType: itemType,
@@ -531,7 +504,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
         })
         console.log('Notification response:', notificationResponse)
         
-        alert('Transfer order rejected and notification sent to Kuwait City')
+        alert(`Transfer order rejected and notification sent to ${targetOutlet}`)
         setShowTransferOrderModal(false)
         setSelectedTransferOrder(null)
         
@@ -559,6 +532,9 @@ const CentralKitchenRawMaterials: React.FC = () => {
 
   // Get unique categories
   const categories = [...new Set(inventoryItems.map(item => item.category))]
+
+
+
 
   if (loading) {
     return (
@@ -818,15 +794,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
                     <div className="text-gray-500">
                       <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                       <p className="text-lg font-medium text-gray-900 mb-2">No raw materials found</p>
-                      <p className="text-gray-600 mb-4">Click "Sync Inventory" to import items from Zoho Inventory</p>
-                      <button
-                        onClick={handleSyncWithZoho}
-                        disabled={syncing}
-                        className={`inline-flex items-center px-4 py-2 rounded-md text-sm font-medium ${syncing ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
-                      >
-                        <RotateCcw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-                        {syncing ? 'Syncing...' : 'Sync Inventory'}
-                      </button>
+                      <p className="text-gray-600 mb-4">Raw materials inventory is empty</p>
                     </div>
                   </td>
                 </tr>

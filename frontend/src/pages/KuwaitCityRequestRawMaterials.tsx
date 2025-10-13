@@ -175,6 +175,10 @@ const KuwaitCityRequestRawMaterials: React.FC = () => {
       }
 
       const response = await apiService.createTransferOrder(transferOrderData)
+      console.log('🔍 Kuwait City: Transfer order response:', response)
+      console.log('🔍 Kuwait City: response.data:', response.data)
+      console.log('🔍 Kuwait City: response.data._id:', response.data?._id)
+      console.log('🔍 Kuwait City: response.data.id:', response.data?.id)
 
       if (response.success) {
         // Send notification to Central Kitchen
@@ -190,13 +194,18 @@ const KuwaitCityRequestRawMaterials: React.FC = () => {
           const notificationData = {
             title: `Transfer Request from Kuwait City - ${itemType}`,
             message: `Transfer order #${transferOrderData.fromOutlet}-${Date.now()} from Kuwait City. Items: ${itemDetails}`,
-            type: `transfer_request_${itemType.toLowerCase().replace(' ', '_')}`,
+            type: 'transfer_request',
             targetOutlet: 'Central Kitchen',
             sourceOutlet: 'Kuwait City',
-            transferOrderId: response.data._id || response.data.id,
+            transferOrderId: response.data._id || response.data.id || response.data.transferId || null,
             itemType: itemType,
             priority: formData.priority === 'Urgent' ? 'high' : 'normal'
           }
+          
+          console.log('🔍 Kuwait City: Creating notification with data:', notificationData)
+          console.log('🔍 Kuwait City: transferOrderId being set to:', notificationData.transferOrderId)
+          console.log('🔍 Kuwait City: response.data keys:', Object.keys(response.data))
+          console.log('🔍 Kuwait City: response.data values:', response.data)
           
           const notificationResponse = await apiService.createNotification(notificationData)
           console.log('Notification sent to Central Kitchen:', notificationResponse)

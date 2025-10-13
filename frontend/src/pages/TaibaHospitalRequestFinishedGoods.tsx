@@ -187,7 +187,7 @@ const TaibaHospitalRequestFinishedGoods: React.FC = () => {
           const notificationData = {
             title: `Transfer Request from Taiba Hospital - ${itemType}`,
             message: `Transfer order #${transferOrderData.fromOutlet}-${Date.now()} from Taiba Hospital. Items: ${itemDetails}`,
-            type: `transfer_request_${itemType.toLowerCase().replace(' ', '_')}`,
+            type: 'transfer_request',
             targetOutlet: 'Central Kitchen',
             sourceOutlet: 'Taiba Hospital',
             transferOrderId: response.data._id || response.data.id,

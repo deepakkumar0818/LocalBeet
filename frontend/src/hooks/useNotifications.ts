@@ -46,7 +46,7 @@ export const useNotifications = (outletName?: string) => {
             read: notif.read,
             outlet: outletName,
             transferOrderId: notif.transferOrderId,
-            isTransferOrder: notif.type === 'transfer_completed' || notif.isTransferOrder || false,
+            isTransferOrder: notif.type === 'transfer_completed' || notif.type === 'transfer_request' || notif.type === 'transfer_acceptance' || notif.type === 'transfer_rejection' || notif.isTransferOrder || false,
             itemType: notif.itemType,
             priority: notif.priority
           }

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Package, TrendingDown, AlertTriangle, RefreshCw, Upload, Plus, Bell } from 'lucide-react'
+import { Package, TrendingDown, AlertTriangle, RefreshCw, Upload } from 'lucide-react'
 import { apiService } from '../services/api'
 import { useConfirmation } from '../hooks/useConfirmation'
 import ConfirmationModal from '../components/ConfirmationModal'
@@ -8,19 +7,17 @@ import NotificationDropdown from '../components/NotificationDropdown'
 import TransferOrderModal, { TransferOrder } from '../components/TransferOrderModal'
 import { useNotifications } from '../hooks/useNotifications'
 
-interface FinishedGoodInventoryItem {
+interface OutletInventoryItem {
   id: string
   outletId: string
   outletCode: string
   outletName: string
-  productId: string
-  productCode: string
-  productName: string
+  materialId: string
+  materialCode: string
+  materialName: string
   category: string
-  subCategory?: string
   unitOfMeasure: string
   unitPrice: number
-  costPrice: number
   currentStock: number
   reservedStock: number
   availableStock: number
@@ -28,16 +25,11 @@ interface FinishedGoodInventoryItem {
   maximumStock: number
   reorderPoint: number
   totalValue: number
-  productionDate: string
-  expiryDate: string
+  location: string
   batchNumber: string
-  storageLocation: string
-  storageTemperature: string
-  qualityStatus: string
-  qualityNotes: string
-  status: string
-  transferSource: string
+  supplier: string
   lastUpdated: string
+  status: string
   notes: string
   isActive: boolean
 }
@@ -51,63 +43,90 @@ interface Outlet {
 }
 
 const CentralKitchenFinishedGoods: React.FC = () => {
-  const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { confirmation, showAlert, closeConfirmation } = useConfirmation()
+  const { confirmation, closeConfirmation } = useConfirmation()
   const [outlet, setOutlet] = useState<Outlet | null>(null)
-  const [finishedGoodInventoryItems, setFinishedGoodInventoryItems] = useState<FinishedGoodInventoryItem[]>([])
+  const [inventoryItems, setInventoryItems] = useState<OutletInventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
-  const [sortBy, setSortBy] = useState('productName')
+  const [sortBy, setSortBy] = useState('materialName')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [editingItem, setEditingItem] = useState<OutletInventoryItem | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    currentStock: '',
+    minimumStock: '',
+    maximumStock: '',
+    reorderPoint: '',
+    unitPrice: '',
+    notes: ''
+  })
   const [showTransferOrderModal, setShowTransferOrderModal] = useState(false)
   const [selectedTransferOrder, setSelectedTransferOrder] = useState<TransferOrder | null>(null)
   const [transferOrderLoading, setTransferOrderLoading] = useState(false)
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Central Kitchen')
   
-  // Filter notifications to only show Finished Goods transfer requests from any outlet
+  // Filter notifications to show Finished Goods transfer requests only
   const finishedGoodsNotifications = notifications.filter(notification => 
-    notification.isTransferOrder && 
-    (notification.itemType === 'Finished Goods' || notification.itemType === 'Mixed') &&
-    (notification.title?.includes('Transfer Request from Kuwait City') || 
-     notification.title?.includes('Transfer Request from 360 Mall') ||
-     notification.title?.includes('Transfer Request from Vibe Complex') ||
-     notification.title?.includes('Transfer Request from Taiba Hospital'))
+    (notification.isTransferOrder && 
+     (notification.itemType === 'Finished Goods' || notification.itemType === 'Mixed') &&
+     (notification.title?.includes('Transfer Request from Kuwait City') || 
+      notification.title?.includes('Transfer Request from 360 Mall') ||
+      notification.title?.includes('Transfer Request from Vibes Complex') ||
+      notification.title?.includes('Transfer Request from Taiba Hospital'))) ||
+    (notification.title?.includes('Items Received from Ingredient Master') &&
+     notification.type === 'success')  // Fixed: frontend maps transfer_completed to success
   )
+
+  // Debug logging for notifications
+  useEffect(() => {
+    console.log('🔔 Central Kitchen Finished Goods: All notifications:', notifications)
+    console.log('🔔 Central Kitchen Finished Goods: Filtered notifications:', finishedGoodsNotifications)
+    console.log('🔔 Central Kitchen Finished Goods: Number of all notifications:', notifications.length)
+    console.log('🔔 Central Kitchen Finished Goods: Number of filtered notifications:', finishedGoodsNotifications.length)
+  }, [notifications, finishedGoodsNotifications])
+
+  // Auto-refresh notifications every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('🔄 Central Kitchen Finished Goods: Auto-refreshing notifications...')
+      refreshNotifications()
+    }, 5000)
+    
+    return () => clearInterval(interval)
+  }, [refreshNotifications])
 
   useEffect(() => {
     loadCentralKitchenData()
-    loadInventory()
   }, [])
 
-  // Reload inventory when filters change or when loading completes
+  // Reload inventory when filters change
   useEffect(() => {
     if (!loading) {
       loadInventory()
     }
-  }, [loading, searchTerm, filterCategory, filterStatus, sortBy, sortOrder])
+  }, [searchTerm, filterCategory, filterStatus, sortBy, sortOrder])
 
   const loadCentralKitchenData = async () => {
     try {
       setLoading(true)
       setError(null)
       
-      // Get central kitchen outlet
+      // Get central kitchen outlet from backend
       const outletsResponse = await apiService.getCentralKitchens()
       if (outletsResponse.success && outletsResponse.data.length > 0) {
         const centralKitchen = outletsResponse.data[0]
-        
-        // Transform the data to match the expected interface
         setOutlet({
           id: centralKitchen._id,
-          outletCode: centralKitchen.outletCode || centralKitchen.kitchenCode,
-          outletName: centralKitchen.outletName || centralKitchen.kitchenName,
+          outletCode: centralKitchen.kitchenCode,
+          outletName: centralKitchen.kitchenName,
           outletType: 'Central Kitchen',
           isCentralKitchen: true
         })
+        await loadInventory()
       } else {
         setError('Central Kitchen not found')
       }
@@ -124,66 +143,56 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       console.log('Loading finished goods from Central Kitchen dedicated database')
       
       // Load finished goods from Central Kitchen dedicated database
-      const finishedGoodsResponse = await apiService.getCentralKitchenFinishedProducts({
+      const inventoryResponse = await apiService.getCentralKitchenFinishedProducts({
         limit: 1000,
         search: searchTerm,
         subCategory: filterCategory,
         status: filterStatus,
-        sortBy: sortBy === 'productName' ? 'productName' : sortBy,
+        sortBy: sortBy === 'materialName' ? 'materialName' : sortBy,
         sortOrder
       })
 
-      if (finishedGoodsResponse.success) {
-        console.log('Loaded Central Kitchen Finished Goods:', finishedGoodsResponse.data)
+      if (inventoryResponse.success) {
+        console.log('Loaded Central Kitchen Finished Goods:', inventoryResponse.data)
         
-        if (finishedGoodsResponse.data && finishedGoodsResponse.data.length > 0) {
+        if (inventoryResponse.data && inventoryResponse.data.length > 0) {
           // Transform the data to match the expected interface
-          const transformedItems: FinishedGoodInventoryItem[] = finishedGoodsResponse.data.map((item: any) => ({
+          const transformedItems: OutletInventoryItem[] = inventoryResponse.data.map((item: any) => ({
             id: item._id || item.id,
             outletId: 'central-kitchen',
             outletCode: 'CK001',
             outletName: 'Central Kitchen',
-            productId: item._id,
-            productCode: item.productCode,
-            productName: item.productName,
-            category: item.category, // Parent Category
-            subCategory: item.subCategory, // Sub Category
+            materialId: item._id,
+            materialCode: item.productCode, // Finished goods use productCode
+            materialName: item.productName, // Finished goods use productName
+            category: item.subCategory,
             unitOfMeasure: item.unitOfMeasure,
             unitPrice: item.unitPrice,
-            costPrice: item.costPrice,
             currentStock: item.currentStock,
+            reservedStock: 0,
             availableStock: item.currentStock,
             minimumStock: item.minimumStock,
             maximumStock: item.maximumStock,
+            reorderPoint: item.reorderPoint,
             totalValue: item.currentStock * item.unitPrice,
-            productionDate: new Date().toISOString(),
-            expiryDate: item.shelfLife ? new Date(Date.now() + item.shelfLife * 24 * 60 * 60 * 1000).toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            qualityStatus: 'Good',
-            batchNumber: `FG-${item.productCode}-${Date.now()}`,
             location: 'Main Storage',
+            batchNumber: '',
+            supplier: '',
+            lastUpdated: item.lastStockUpdate || item.updatedAt,
             status: item.status,
             notes: item.notes || '',
-            isActive: item.isActive,
-            reservedStock: item.reservedStock || 0,
-            reorderPoint: item.reorderPoint || item.minimumStock || 0,
-            storageLocation: item.storageLocation || 'Default Location',
-            storageTemperature: item.storageTemperature || 'Room Temperature',
-            lastStockCount: item.lastStockCount || new Date().toISOString(),
-            shelfLife: item.shelfLife || 0,
-            qualityNotes: item.qualityNotes || '',
-            transferSource: item.transferSource || 'Central Kitchen',
-            lastUpdated: item.lastUpdated || new Date().toISOString()
+            isActive: true
           }))
           
-          setFinishedGoodInventoryItems(transformedItems)
+          setInventoryItems(transformedItems)
         } else {
           console.log('No finished goods inventory found for this central kitchen')
-          setFinishedGoodInventoryItems([])
-          setError('No finished goods inventory found. Please add some finished goods to the central kitchen.')
+          setInventoryItems([])
+          // Don't set error for empty inventory - show normal UI with empty state
         }
       } else {
-        console.error('Failed to load finished goods inventory:', (finishedGoodsResponse as any).error || 'API Error')
-        setError(`Failed to load inventory from server: ${(finishedGoodsResponse as any).error || 'Unknown error'}`)
+        console.error('Failed to load finished goods inventory:', (inventoryResponse as any).error || 'API Error')
+        setError(`Failed to load inventory from server: ${(inventoryResponse as any).error || 'Unknown error'}`)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load inventory')
@@ -195,12 +204,71 @@ const CentralKitchenFinishedGoods: React.FC = () => {
     setSearchTerm('')
     setFilterCategory('')
     setFilterStatus('')
-    setSortBy('productName')
+    setSortBy('materialName')
     setSortOrder('asc')
   }
 
+  const handleEditItem = (item: OutletInventoryItem) => {
+    setEditingItem(item)
+    setEditFormData({
+      currentStock: item.currentStock.toString(),
+      minimumStock: item.minimumStock.toString(),
+      maximumStock: item.maximumStock.toString(),
+      reorderPoint: item.reorderPoint.toString(),
+      unitPrice: item.unitPrice.toString(),
+      notes: item.notes || ''
+    })
+    setShowEditModal(true)
+  }
 
+  const handleSaveEdit = async () => {
+    if (!editingItem) return
 
+    try {
+      setLoading(true)
+      
+      // Update the inventory item
+      const updateData = {
+        currentStock: parseFloat(editFormData.currentStock) || 0,
+        minimumStock: parseFloat(editFormData.minimumStock) || 0,
+        maximumStock: parseFloat(editFormData.maximumStock) || 0,
+        reorderPoint: parseFloat(editFormData.reorderPoint) || 0,
+        unitPrice: parseFloat(editFormData.unitPrice) || 0,
+        notes: editFormData.notes,
+        updatedBy: 'user'
+      }
+
+      const response = await apiService.updateCentralKitchenRawMaterial(editingItem.id, updateData)
+      
+      if (response.success) {
+        alert('Raw material updated successfully!')
+        setShowEditModal(false)
+        setEditingItem(null)
+        // Reload the inventory data
+        await loadInventory()
+      } else {
+        throw new Error(response.message || 'Failed to update raw material')
+      }
+    } catch (err) {
+      console.error('Error updating raw material:', err)
+      alert(`Failed to update raw material: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setShowEditModal(false)
+    setEditingItem(null)
+    setEditFormData({
+      currentStock: '',
+      minimumStock: '',
+      maximumStock: '',
+      reorderPoint: '',
+      unitPrice: '',
+      notes: ''
+    })
+  }
 
   const handleImport = () => {
     fileInputRef.current?.click()
@@ -232,60 +300,48 @@ const CentralKitchenFinishedGoods: React.FC = () => {
         try {
           const values = row.split(',').map(v => v.replace(/"/g, '').trim())
           
-          const productData = {
-            productCode: values[0],
-            productName: values[1],
-            category: values[2],
-            unitOfMeasure: values[3],
-            unitPrice: parseFloat(values[4]) || 0,
-            costPrice: parseFloat(values[5]) || 0,
-            currentStock: parseInt(values[6]) || 0,
-            minimumStock: parseInt(values[8]) || 0,
-            maximumStock: parseInt(values[9]) || 0,
-            productionDate: values[12] || new Date().toISOString().split('T')[0],
-            expiryDate: values[13] || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            batchNumber: values[14] || `BATCH-${Date.now()}`,
-            storageLocation: values[15] || 'Cold Storage',
-            storageTemperature: values[16] || '4°C',
-            qualityStatus: values[17] || 'Good',
-            notes: values[19] || ''
+          const materialData = {
+            materialCode: values[0],
+            materialName: values[1],
+            category: values[3], // SubCategory Name
+            unitOfMeasure: values[4], // Unit
+            unitPrice: 0,
+            currentStock: 0,
+            minimumStock: 0,
+            maximumStock: 0,
+            supplier: '',
+            notes: ''
           }
           
           // Add to local state
-          const newItem: FinishedGoodInventoryItem = {
-            id: `fg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          const newItem: OutletInventoryItem = {
+            id: `rm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             outletId: outlet?.id || 'central-kitchen-001',
             outletCode: outlet?.outletCode || '',
             outletName: outlet?.outletName || '',
-            productId: productData.productCode,
-            productCode: productData.productCode,
-            productName: productData.productName,
-            category: productData.category,
-            unitOfMeasure: productData.unitOfMeasure,
-            unitPrice: productData.unitPrice,
-            costPrice: productData.costPrice,
-            currentStock: productData.currentStock,
+            materialId: materialData.materialCode,
+            materialCode: materialData.materialCode,
+            materialName: materialData.materialName,
+            category: materialData.category,
+            unitOfMeasure: materialData.unitOfMeasure,
+            unitPrice: materialData.unitPrice,
+            currentStock: materialData.currentStock,
             reservedStock: 0,
-            availableStock: productData.currentStock,
-            minimumStock: productData.minimumStock,
-            maximumStock: productData.maximumStock,
-            reorderPoint: Math.ceil(productData.minimumStock * 1.5),
-            totalValue: productData.currentStock * productData.unitPrice,
-            productionDate: productData.productionDate,
-            expiryDate: productData.expiryDate,
-            batchNumber: productData.batchNumber,
-            storageLocation: productData.storageLocation,
-            storageTemperature: productData.storageTemperature,
-            qualityStatus: productData.qualityStatus,
-            qualityNotes: 'Imported from CSV',
-            status: 'In Stock',
-            transferSource: 'Import',
+            availableStock: materialData.currentStock,
+            minimumStock: materialData.minimumStock,
+            maximumStock: materialData.maximumStock,
+            reorderPoint: Math.ceil(materialData.minimumStock * 1.5),
+            totalValue: materialData.currentStock * materialData.unitPrice,
+            location: 'Main Storage',
+            batchNumber: `BATCH-${Date.now()}`,
+            supplier: materialData.supplier,
             lastUpdated: new Date().toISOString(),
-            notes: productData.notes,
+            status: 'In Stock',
+            notes: materialData.notes,
             isActive: true
           }
           
-          setFinishedGoodInventoryItems(prev => [...prev, newItem])
+          setInventoryItems(prev => [...prev, newItem])
           successCount++
         } catch (err) {
           errorCount++
@@ -302,43 +358,6 @@ const CentralKitchenFinishedGoods: React.FC = () => {
     }
   }
 
-  const handleMakeRequestedItemNotification = async () => {
-    // Get items with low stock or out of stock
-    const requestedItems = finishedGoodInventoryItems.filter(item => 
-      item.status === 'Low Stock' || item.status === 'Out of Stock'
-    )
-
-    if (requestedItems.length === 0) {
-      await showAlert(
-        'All Items In Stock',
-        'No finished goods need to be produced at this time. All items are in stock.',
-        'info'
-      )
-      return
-    }
-
-    // Create notification message
-    const notificationMessage = `Requested Finished Goods Notification:\n\n` +
-      `Total items needing production: ${requestedItems.length}\n\n` +
-      `Items to produce:\n` +
-      requestedItems.map(item => 
-        `• ${item.productName} (${item.productCode}) - Current Stock: ${item.currentStock} ${item.unitOfMeasure}`
-      ).join('\n') +
-      `\n\nPlease schedule production for these finished goods.`
-
-    // Show notification
-    await showAlert(
-      'Requested Finished Goods Notification',
-      notificationMessage,
-      'warning'
-    )
-    
-    // Here you could also implement additional notification logic like:
-    // - Send email notifications to production team
-    // - Create production request records in database
-    // - Integrate with production scheduling systems
-    console.log('Requested finished goods notification generated:', requestedItems)
-  }
 
   // Get transfer order details from API
   const getTransferOrderDetails = async (transferOrderId: string): Promise<TransferOrder> => {
@@ -357,11 +376,16 @@ const CentralKitchenFinishedGoods: React.FC = () => {
 
   const handleViewTransferOrder = async (transferOrderId: string) => {
     try {
-      console.log('handleViewTransferOrder called with transferOrderId:', transferOrderId)
+      console.log('🔍 Central Kitchen Raw Materials: handleViewTransferOrder called with transferOrderId:', transferOrderId)
       setTransferOrderLoading(true)
-      const transferOrder = await getTransferOrderDetails(transferOrderId)
-      setSelectedTransferOrder(transferOrder)
-      setShowTransferOrderModal(true)
+      const response = await apiService.getTransferOrderById(transferOrderId)
+      if (response.success) {
+        setSelectedTransferOrder(response.data)
+        setShowTransferOrderModal(true)
+        console.log('✅ Central Kitchen Raw Materials: Transfer order modal opened successfully')
+      } else {
+        throw new Error(response.message || 'Failed to load transfer order')
+      }
     } catch (error) {
       console.error('Error loading transfer order:', error)
       alert('Failed to load transfer order details')
@@ -377,80 +401,38 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       
       // Get transfer order details to determine item type and create notification
       console.log('Fetching transfer order details...')
-      const transferOrder = await getTransferOrderDetails(transferOrderId)
+      const response = await apiService.getTransferOrderById(transferOrderId)
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch transfer order')
+      }
+      const transferOrder = response.data
       console.log('Transfer order details:', transferOrder)
       
-      // Update inventory first (requires pending status), then update status
-      console.log('Updating transfer order inventory...')
-      let statusResponse, inventoryResponse
+      // Approve transfer order (handles inventory updates and notifications automatically)
+      console.log('Approving transfer order...')
+      let approvalResponse
       
       try {
-        inventoryResponse = await apiService.updateTransferOrderInventory(transferOrderId, 'approve')
-        console.log('Inventory update response:', inventoryResponse)
-      } catch (error) {
-        console.error('Inventory update failed:', error)
-        throw new Error(`Inventory update failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      }
-      
-      try {
-        statusResponse = await apiService.updateTransferOrderStatus(transferOrderId, {
-          status: 'Approved',
+        approvalResponse = await apiService.approveTransferOrder(transferOrderId, {
           approvedBy: 'Central Kitchen Manager',
           notes: 'Transfer order approved by Central Kitchen'
         })
-        console.log('Status update response:', statusResponse)
+        console.log('Approval response:', approvalResponse)
       } catch (error) {
-        console.error('Status update failed:', error)
-        throw new Error(`Status update failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        console.error('Approval failed:', error)
+        throw new Error(`Approval failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
 
-      if (statusResponse.success && inventoryResponse.success) {
-        // Send notification back to the requesting outlet
-        const itemType = transferOrder.items[0]?.itemType || 'Mixed'
-        const itemDetails = transferOrder.items.map(item => 
-          `${item.itemName} (${item.quantity} ${item.unitOfMeasure || 'pcs'})`
-        ).join(', ')
-        
-        // Determine target outlet based on transfer order source
-        const targetOutlet = typeof transferOrder.fromOutlet === 'string' ? transferOrder.fromOutlet : (transferOrder.fromOutlet as any)?.outletName || transferOrder.fromOutlet?.name || 'Unknown Outlet'
-        
-        console.log(`🔍 Transfer Order Details:`, {
-          transferOrderId,
-          fromOutlet: transferOrder.fromOutlet,
-          fromOutletType: typeof transferOrder.fromOutlet,
-          fromOutletString: JSON.stringify(transferOrder.fromOutlet),
-          toOutlet: transferOrder.toOutlet,
-          targetOutlet,
-          targetOutletType: typeof targetOutlet,
-          fullTransferOrder: transferOrder
-        })
-        console.log(`Creating acceptance notification for ${targetOutlet}...`)
-        
-        if (!targetOutlet) {
-          console.error('❌ ERROR: targetOutlet is undefined! Transfer order fromOutlet:', transferOrder.fromOutlet);
-          alert('Error: Cannot determine target outlet for notification');
-          return;
-        }
-        const notificationResponse = await apiService.createNotification({
-          title: 'Transfer Order Accepted',
-          message: `Transfer order #${transferOrder.transferNumber} has been accepted. Items transferred: ${itemDetails}`,
-          type: 'transfer_acceptance',
-          targetOutlet: targetOutlet,
-          sourceOutlet: 'Central Kitchen',
-          transferOrderId: transferOrderId,
-          itemType: itemType,
-          priority: 'normal'
-        })
-        console.log('Notification response:', notificationResponse)
-        
-        alert(`Transfer order accepted and notification sent to ${targetOutlet}`)
+      if (approvalResponse.success) {
+        // Backend automatically handles inventory updates and notifications
+        alert(`Transfer order accepted successfully!`)
         setShowTransferOrderModal(false)
         setSelectedTransferOrder(null)
         
         // Mark notification as read
         markAsRead(transferOrderId)
       } else {
-        throw new Error(`Failed to update transfer order status. Status: ${statusResponse.success}, Inventory: ${inventoryResponse.success}`)
+        throw new Error(`Failed to approve transfer order: ${approvalResponse.message}`)
       }
       
     } catch (error) {
@@ -467,63 +449,40 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       setTransferOrderLoading(true)
       console.log('Starting rejection process for transfer order:', transferOrderId)
       
-      // Get transfer order details to determine item type and create notification
+      // Get transfer order details first
       console.log('Fetching transfer order details...')
-      const transferOrder = await getTransferOrderDetails(transferOrderId)
+      const response = await apiService.getTransferOrderById(transferOrderId)
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch transfer order')
+      }
+      const transferOrder = response.data
       console.log('Transfer order details:', transferOrder)
       
-      // Update inventory first (requires pending status), then update status
-      console.log('Updating transfer order inventory...')
-      let statusResponse, inventoryResponse
+      // Reject transfer order (handles notifications automatically)
+      console.log('Rejecting transfer order...')
+      let rejectionResponse
       
       try {
-        inventoryResponse = await apiService.updateTransferOrderInventory(transferOrderId, 'reject')
-        console.log('Inventory update response:', inventoryResponse)
-      } catch (error) {
-        console.error('Inventory update failed:', error)
-        throw new Error(`Inventory update failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      }
-      
-      try {
-        statusResponse = await apiService.updateTransferOrderStatus(transferOrderId, {
-          status: 'Rejected',
+        rejectionResponse = await apiService.rejectTransferOrder(transferOrderId, {
           approvedBy: 'Central Kitchen Manager',
           notes: 'Transfer order rejected by Central Kitchen'
         })
-        console.log('Status update response:', statusResponse)
+        console.log('Rejection response:', rejectionResponse)
       } catch (error) {
-        console.error('Status update failed:', error)
-        throw new Error(`Status update failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        console.error('Rejection failed:', error)
+        throw new Error(`Rejection failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
 
-      if (statusResponse.success && inventoryResponse.success) {
-        // Send notification back to Kuwait City
-        const itemType = transferOrder.items[0]?.itemType || 'Mixed'
-        const itemDetails = transferOrder.items.map(item => 
-          `${item.itemName} (${item.quantity} ${item.unitOfMeasure || 'pcs'})`
-        ).join(', ')
-        
-        console.log('Creating notification for Kuwait City...')
-        const notificationResponse = await apiService.createNotification({
-          title: 'Transfer Order Rejected',
-          message: `Transfer order #${transferOrder.transferNumber} has been rejected. Requested items: ${itemDetails}`,
-          type: 'transfer_rejection',
-          targetOutlet: 'Kuwait City',
-          sourceOutlet: 'Central Kitchen',
-          transferOrderId: transferOrderId,
-          itemType: itemType,
-          priority: 'normal'
-        })
-        console.log('Notification response:', notificationResponse)
-        
-        alert('Transfer order rejected and notification sent to Kuwait City')
+      if (rejectionResponse.success) {
+        // Backend automatically handles notifications
+        alert(`Transfer order rejected successfully!`)
         setShowTransferOrderModal(false)
         setSelectedTransferOrder(null)
         
         // Mark notification as read
         markAsRead(transferOrderId)
       } else {
-        throw new Error(`Failed to update transfer order status. Status: ${statusResponse.success}, Inventory: ${inventoryResponse.success}`)
+        throw new Error(`Failed to reject transfer order: ${rejectionResponse.message}`)
       }
       
     } catch (error) {
@@ -535,15 +494,18 @@ const CentralKitchenFinishedGoods: React.FC = () => {
     }
   }
 
+
   // Calculate summary statistics
-  const totalItems = finishedGoodInventoryItems.length
-  const totalValue = finishedGoodInventoryItems.reduce((sum, item) => sum + item.totalValue, 0)
-  const lowStockItems = finishedGoodInventoryItems.filter(item => item.status === 'Low Stock').length
-  const outOfStockItems = finishedGoodInventoryItems.filter(item => item.status === 'Out of Stock').length
-  const expiredItems = finishedGoodInventoryItems.filter(item => item.status === 'Expired').length
+  const totalItems = inventoryItems.length
+  const totalValue = inventoryItems.reduce((sum, item) => sum + item.totalValue, 0)
+  const lowStockItems = inventoryItems.filter(item => item.status === 'Low Stock').length
+  const outOfStockItems = inventoryItems.filter(item => item.status === 'Out of Stock').length
 
   // Get unique categories
-  const categories = [...new Set(finishedGoodInventoryItems.map(item => item.category))]
+  const categories = [...new Set(inventoryItems.map(item => item.category))]
+
+
+
 
   if (loading) {
     return (
@@ -582,11 +544,11 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <div className="p-3 bg-green-100 rounded-lg">
-            <Package className="h-8 w-8 text-green-600" />
+          <div className="p-3 bg-blue-100 rounded-lg">
+            <Package className="h-8 w-8 text-blue-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Finished Good Inventory</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Finished Goods Inventory</h1>
             <p className="text-gray-600">Central Kitchen - {outlet?.outletName}</p>
           </div>
         </div>
@@ -598,21 +560,6 @@ const CentralKitchenFinishedGoods: React.FC = () => {
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
-          </button>
-          <button
-            onClick={() => navigate('/central-kitchen/make-finished-good')}
-            className="btn-primary flex items-center"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Make Finished Good
-          </button>
-          <button
-            onClick={handleMakeRequestedItemNotification}
-            className="btn-secondary flex items-center"
-            title="Requested Item"
-          >
-            <Bell className="h-4 w-4 mr-2" />
-            Requested Item
           </button>
           <NotificationDropdown
             notifications={finishedGoodsNotifications}
@@ -626,7 +573,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="card p-6">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 rounded-lg">
@@ -674,18 +621,6 @@ const CentralKitchenFinishedGoods: React.FC = () => {
             </div>
           </div>
         </div>
-
-        <div className="card p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <AlertTriangle className="h-6 w-6 text-orange-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Expired Items</p>
-              <p className="text-2xl font-semibold text-gray-900">{expiredItems}</p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Filters and Search */}
@@ -697,7 +632,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
               <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search finished goods by name, code, or category..."
+                placeholder="Search finished goods by name, code, or supplier..."
                 className="input-field pl-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -751,7 +686,6 @@ const CentralKitchenFinishedGoods: React.FC = () => {
               <option value="Low Stock">Low Stock</option>
               <option value="Out of Stock">Out of Stock</option>
               <option value="Overstock">Overstock</option>
-              <option value="Expired">Expired</option>
             </select>
           </div>
 
@@ -763,11 +697,10 @@ const CentralKitchenFinishedGoods: React.FC = () => {
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
               >
-                <option value="productName">Product Name</option>
+                <option value="materialName">Product Name</option>
                 <option value="currentStock">Current Stock</option>
                 <option value="totalValue">Total Value</option>
                 <option value="status">Status</option>
-                <option value="expiryDate">Expiry Date</option>
                 <option value="lastUpdated">Last Updated</option>
               </select>
               <button
@@ -784,7 +717,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
         {/* Results Summary */}
         <div className="flex items-center justify-between text-sm text-gray-600">
           <span>
-             Showing {finishedGoodInventoryItems.length} finished good items
+             Showing {inventoryItems.length} finished goods items
             {(searchTerm || filterCategory || filterStatus) && (
               <span className="ml-2 text-blue-600">
                 (filtered)
@@ -808,43 +741,67 @@ const CentralKitchenFinishedGoods: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">Finished Goods Inventory</h3>
-              <p className="text-sm text-gray-600">Complete finished goods inventory list</p>
+              <p className="text-sm text-gray-600">Complete inventory list with all fields</p>
             </div>
           </div>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-green-50">
               <tr>
-                <th className="table-header">SKU</th>
-                <th className="table-header">Name of Finished Good</th>
-                <th className="table-header">Sub Category</th>
-                <th className="table-header">Current Stock Quantity</th>
-                <th className="table-header">Value</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Quantity</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {finishedGoodInventoryItems.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="table-cell">
-                    <div className="text-gray-900 font-medium">{item.productCode}</div>
-                  </td>
-                  <td className="table-cell">
-                    <div className="text-gray-900 font-medium">{item.productName}</div>
-                  </td>
-                  <td className="table-cell">
-                    <div className="text-gray-900">{item.subCategory || '-'}</div>
-                  </td>
-                  <td className="table-cell">
-                    <div className="text-gray-900 font-medium">{item.currentStock}</div>
-                    <div className="text-gray-500 text-sm">{item.unitOfMeasure}</div>
-                  </td>
-                  <td className="table-cell">
-                    <div className="text-gray-900 font-medium">{item.totalValue.toFixed(2)} KWD</div>
-                    <div className="text-gray-500 text-sm">{item.unitPrice.toFixed(2)} per {item.unitOfMeasure}</div>
+              {inventoryItems.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center">
+                    <div className="text-gray-500">
+                      <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                      <p className="text-lg font-medium text-gray-900 mb-2">No finished goods found</p>
+                      <p className="text-gray-600 mb-4">Finished goods inventory is empty</p>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                inventoryItems.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {item.materialCode}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {item.materialName}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {item.category}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {item.unitOfMeasure}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                      KWD {item.unitPrice ? Number(item.unitPrice).toFixed(3) : '0.000'}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {item.currentStock}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={() => handleEditItem(item)}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="Edit"
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -858,6 +815,128 @@ const CentralKitchenFinishedGoods: React.FC = () => {
         onChange={handleFileUpload}
         style={{ display: 'none' }}
       />
+
+      {/* Edit Modal */}
+      {showEditModal && editingItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Edit Raw Material: {editingItem.materialName}
+              </h3>
+              <button
+                onClick={handleCancelEdit}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Current Stock ({editingItem.unitOfMeasure})
+                </label>
+                <input
+                  type="number"
+                  value={editFormData.currentStock}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, currentStock: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Minimum Stock ({editingItem.unitOfMeasure})
+                </label>
+                <input
+                  type="number"
+                  value={editFormData.minimumStock}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, minimumStock: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Maximum Stock ({editingItem.unitOfMeasure})
+                </label>
+                <input
+                  type="number"
+                  value={editFormData.maximumStock}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, maximumStock: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reorder Point ({editingItem.unitOfMeasure})
+                </label>
+                <input
+                  type="number"
+                  value={editFormData.reorderPoint}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, reorderPoint: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unit Price (KWD)
+                </label>
+                <input
+                  type="number"
+                  value={editFormData.unitPrice}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, unitPrice: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  value={editFormData.notes}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Optional notes..."
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={handleCancelEdit}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {loading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation Modal */}
       <ConfirmationModal

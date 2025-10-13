@@ -148,7 +148,29 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                   key={notification.id}
                   className={`p-4 border-b border-gray-100 hover:bg-gray-50 ${
                     !notification.read ? 'bg-blue-50' : ''
+                  } ${
+                    notification.isTransferOrder && notification.transferOrderId && onViewTransferOrder
+                      ? 'cursor-pointer hover:bg-blue-100 transition-colors' : ''
                   }`}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    console.log('🔍 NotificationDropdown: Notification clicked!')
+                    console.log('🔍 NotificationDropdown: notification =', notification)
+                    console.log('🔍 NotificationDropdown: isTransferOrder =', notification.isTransferOrder)
+                    console.log('🔍 NotificationDropdown: transferOrderId =', notification.transferOrderId)
+                    console.log('🔍 NotificationDropdown: onViewTransferOrder =', !!onViewTransferOrder)
+                    
+                    if (notification.isTransferOrder && notification.transferOrderId && onViewTransferOrder) {
+                      console.log('✅ NotificationDropdown: All conditions met, calling onViewTransferOrder')
+                      onViewTransferOrder(notification.transferOrderId)
+                    } else {
+                      console.log('❌ NotificationDropdown: Conditions not met for transfer order')
+                      console.log('❌ NotificationDropdown: isTransferOrder =', notification.isTransferOrder)
+                      console.log('❌ NotificationDropdown: transferOrderId =', notification.transferOrderId)
+                      console.log('❌ NotificationDropdown: onViewTransferOrder exists =', !!onViewTransferOrder)
+                    }
+                  }}
                 >
                   <div className="flex items-start space-x-3">
                     <div className="flex-shrink-0 mt-0.5">
@@ -172,6 +194,11 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                       {notification.outlet && (
                         <p className="text-xs text-gray-500 mt-1">
                           {notification.outlet}
+                        </p>
+                      )}
+                      {notification.isTransferOrder && notification.transferOrderId && onViewTransferOrder && (
+                        <p className="text-xs text-blue-600 mt-1 font-medium">
+                          Click to view transfer details →
                         </p>
                       )}
                     </div>
