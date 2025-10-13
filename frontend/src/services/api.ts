@@ -931,6 +931,104 @@ class ApiService {
       body: JSON.stringify(data)
     });
   }
+
+  // Sales Orders API
+  async getSalesOrders(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    outletId?: string;
+    outletCode?: string;
+    outletName?: string;
+    orderStatus?: string;
+    orderType?: string;
+    paymentStatus?: string;
+    startDate?: string;
+    endDate?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.outletId) queryParams.append('outletId', params.outletId);
+    if (params?.outletCode) queryParams.append('outletCode', params.outletCode);
+    if (params?.outletName) queryParams.append('outletName', params.outletName);
+    if (params?.orderStatus) queryParams.append('orderStatus', params.orderStatus);
+    if (params?.orderType) queryParams.append('orderType', params.orderType);
+    if (params?.paymentStatus) queryParams.append('paymentStatus', params.paymentStatus);
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+    if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/sales-orders${queryString ? `?${queryString}` : ''}`;
+    
+    return this.request<{
+      success: boolean;
+      data: any[];
+      pagination?: {
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        itemsPerPage: number;
+      };
+    }>(endpoint);
+  }
+
+  async getSalesOrderById(id: string) {
+    return this.request<{
+      success: boolean;
+      data: any;
+    }>(`/sales-orders/${id}`);
+  }
+
+  async createSalesOrder(data: any) {
+    return this.request<{
+      success: boolean;
+      data: any;
+      message: string;
+    }>('/sales-orders', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateSalesOrder(id: string, data: any) {
+    return this.request<{
+      success: boolean;
+      data: any;
+      message: string;
+    }>(`/sales-orders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteSalesOrder(id: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+    }>(`/sales-orders/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async updateSalesOrderStatus(id: string, data: {
+    orderStatus: string;
+    updatedBy?: string;
+  }) {
+    return this.request<{
+      success: boolean;
+      data: any;
+      message: string;
+    }>(`/sales-orders/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
 }
 
 export const apiService = new ApiService();

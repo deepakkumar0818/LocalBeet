@@ -129,7 +129,7 @@ const POSCreateOrder: React.FC = () => {
   const loadOutletData = async () => {
     try {
       console.log('loadOutletData - Looking for outlet:', outletName)
-      const outletsResponse = await apiService.getOutlets({ limit: 1000 })
+      const outletsResponse = await apiService.getOutlets()
       if (outletsResponse.success && Array.isArray(outletsResponse.data)) {
         console.log('loadOutletData - Available outlets:', outletsResponse.data.map(o => o.outletName))
         const match = outletsResponse.data.find((o: any) => o.outletName === outletName)
@@ -272,7 +272,7 @@ const POSCreateOrder: React.FC = () => {
     
     // Check stock availability
     const cartItem = cart.find(item => item.kind==='finished' && item.product && item.product._id === productId)
-    if (cartItem && newQuantity > cartItem.product.currentStock) {
+    if (cartItem && cartItem.product && newQuantity > cartItem.product.currentStock) {
       alert(`Only ${cartItem.product.currentStock} ${cartItem.product.unitOfMeasure} available in stock`)
       return
     }
@@ -284,12 +284,26 @@ const POSCreateOrder: React.FC = () => {
     ))
   }
 
+  const updateRecipeQuantity = (recipeKey: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      const bomCode = recipeKey.replace('recipe-', '')
+      setCart(prev => prev.filter(ci => !(ci.kind==='recipe' && ci.recipe && ci.recipe.bomCode === bomCode)))
+      return
+    }
+    
+    setCart(prev => prev.map(ci => 
+      (ci.kind==='recipe' && ci.recipe && ci.recipe.bomCode === recipeKey.replace('recipe-', ''))
+        ? { ...ci, quantity: newQuantity, subtotal: newQuantity * (ci.recipe.totalCost||0) }
+        : ci
+    ))
+  }
+
   const removeRecipeFromCart = (bomCode: string) => {
     setCart(prev => prev.filter(ci => !(ci.kind==='recipe' && ci.recipe && ci.recipe.bomCode === bomCode)))
   }
 
   const removeFromCart = (productId: string) => {
-    setCart(cart.filter(item => item.product._id !== productId))
+    setCart(cart.filter(item => !(item.kind==='finished' && item.product && item.product._id === productId)))
   }
 
   const getSubtotal = () => {
@@ -392,7 +406,7 @@ const POSCreateOrder: React.FC = () => {
       const response = await apiService.createSalesOrder(salesOrderData)
       
         if (response.success) {
-          const orderNumber = response.data.orderNumber
+          const orderNumber = response.data?.orderNumber || 'N/A'
           alert(`Order ${orderNumber} created successfully!\nTotal: $${getTotal().toFixed(2)}\n\nPlease refresh the sales orders page to see the new order.`)
       
       // Clear cart and reset form
