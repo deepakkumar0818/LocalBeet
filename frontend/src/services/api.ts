@@ -1029,6 +1029,38 @@ class ApiService {
       body: JSON.stringify(data)
     });
   }
+
+  // Ingredient Master Transfer Methods
+  async createIngredientMasterTransfer(data: {
+    toOutlet: string;
+    transferDate: string;
+    priority: string;
+    notes?: string;
+    items: any[];
+  }) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: {
+        transferId: string;
+        transferNumber: string;
+        _id: string;
+        id: string;
+        fromOutlet: string;
+        toOutlet: string;
+        transferDate: string;
+        priority: string;
+        items: any[];
+        totalValue: number;
+        notes: string;
+        status: string;
+        createdAt: string;
+      };
+    }>(`/ingredient-master/create-transfer`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
 }
 
 export const apiService = new ApiService();

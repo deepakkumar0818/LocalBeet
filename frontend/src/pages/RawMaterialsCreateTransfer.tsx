@@ -33,17 +33,65 @@ const RawMaterialsCreateTransfer: React.FC = () => {
   const [rawMaterials, setRawMaterials] = useState<any[]>([])
   const [loadingMaterials, setLoadingMaterials] = useState(false)
   const [transferData, setTransferData] = useState({
-    toOutlet: '',
+    toOutlet: '', // Not needed for auto-distribution
     transferDate: new Date().toISOString().split('T')[0],
     priority: 'Normal',
     notes: ''
   })
+  const [autoDistributeMode, setAutoDistributeMode] = useState(true)
   const [outlets, setOutlets] = useState<Outlet[]>([])
 
   useEffect(() => {
     loadRawMaterialsData()
     loadOutlets()
   }, [])
+
+  // Auto-distribute items based on location quantities
+  const autoDistributeItems = () => {
+    const itemsToDistribute: Array<{id: string, data: Partial<TransferItem>}> = []
+    
+    rawMaterials.forEach(material => {
+      if (material.locationStocks) {
+        // Check each location and add items that have stock
+        Object.entries(material.locationStocks).forEach(([location, quantity]) => {
+          const qty = quantity as number
+          if (qty > 0) {
+            const outletName = getOutletNameFromLocation(location)
+            if (outletName) {
+              itemsToDistribute.push({
+                id: `${material.materialCode}-${location}-${Date.now()}`,
+                data: {
+                  itemCode: material.materialCode,
+                  itemName: material.materialName,
+                  itemType: 'Raw Material',
+                  category: material.parentCategory,
+                  subCategory: material.subCategory,
+                  unitOfMeasure: material.unitOfMeasure,
+                  quantity: qty,
+                  unitPrice: material.unitPrice,
+                  totalValue: qty * material.unitPrice,
+                  notes: `Auto-distributed from Ingredient Master to ${outletName}`
+                }
+              })
+            }
+          }
+        })
+      }
+    })
+    
+    setItemForms(itemsToDistribute)
+  }
+
+  const getOutletNameFromLocation = (location: string): string | null => {
+    const locationMap: {[key: string]: string} = {
+      'centralKitchen': 'Central Kitchen',
+      'kuwaitCity': 'Kuwait City',
+      'mall360': '360 Mall',
+      'vibesComplex': 'Vibe Complex',
+      'taibaKitchen': 'Taiba Hospital'
+    }
+    return locationMap[location] || null
+  }
 
   const loadRawMaterialsData = async () => {
     try {
@@ -57,6 +105,11 @@ const RawMaterialsCreateTransfer: React.FC = () => {
       if (response.success && response.data) {
         console.log('✅ Loaded materials for transfer:', response.data.length, 'items')
         setRawMaterials(response.data)
+        
+        // Auto-distribute items if in auto mode
+        if (autoDistributeMode) {
+          autoDistributeItems()
+        }
       } else {
         console.log('⚠️  No materials found')
         setRawMaterials([])
@@ -143,14 +196,8 @@ const RawMaterialsCreateTransfer: React.FC = () => {
     try {
       setLoadingMaterials(true)
       
-      // Validate form
-      if (!transferData.toOutlet) {
-        alert('Please select a destination outlet')
-        return
-      }
-
       if (itemForms.length === 0) {
-        alert('Please add at least one item to transfer')
+        alert('No items to transfer')
         return
       }
 
@@ -165,14 +212,22 @@ const RawMaterialsCreateTransfer: React.FC = () => {
         return
       }
 
-      // Prepare transfer order data
-      const transferOrderData = {
-        fromOutlet: 'Ingredient Master',
-        toOutlet: transferData.toOutlet,
-        transferDate: transferData.transferDate,
-        priority: transferData.priority,
-        notes: transferData.notes,
-        items: validItems.map(form => ({
+      console.log('🚚 Starting auto-distribution transfer from Ingredient Master')
+      console.log(`📦 Processing ${validItems.length} items`)
+
+      // Group items by destination outlet
+      const itemsByOutlet: {[outlet: string]: any[]} = {}
+      
+      validItems.forEach(form => {
+        // Extract outlet from notes (format: "Auto-distributed from Ingredient Master to {Outlet}")
+        const outletMatch = form.data.notes?.match(/to (\w+(?:\s+\w+)*)$/)
+        const outlet = outletMatch ? outletMatch[1] : 'Central Kitchen'
+        
+        if (!itemsByOutlet[outlet]) {
+          itemsByOutlet[outlet] = []
+        }
+        
+        itemsByOutlet[outlet].push({
           itemCode: form.data.itemCode,
           itemName: form.data.itemName,
           itemType: 'Raw Material',
@@ -183,18 +238,66 @@ const RawMaterialsCreateTransfer: React.FC = () => {
           unitPrice: form.data.unitPrice,
           totalValue: form.data.totalValue,
           notes: form.data.notes || ''
-        }))
-      }
+        })
+      })
 
-      console.log('🚚 Creating transfer order:', transferOrderData)
+      console.log(`📍 Distributing to ${Object.keys(itemsByOutlet).length} outlets:`, Object.keys(itemsByOutlet))
 
-      const response = await apiService.createTransferOrder(transferOrderData)
+      // Create transfer orders for each outlet
+      const transferPromises = Object.entries(itemsByOutlet).map(async ([outlet, items]) => {
+        const transferOrderData = {
+          fromOutlet: 'Ingredient Master',
+          toOutlet: outlet,
+          transferDate: transferData.transferDate,
+          priority: transferData.priority,
+          notes: `Auto-distribution from Ingredient Master to ${outlet}`,
+          items: items
+        }
+
+        console.log(`🚚 Creating transfer to ${outlet}:`, items.length, 'items')
+        
+        try {
+          const response = await apiService.createTransferOrder(transferOrderData)
+          
+          if (response.success) {
+            console.log(`✅ Transfer to ${outlet} created successfully:`, response.data.transferOrderId)
+            return { outlet, success: true, transferId: response.data.transferOrderId }
+          } else {
+            console.error(`❌ Transfer to ${outlet} failed:`, response.message)
+            return { outlet, success: false, error: response.message }
+          }
+        } catch (error) {
+          console.error(`❌ Error creating transfer to ${outlet}:`, error)
+          return { outlet, success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+        }
+      })
+
+      // Wait for all transfers to complete
+      const results = await Promise.all(transferPromises)
       
-      if (response.success) {
-        alert(`Transfer order created successfully!\n\nOrder ID: ${response.data.transferOrderId || 'N/A'}\nItems: ${validItems.length}\nTotal Value: KWD ${validItems.reduce((sum, item) => sum + (item.data.totalValue || 0), 0).toFixed(3)}`)
+      const successful = results.filter(r => r.success)
+      const failed = results.filter(r => !r.success)
+      
+      console.log(`📊 Transfer Results: ${successful.length} successful, ${failed.length} failed`)
+      
+      if (successful.length > 0) {
+        let message = `✅ Auto-distribution completed!\n\n`
+        message += `📦 Successfully transferred to ${successful.length} outlets:\n`
+        successful.forEach(result => {
+          message += `• ${result.outlet}\n`
+        })
+        
+        if (failed.length > 0) {
+          message += `\n❌ Failed transfers:\n`
+          failed.forEach(result => {
+            message += `• ${result.outlet}: ${result.error}\n`
+          })
+        }
+        
+        alert(message)
         navigate('/raw-materials')
       } else {
-        alert(`Failed to create transfer order: ${response.message || 'Unknown error'}`)
+        alert(`❌ All transfers failed. Please check the console for details.`)
       }
 
     } catch (err) {
@@ -257,6 +360,33 @@ const RawMaterialsCreateTransfer: React.FC = () => {
       {/* Transfer Details */}
       <div className="card p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Transfer Details</h2>
+        
+        {/* Auto-Distribution Mode Toggle */}
+        <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="autoDistribute"
+              checked={autoDistributeMode}
+              onChange={(e) => {
+                setAutoDistributeMode(e.target.checked)
+                if (e.target.checked) {
+                  autoDistributeItems()
+                } else {
+                  setItemForms([])
+                }
+              }}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="autoDistribute" className="ml-2 text-sm font-medium text-gray-700">
+              Auto-Distribute to All Outlets Based on Location Quantities
+            </label>
+          </div>
+          <p className="text-xs text-gray-600 mt-1">
+            When enabled, items will be automatically distributed to outlets based on their current location quantities in Ingredient Master.
+          </p>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">From Outlet</label>
@@ -268,20 +398,31 @@ const RawMaterialsCreateTransfer: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">To Outlet *</label>
-            <select
-              className="input-field"
-              value={transferData.toOutlet}
-              onChange={(e) => setTransferData(prev => ({ ...prev, toOutlet: e.target.value }))}
-              required
-            >
-              <option value="">Select Destination</option>
-              {outlets.map(outlet => (
-                <option key={outlet.id} value={outlet.outletName}>
-                  {outlet.outletName}
-                </option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              To Outlet {autoDistributeMode ? '(Auto-Distributed)' : '*'}
+            </label>
+            {autoDistributeMode ? (
+              <input
+                type="text"
+                value="Multiple Outlets (Auto-Distributed)"
+                disabled
+                className="input-field bg-blue-100"
+              />
+            ) : (
+              <select
+                className="input-field"
+                value={transferData.toOutlet}
+                onChange={(e) => setTransferData(prev => ({ ...prev, toOutlet: e.target.value }))}
+                required
+              >
+                <option value="">Select Destination</option>
+                {outlets.map(outlet => (
+                  <option key={outlet.id} value={outlet.outletName}>
+                    {outlet.outletName}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Transfer Date</label>
@@ -460,8 +601,8 @@ const RawMaterialsCreateTransfer: React.FC = () => {
             </button>
             <button
               onClick={handleSubmit}
-              disabled={loadingMaterials || itemForms.length === 0 || !transferData.toOutlet}
-              className={`${loadingMaterials || itemForms.length === 0 || !transferData.toOutlet ? 'btn-disabled' : 'btn-primary'} flex items-center`}
+              disabled={loadingMaterials || itemForms.length === 0 || (!autoDistributeMode && !transferData.toOutlet)}
+              className={`${loadingMaterials || itemForms.length === 0 || (!autoDistributeMode && !transferData.toOutlet) ? 'btn-disabled' : 'btn-primary'} flex items-center`}
             >
               {loadingMaterials ? (
                 <>

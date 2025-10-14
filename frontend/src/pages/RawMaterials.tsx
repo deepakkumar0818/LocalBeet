@@ -52,6 +52,7 @@ const RawMaterials: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [transferring, setTransferring] = useState(false)
   
   const [searchTerm, setSearchTerm] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
@@ -81,8 +82,9 @@ const RawMaterials: React.FC = () => {
       })
 
       if (response.success && response.data) {
-        console.log('✅ Loaded Ingredient Master:', response.data.length, 'items')
-        setMaterials(response.data)
+        const materialsArray = Array.isArray(response.data) ? response.data : response.data.data || []
+        console.log('✅ Loaded Ingredient Master:', materialsArray.length, 'items')
+        setMaterials(materialsArray)
       } else {
         console.log('⚠️  No materials found')
         setMaterials([])
@@ -93,6 +95,157 @@ const RawMaterials: React.FC = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleDirectTransfer = async () => {
+    console.log('🚀 Create Transfer button clicked!')
+    console.log('📊 Current materials count:', materials.length)
+    
+    try {
+      setTransferring(true)
+      console.log('⏳ Transfer process started...')
+      
+      // Get all items with stock in any location
+      const itemsToDistribute: any[] = []
+      
+      console.log('🔍 Processing materials for distribution...')
+      materials.forEach((material, index) => {
+        console.log(`  ${index + 1}. ${material.materialName} (${material.materialCode})`)
+        if (material.locationStocks) {
+          console.log(`     Location stocks:`, material.locationStocks)
+          // Check each location and add items that have stock
+          Object.entries(material.locationStocks).forEach(([location, quantity]) => {
+            const qty = quantity as number
+            console.log(`     ${location}: ${qty}`)
+            if (qty > 0) {
+              const outletName = getOutletNameFromLocation(location)
+              console.log(`     → Mapping ${location} to ${outletName}`)
+              if (outletName) {
+                itemsToDistribute.push({
+                  itemCode: material.materialCode,
+                  itemName: material.materialName,
+                  itemType: 'Raw Material',
+                  category: material.parentCategory,
+                  subCategory: material.subCategory,
+                  unitOfMeasure: material.unitOfMeasure,
+                  quantity: qty,
+                  unitPrice: material.unitPrice,
+                  totalValue: qty * material.unitPrice,
+                  notes: `Auto-distributed from Ingredient Master to ${outletName}`
+                })
+                console.log(`     ✅ Added to distribution: ${qty} ${material.unitOfMeasure} → ${outletName}`)
+              }
+            }
+          })
+        } else {
+          console.log(`     No location stocks found`)
+        }
+      })
+
+      console.log(`📦 Total items to distribute: ${itemsToDistribute.length}`)
+      
+      if (itemsToDistribute.length === 0) {
+        console.log('⚠️  No items found with stock in any location')
+        showAlert('No Items to Transfer', 'No items found with stock in any location.', 'warning')
+        return
+      }
+
+      console.log('🚚 Starting direct auto-distribution transfer from Ingredient Master')
+      console.log(`📦 Processing ${itemsToDistribute.length} items`)
+
+      // Group items by destination outlet
+      const itemsByOutlet: {[outlet: string]: any[]} = {}
+      
+      itemsToDistribute.forEach(item => {
+        // Extract outlet from notes (format: "Auto-distributed from Ingredient Master to {Outlet}")
+        const outletMatch = item.notes?.match(/to (\w+(?:\s+\w+)*)$/)
+        const outlet = outletMatch ? outletMatch[1] : 'Central Kitchen'
+        
+        if (!itemsByOutlet[outlet]) {
+          itemsByOutlet[outlet] = []
+        }
+        
+        itemsByOutlet[outlet].push(item)
+      })
+
+      console.log(`📍 Distributing to ${Object.keys(itemsByOutlet).length} outlets:`, Object.keys(itemsByOutlet))
+
+      // Create transfer orders for each outlet
+      const transferPromises = Object.entries(itemsByOutlet).map(async ([outlet, items]) => {
+        const transferOrderData = {
+          fromOutlet: 'Ingredient Master',
+          toOutlet: outlet,
+          transferDate: new Date().toISOString().split('T')[0],
+          priority: 'Normal',
+          notes: `Auto-distribution from Ingredient Master to ${outlet}`,
+          items: items
+        }
+
+        console.log(`🚚 Creating transfer to ${outlet}:`, items.length, 'items')
+        
+        try {
+          const response = await apiService.createIngredientMasterTransfer(transferOrderData)
+          
+          if (response.success) {
+            console.log(`✅ Transfer to ${outlet} created successfully:`, response.data)
+            return { outlet, success: true, transferId: response.data._id || response.data.id || response.data.transferOrderId }
+          } else {
+            console.error(`❌ Transfer to ${outlet} failed:`, response.message)
+            return { outlet, success: false, error: response.message }
+          }
+        } catch (error) {
+          console.error(`❌ Error creating transfer to ${outlet}:`, error)
+          return { outlet, success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+        }
+      })
+
+      // Wait for all transfers to complete
+      const results = await Promise.all(transferPromises)
+      
+      const successful = results.filter(r => r.success)
+      const failed = results.filter(r => !r.success)
+      
+      console.log(`📊 Transfer Results: ${successful.length} successful, ${failed.length} failed`)
+      
+      if (successful.length > 0) {
+        let message = `✅ Auto-distribution completed!\n\n`
+        message += `📦 Successfully transferred to ${successful.length} outlets:\n`
+        successful.forEach(result => {
+          message += `• ${result.outlet}\n`
+        })
+        
+        if (failed.length > 0) {
+          message += `\n❌ Failed transfers:\n`
+          failed.forEach(result => {
+            message += `• ${result.outlet}: ${result.error}\n`
+          })
+        }
+        
+        showAlert('Transfer Completed', message, 'success')
+        
+        // Refresh the materials list to show updated quantities
+        await loadRawMaterials()
+      } else {
+        showAlert('Transfer Failed', 'All transfers failed. Please check the console for details.', 'error')
+      }
+
+    } catch (err) {
+      console.error('Error in direct transfer:', err)
+      showAlert('Transfer Error', `Error during transfer: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error')
+    } finally {
+      setTransferring(false)
+    }
+  }
+
+  const getOutletNameFromLocation = (location: string): string | null => {
+    const locationMap: {[key: string]: string} = {
+      'centralKitchen': 'Central Kitchen',
+      'kuwaitCity': 'Kuwait City',
+      'mall360': '360 Mall',
+      'vibesComplex': 'Vibe Complex',
+      'taibaKitchen': 'Taiba Hospital'
+    }
+    return locationMap[location] || null
   }
 
   const handleSyncWithZoho = async () => {
@@ -264,12 +417,13 @@ const RawMaterials: React.FC = () => {
             {syncing ? 'Syncing...' : 'Sync Inventory'}
           </button>
           <button
-            onClick={() => navigate('/raw-materials/create-transfer')}
-            className="btn-secondary flex items-center"
-            title="Create transfer order"
+            onClick={handleDirectTransfer}
+            disabled={transferring}
+            className={`flex items-center ${transferring ? 'btn-disabled' : 'btn-secondary'}`}
+            title="Auto-distribute all items to outlets"
           >
-            <Truck className="h-4 w-4 mr-2" />
-            Create Transfer
+            <Truck className={`h-4 w-4 mr-2 ${transferring ? 'animate-pulse' : ''}`} />
+            {transferring ? 'Transferring...' : 'Create Transfer'}
           </button>
           <button
             onClick={() => navigate('/raw-materials/add')}

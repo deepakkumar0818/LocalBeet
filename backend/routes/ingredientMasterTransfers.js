@@ -114,20 +114,19 @@ router.post('/create-transfer', async (req, res) => {
             locationKey = 'taibaKitchen';
           }
           
-          // Subtract from total stock
-          ingredientMasterItem.currentStock -= item.quantity;
+          // For Ingredient Master transfers, we want to reset quantities to 0 after transfer
+          // This simulates moving all stock from Ingredient Master to the outlets
           
-          // Subtract from Central Kitchen location (as Ingredient Master items are stored in CK)
-          if (ingredientMasterItem.locationStocks && ingredientMasterItem.locationStocks.centralKitchen) {
-            ingredientMasterItem.locationStocks.centralKitchen -= item.quantity;
-          }
+          // Reset total stock to 0 (all items are being transferred out)
+          ingredientMasterItem.currentStock = 0;
           
-          // Add to destination location stock
-          if (locationKey && ingredientMasterItem.locationStocks) {
-            if (!ingredientMasterItem.locationStocks[locationKey]) {
-              ingredientMasterItem.locationStocks[locationKey] = 0;
-            }
-            ingredientMasterItem.locationStocks[locationKey] += item.quantity;
+          // Reset all location stocks to 0 (all stock is being moved to outlets)
+          if (ingredientMasterItem.locationStocks) {
+            ingredientMasterItem.locationStocks.centralKitchen = 0;
+            ingredientMasterItem.locationStocks.kuwaitCity = 0;
+            ingredientMasterItem.locationStocks.mall360 = 0;
+            ingredientMasterItem.locationStocks.vibesComplex = 0;
+            ingredientMasterItem.locationStocks.taibaKitchen = 0;
           }
           
           await ingredientMasterItem.save();
