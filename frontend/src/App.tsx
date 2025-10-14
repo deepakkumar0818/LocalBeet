@@ -4,7 +4,6 @@ import Dashboard from './pages/Dashboard'
 import RawMaterials from './pages/RawMaterials'
 import AddMaterial from './pages/AddMaterial'
 import EditMaterial from './pages/EditMaterial'
-import RawMaterialsCreateTransfer from './pages/RawMaterialsCreateTransfer'
 import BillOfMaterials from './pages/BillOfMaterials'
 import AddBOM from './pages/AddBOM'
 import EditBOM from './pages/EditBOM'
@@ -59,7 +58,6 @@ function App() {
         <Route path="/raw-materials" element={<RawMaterials />} />
         <Route path="/raw-materials/add" element={<AddMaterial />} />
         <Route path="/raw-materials/edit/:id" element={<EditMaterial />} />
-        <Route path="/raw-materials/create-transfer" element={<RawMaterialsCreateTransfer />} />
         <Route path="/bill-of-materials" element={<BillOfMaterials />} />
         <Route path="/bill-of-materials/add" element={<AddBOM />} />
         <Route path="/bill-of-materials/edit/:id" element={<EditBOM />} />
