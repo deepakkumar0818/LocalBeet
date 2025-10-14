@@ -471,7 +471,7 @@ const Dashboard: React.FC = () => {
           </div>
         )
       }
-      return (
+  return (
     <div className="space-y-6">
           {/* Overall Stats */}
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
@@ -638,7 +638,7 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Charts */}
+        {/* Charts */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Filters */}
           <div className="col-span-1 lg:col-span-2">

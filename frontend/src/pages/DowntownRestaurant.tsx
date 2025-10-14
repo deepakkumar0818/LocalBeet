@@ -81,11 +81,11 @@ const DowntownRestaurant: React.FC = () => {
   const [finishedGoodInventoryItems, setFinishedGoodInventoryItems] = useState<FinishedGoodInventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [searchTerm] = useState('')
-  const [filterCategory] = useState('')
-  const [filterStatus] = useState('')
-  const [sortBy] = useState('materialName')
-  const [sortOrder] = useState<'asc' | 'desc'>('asc')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterCategory, setFilterCategory] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+  const [sortBy, setSortBy] = useState('materialName')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Kuwait City')
   
@@ -176,6 +176,15 @@ const DowntownRestaurant: React.FC = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  const clearFilters = () => {
+    setSearchTerm('')
+    setFilterCategory('')
+    setFilterStatus('')
+    setSortBy(currentSection === 'finished-goods' ? 'productName' : 'materialName')
+    setSortOrder('asc')
+    loadInventory()
   }
 
   const loadInventory = async () => {
@@ -499,7 +508,52 @@ const DowntownRestaurant: React.FC = () => {
             </div>
           </div>
         </div>
-        {/* Raw Materials Table */}
+        {/* Search & Filters */}
+        <div className="px-6 py-4 bg-white border-b border-gray-200">
+          <div className="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-3 md:space-y-0">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder="Search raw materials by name, code, or supplier..."
+                value={searchTerm}
+                onChange={(e)=>setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <select value={filterCategory} onChange={(e)=>setFilterCategory(e.target.value)} className="px-3 py-2 border rounded-lg">
+              <option value="">All Categories</option>
+              {/* common categories */}
+              <option value="NON FOOD - PACKING">NON FOOD - PACKING</option>
+              <option value="Vegetables">Vegetables</option>
+              <option value="Dairy">Dairy</option>
+            </select>
+            <select value={filterStatus} onChange={(e)=>setFilterStatus(e.target.value)} className="px-3 py-2 border rounded-lg">
+              <option value="">All Status</option>
+              <option value="In Stock">In Stock</option>
+              <option value="Low Stock">Low Stock</option>
+              <option value="Out of Stock">Out of Stock</option>
+            </select>
+            <div className="flex items-center space-x-2">
+              <select value={sortBy} onChange={(e)=>setSortBy(e.target.value)} className="px-3 py-2 border rounded-lg">
+                <option value="materialName">Material Name</option>
+                <option value="currentStock">Current Quantity</option>
+                <option value="unitPrice">Unit Price</option>
+              </select>
+              <button onClick={()=>setSortOrder(sortOrder==='asc'?'desc':'asc')} className="px-2 py-2 border rounded-lg" title="Toggle sort order">{sortOrder==='asc'?'↑':'↓'}</button>
+              <button onClick={clearFilters} className="px-3 py-2 border rounded-lg bg-gray-50">Clear Filters</button>
+            </div>
+          </div>
+        </div>
+        {/* Raw Materials Table / Empty State */}
+        {inventoryItems.length === 0 ? (
+          <div className="p-10 text-center text-gray-500">
+            <p>No raw materials match the selected filters.</p>
+            <div className="mt-3 space-x-2">
+              <button onClick={clearFilters} className="px-3 py-2 border rounded-lg bg-gray-50">Clear Filters</button>
+              <button onClick={loadInventory} className="px-3 py-2 border rounded-lg">Refresh</button>
+            </div>
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -530,6 +584,7 @@ const DowntownRestaurant: React.FC = () => {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   )
@@ -546,7 +601,50 @@ const DowntownRestaurant: React.FC = () => {
         </div>
           </div>
         </div>
-        {/* Finished Goods Table */}
+        {/* Search & Filters */}
+        <div className="px-6 py-4 bg-white border-b border-gray-200">
+          <div className="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-3 md:space-y-0">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder="Search finished goods by name or code..."
+                value={searchTerm}
+                onChange={(e)=>setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+            <select value={filterCategory} onChange={(e)=>setFilterCategory(e.target.value)} className="px-3 py-2 border rounded-lg">
+              <option value="">All Categories</option>
+              <option value="GATHERING">GATHERING</option>
+              <option value="HAPPY ENDINGS">HAPPY ENDINGS</option>
+            </select>
+            <select value={filterStatus} onChange={(e)=>setFilterStatus(e.target.value)} className="px-3 py-2 border rounded-lg">
+              <option value="">All Status</option>
+              <option value="In Stock">In Stock</option>
+              <option value="Low Stock">Low Stock</option>
+              <option value="Out of Stock">Out of Stock</option>
+            </select>
+            <div className="flex items-center space-x-2">
+              <select value={sortBy} onChange={(e)=>setSortBy(e.target.value)} className="px-3 py-2 border rounded-lg">
+                <option value="productName">Product Name</option>
+                <option value="currentStock">Current Stock</option>
+                <option value="unitPrice">Unit Price</option>
+              </select>
+              <button onClick={()=>setSortOrder(sortOrder==='asc'?'desc':'asc')} className="px-2 py-2 border rounded-lg" title="Toggle sort order">{sortOrder==='asc'?'↑':'↓'}</button>
+              <button onClick={clearFilters} className="px-3 py-2 border rounded-lg bg-gray-50">Clear Filters</button>
+            </div>
+          </div>
+        </div>
+        {/* Finished Goods Table / Empty State */}
+        {finishedGoodInventoryItems.length === 0 ? (
+          <div className="p-10 text-center text-gray-500">
+            <p>No finished goods match the selected filters.</p>
+            <div className="mt-3 space-x-2">
+              <button onClick={clearFilters} className="px-3 py-2 border rounded-lg bg-gray-50">Clear Filters</button>
+              <button onClick={loadInventory} className="px-3 py-2 border rounded-lg">Refresh</button>
+            </div>
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -586,6 +684,7 @@ const DowntownRestaurant: React.FC = () => {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   )

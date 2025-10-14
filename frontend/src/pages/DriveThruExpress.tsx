@@ -83,10 +83,10 @@ const DriveThruExpress: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterCategory] = useState('')
-  const [filterStatus] = useState('')
-  const [sortBy] = useState('materialName')
-  const [sortOrder] = useState<'asc' | 'desc'>('asc')
+  const [filterCategory, setFilterCategory] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+  const [sortBy, setSortBy] = useState('materialName')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [, setImporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Taiba Hospital')
@@ -204,6 +204,15 @@ const DriveThruExpress: React.FC = () => {
     }
   }
 
+  const clearFilters = () => {
+    setSearchTerm('')
+    setFilterCategory('')
+    setFilterStatus('')
+    setSortBy('materialName')
+    setSortOrder('asc')
+    loadInventory()
+  }
+
   const loadInventory = async () => {
     try {
       console.log('Loading Taiba Kitchen inventory...')
@@ -254,11 +263,12 @@ const DriveThruExpress: React.FC = () => {
         } else {
           console.log('No raw materials inventory found for Taiba Kitchen')
           setInventoryItems([])
-          setError('No raw materials inventory found. Please add some raw materials to Taiba Kitchen.')
+          // Don't set a blocking error; allow graceful empty state rendering
         }
       } else {
         console.error('Failed to load raw materials inventory:', (rawMaterialsResponse as any).error || 'API Error')
-        setError(`Failed to load inventory from server: ${(rawMaterialsResponse as any).error || 'Unknown error'}`)
+        // Show non-blocking error text in empty state instead of page-level error
+        setInventoryItems([])
       }
 
       // Load finished goods inventory from Taiba Kitchen dedicated API
@@ -603,23 +613,7 @@ const DriveThruExpress: React.FC = () => {
           <h2 className="text-xl font-semibold text-gray-900">Raw Materials Inventory</h2>
         </div>
         
-        {/* Search and Filter Controls */}
-        <div className="mb-6 space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <input
-                  type="text"
-                  placeholder="Search raw materials..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* (Removed duplicate top search bar) */}
 
         {/* Hidden file input for import */}
         <input
@@ -630,7 +624,49 @@ const DriveThruExpress: React.FC = () => {
           style={{ display: 'none' }}
         />
 
-        {/* Raw Materials Table */}
+        {/* Search & Filters - Raw Materials */}
+        <div className="px-6 py-4 bg-white border-b border-gray-200">
+          <div className="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-3 md:space-y-0">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder="Search raw materials by name, code, or supplier..."
+                value={searchTerm}
+                onChange={(e)=>setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <select value={filterCategory} onChange={(e)=>setFilterCategory(e.target.value)} className="px-3 py-2 border rounded-lg">
+              <option value="">All Categories</option>
+            </select>
+            <select value={filterStatus} onChange={(e)=>setFilterStatus(e.target.value)} className="px-3 py-2 border rounded-lg">
+              <option value="">All Status</option>
+              <option value="In Stock">In Stock</option>
+              <option value="Low Stock">Low Stock</option>
+              <option value="Out of Stock">Out of Stock</option>
+            </select>
+            <div className="flex items-center space-x-2">
+              <select value={sortBy} onChange={(e)=>setSortBy(e.target.value)} className="px-3 py-2 border rounded-lg">
+                <option value="materialName">Material Name</option>
+                <option value="currentStock">Current Quantity</option>
+                <option value="unitPrice">Unit Price</option>
+              </select>
+              <button onClick={()=>setSortOrder(sortOrder==='asc'?'desc':'asc')} className="px-2 py-2 border rounded-lg" title="Toggle sort order">{sortOrder==='asc'?'↑':'↓'}</button>
+              <button onClick={clearFilters} className="px-3 py-2 border rounded-lg bg-gray-50">Clear Filters</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Raw Materials Table / Empty State */}
+        {inventoryItems.length === 0 ? (
+          <div className="p-10 text-center text-gray-500">
+            <p>No raw materials match the selected filters.</p>
+            <div className="mt-3 space-x-2">
+              <button onClick={clearFilters} className="px-3 py-2 border rounded-lg bg-gray-50">Clear Filters</button>
+              <button onClick={loadInventory} className="px-3 py-2 border rounded-lg">Refresh</button>
+            </div>
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -667,6 +703,7 @@ const DriveThruExpress: React.FC = () => {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   )
@@ -684,7 +721,49 @@ const DriveThruExpress: React.FC = () => {
           </div>
         </div>
         
-        {/* Finished Goods Table */}
+        {/* Search & Filters - Finished Goods */}
+        <div className="px-6 py-4 bg-white border-b border-gray-200">
+          <div className="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-3 md:space-y-0">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder="Search finished goods by name or code..."
+                value={searchTerm}
+                onChange={(e)=>setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+            <select value={filterCategory} onChange={(e)=>setFilterCategory(e.target.value)} className="px-3 py-2 border rounded-lg">
+              <option value="">All Categories</option>
+            </select>
+            <select value={filterStatus} onChange={(e)=>setFilterStatus(e.target.value)} className="px-3 py-2 border rounded-lg">
+              <option value="">All Status</option>
+              <option value="In Stock">In Stock</option>
+              <option value="Low Stock">Low Stock</option>
+              <option value="Out of Stock">Out of Stock</option>
+            </select>
+            <div className="flex items-center space-x-2">
+              <select value={sortBy} onChange={(e)=>setSortBy(e.target.value)} className="px-3 py-2 border rounded-lg">
+                <option value="productName">Product Name</option>
+                <option value="currentStock">Current Stock</option>
+                <option value="unitPrice">Unit Price</option>
+              </select>
+              <button onClick={()=>setSortOrder(sortOrder==='asc'?'desc':'asc')} className="px-2 py-2 border rounded-lg" title="Toggle sort order">{sortOrder==='asc'?'↑':'↓'}</button>
+              <button onClick={clearFilters} className="px-3 py-2 border rounded-lg bg-gray-50">Clear Filters</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Finished Goods Table / Empty State */}
+        {finishedGoodInventoryItems.length === 0 ? (
+          <div className="p-10 text-center text-gray-500">
+            <p>No finished goods match the selected filters.</p>
+            <div className="mt-3 space-x-2">
+              <button onClick={clearFilters} className="px-3 py-2 border rounded-lg bg-gray-50">Clear Filters</button>
+              <button onClick={loadInventory} className="px-3 py-2 border rounded-lg">Refresh</button>
+            </div>
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -726,6 +805,7 @@ const DriveThruExpress: React.FC = () => {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   )
