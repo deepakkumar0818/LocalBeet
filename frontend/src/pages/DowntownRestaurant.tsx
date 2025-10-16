@@ -237,11 +237,11 @@ const DowntownRestaurant: React.FC = () => {
         } else {
           console.log('No raw materials inventory found for Kuwait City')
           setInventoryItems([])
-          setError('No raw materials inventory found. Please add some raw materials to Kuwait City.')
+          // Do not set page-level error; empty table state will render and user can adjust filters
         }
       } else {
         console.error('Failed to load raw materials inventory:', 'API Error')
-        setError(`Failed to load inventory from server: Unknown error`)
+        setInventoryItems([])
       }
 
       // Load finished goods from Kuwait City dedicated database
@@ -667,7 +667,7 @@ const DowntownRestaurant: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.productName}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.category}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.unitOfMeasure}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.unitPrice.toFixed(2)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">KWD {item.unitPrice.toFixed(2)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.currentStock}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${

@@ -276,11 +276,11 @@ const MallFoodCourt: React.FC = () => {
         } else {
           console.log('No raw materials inventory found for 360 Mall')
           setInventoryItems([])
-          setError('No raw materials inventory found. Please add some raw materials to 360 Mall.')
+          // Do not set page-level error; let empty state render under the table with actions
         }
       } else {
         console.error('Failed to load raw materials inventory:', (rawMaterialsResponse as any).error || 'API Error')
-        setError(`Failed to load inventory from server: ${(rawMaterialsResponse as any).error || 'Unknown error'}`)
+        setInventoryItems([])
       }
 
       // Load finished goods from 360 Mall dedicated database
@@ -685,7 +685,7 @@ const MallFoodCourt: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.category}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.unitOfMeasure}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.currentStock}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.unitPrice.toFixed(2)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">KWD {item.unitPrice.toFixed(2)}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(item.status)}`}>
                       {item.status}
