@@ -381,7 +381,7 @@ const Dashboard: React.FC = () => {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Total Sales</p>
-                    <p className="text-2xl font-semibold text-gray-900">${overallLive.totalSales.toLocaleString()}</p>
+                    <p className="text-2xl font-semibold text-gray-900">KWD {overallLive.totalSales.toLocaleString()}</p>
                   </div>
                 </div>
               </div>
@@ -403,7 +403,7 @@ const Dashboard: React.FC = () => {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
-                    <p className="text-2xl font-semibold text-gray-900">${overallLive.avgOrderValue}</p>
+                    <p className="text-2xl font-semibold text-gray-900">KWD {overallLive.avgOrderValue}</p>
                   </div>
                 </div>
               </div>
@@ -421,7 +421,7 @@ const Dashboard: React.FC = () => {
                     <div className="text-center space-y-2">
                       <p className="font-semibold text-gray-900">{outlet.name}</p>
                       <p className="text-sm text-gray-600">{outlet.orders} orders</p>
-                      <p className="font-bold text-gray-900">${outlet.sales.toLocaleString()}</p>
+                      <p className="font-bold text-gray-900">KWD {outlet.sales.toLocaleString()}</p>
                       <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                         {outlet.percentage}% of total
                       </div>
@@ -440,7 +440,7 @@ const Dashboard: React.FC = () => {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="day" />
                     <YAxis />
-                    <Tooltip formatter={(value) => [`$${value}`, 'Sales']} />
+                    <Tooltip formatter={(value) => [`KWD ${value}`, 'Sales']} />
                     <Line type="monotone" dataKey="sales" stroke="#3B82F6" strokeWidth={3} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -461,7 +461,7 @@ const Dashboard: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-gray-900">${product.sales.toLocaleString()}</p>
+                        <p className="font-semibold text-gray-900">KWD {product.sales.toLocaleString()}</p>
                       </div>
                     </div>
                   ))}
@@ -471,126 +471,13 @@ const Dashboard: React.FC = () => {
           </div>
         )
       }
-  return (
-    <div className="space-y-6">
-          {/* Overall Stats */}
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-            <div className="card p-6">
-              <div className="flex items-center">
-                <div className="p-3 rounded-lg bg-indigo-500">
-                  <BarChart3 className="h-6 w-6 text-white" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Total Sales</p>
-                  <p className="text-2xl font-semibold text-gray-900">${overallData.totalSales.toLocaleString()}</p>
-                </div>
-              </div>
-            </div>
-            <div className="card p-6">
-              <div className="flex items-center">
-                <div className="p-3 rounded-lg bg-green-500">
-                  <ShoppingCart className="h-6 w-6 text-white" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Total Orders</p>
-                  <p className="text-2xl font-semibold text-gray-900">{overallData.totalOrders}</p>
-        </div>
-        </div>
-      </div>
-            <div className="card p-6">
-              <div className="flex items-center">
-                <div className="p-3 rounded-lg bg-blue-500">
-                  <TrendingUp className="h-6 w-6 text-white" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
-                  <p className="text-2xl font-semibold text-gray-900">${overallData.avgOrderValue}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          {/* Outlet Breakdown */}
-          <div className="card p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-6">Sales by Outlet</h3>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {overallData.outletBreakdown.map((outlet, index) => (
-                <div key={outlet.name} className="flex flex-col items-center p-6 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
-                  <div className={`p-4 rounded-full mb-4 ${
-                    index === 0 ? 'bg-blue-100' : 
-                    index === 1 ? 'bg-green-100' : 
-                    index === 2 ? 'bg-orange-100' : 'bg-purple-100'
-                  }`}>
-                    {index === 0 ? <Store className="h-8 w-8 text-blue-600" /> :
-                     index === 1 ? <Coffee className="h-8 w-8 text-green-600" /> :
-                     index === 2 ? <ShoppingBag className="h-8 w-8 text-orange-600" /> :
-                     <Car className="h-8 w-8 text-purple-600" />}
-                  </div>
-                  <div className="text-center space-y-2">
-                    <p className="font-semibold text-gray-900 text-lg">{outlet.name}</p>
-                    <p className="text-sm text-gray-600">{outlet.orders} orders</p>
-                    <p className="font-bold text-gray-900 text-xl">${outlet.sales.toLocaleString()}</p>
-                    <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {outlet.percentage}% of total
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-      </div>
-
-          {/* Overall Charts */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {/* Overall Sales Trend */}
-        <div className="card p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Overall Sales Trend</h3>
-          <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={[
-                  { day: 'Mon', sales: 22700 },
-                  { day: 'Tue', sales: 24700 },
-                  { day: 'Wed', sales: 21000 },
-                  { day: 'Thu', sales: 28000 },
-                  { day: 'Fri', sales: 34000 },
-                  { day: 'Sat', sales: 39700 },
-                  { day: 'Sun', sales: 30000 }
-                ]}>
-              <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-              <YAxis />
-                  <Tooltip formatter={(value) => [`$${value}`, 'Sales']} />
-                  <Line type="monotone" dataKey="sales" stroke="#3B82F6" strokeWidth={3} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-            {/* Top Products Overall */}
-        <div className="card p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Top Products Overall</h3>
-              <div className="space-y-4">
-                {[
-                  { name: 'Caesar Salad', sales: 12500, orders: 45, outlet: 'Kuwait City' },
-                  { name: 'Cappuccino', sales: 9800, orders: 65, outlet: '360 Mall' },
-                  { name: 'Grilled Chicken', sales: 9800, orders: 38, outlet: 'Kuwait City' },
-                  { name: 'Burger Deluxe', sales: 8200, orders: 28, outlet: 'Vibes Complex' },
-                  { name: 'Latte', sales: 7200, orders: 48, outlet: '360 Mall' }
-                ].map((product, index) => (
-                  <div key={product.name} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-semibold text-blue-600">{index + 1}</span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{product.name}</p>
-                        <p className="text-sm text-gray-600">{product.outlet} • {product.orders} orders</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-gray-900">${product.sales.toLocaleString()}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+      
+      // Show loading state when overallLive is not available
+      return (
+        <div className="space-y-6">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading overall sales data...</p>
           </div>
         </div>
       )
@@ -610,7 +497,7 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Sales</p>
-                <p className="text-2xl font-semibold text-gray-900">${outlet.totalSales.toLocaleString()}</p>
+                <p className="text-2xl font-semibold text-gray-900">KWD {outlet.totalSales.toLocaleString()}</p>
               </div>
             </div>
           </div>
@@ -632,7 +519,7 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
-                <p className="text-2xl font-semibold text-gray-900">${outlet.avgOrderValue}</p>
+                <p className="text-2xl font-semibold text-gray-900">KWD {outlet.avgOrderValue}</p>
               </div>
             </div>
         </div>
@@ -657,7 +544,7 @@ const Dashboard: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
                 <YAxis />
-                <Tooltip formatter={(value) => [`$${value}`, 'Sales']} />
+                <Tooltip formatter={(value) => [`KWD ${value}`, 'Sales']} />
                 <Line type="monotone" dataKey="sales" stroke="#3B82F6" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
@@ -675,7 +562,7 @@ const Dashboard: React.FC = () => {
                     <p className="text-sm text-gray-600">{product.orders} orders</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-gray-900">${product.sales.toLocaleString()}</p>
+                    <p className="font-semibold text-gray-900">KWD {product.sales.toLocaleString()}</p>
               </div>
             </div>
           ))}
@@ -743,7 +630,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Total Sales</p>
-                  <p className="text-2xl font-semibold text-gray-900">${liveByTab[activeTab].totalSales.toLocaleString()}</p>
+                  <p className="text-2xl font-semibold text-gray-900">KWD {liveByTab[activeTab].totalSales.toLocaleString()}</p>
                 </div>
               </div>
             </div>
@@ -765,7 +652,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
-                  <p className="text-2xl font-semibold text-gray-900">${liveByTab[activeTab].avgOrderValue}</p>
+                  <p className="text-2xl font-semibold text-gray-900">KWD {liveByTab[activeTab].avgOrderValue}</p>
                 </div>
               </div>
             </div>
@@ -787,7 +674,7 @@ const Dashboard: React.FC = () => {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="day" />
                   <YAxis />
-                  <Tooltip formatter={(value) => [`$${value}`, 'Sales']} />
+                  <Tooltip formatter={(value) => [`KWD ${value}`, 'Sales']} />
                   <Line type="monotone" dataKey="sales" stroke="#3B82F6" strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
@@ -803,7 +690,7 @@ const Dashboard: React.FC = () => {
                       <p className="text-sm text-gray-600">{product.orders} orders</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-gray-900">${product.sales.toLocaleString()}</p>
+                      <p className="font-semibold text-gray-900">KWD {product.sales.toLocaleString()}</p>
                     </div>
                   </div>
                 ))}

@@ -698,7 +698,7 @@ const SalesOrders: React.FC = () => {
                     {order.orderItems.length} item{order.orderItems.length !== 1 ? 's' : ''}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    ${order.orderSummary.totalAmount.toFixed(2)}
+                    KWD {order.orderSummary.totalAmount.toFixed(2)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.orderStatus)}`}>
@@ -775,7 +775,7 @@ const SalesOrders: React.FC = () => {
                   <p><strong>Status:</strong> <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(selectedOrder.orderStatus)}`}>{selectedOrder.orderStatus}</span></p>
                   <p><strong>Payment:</strong> <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getPaymentStatusColor(selectedOrder.orderSummary.paymentStatus)}`}>{selectedOrder.orderSummary.paymentStatus}</span></p>
                   <p><strong>Method:</strong> {selectedOrder.orderSummary.paymentMethod}</p>
-                  <p><strong>Total:</strong> ${selectedOrder.orderSummary.totalAmount.toFixed(2)}</p>
+                  <p><strong>Total:</strong> KWD {selectedOrder.orderSummary.totalAmount.toFixed(2)}</p>
                 </div>
               </div>
             </div>
@@ -807,8 +807,8 @@ const SalesOrders: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.category}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.quantity}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.unitPrice.toFixed(2)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.totalPrice.toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">KWD {item.unitPrice.toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">KWD {item.totalPrice.toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>

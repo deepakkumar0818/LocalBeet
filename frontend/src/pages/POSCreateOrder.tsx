@@ -265,15 +265,8 @@ const POSCreateOrder: React.FC = () => {
   }
 
   const updateQuantity = (productId: string, newQuantity: number) => {
-    if (newQuantity <= 0) {
-      setCart(prev => prev.filter(ci => !(ci.kind==='finished' && ci.product && ci.product._id===productId)))
-      return
-    }
-    
-    // Check stock availability
-    const cartItem = cart.find(item => item.kind==='finished' && item.product && item.product._id === productId)
-    if (cartItem && cartItem.product && newQuantity > cartItem.product.currentStock) {
-      alert(`Only ${cartItem.product.currentStock} ${cartItem.product.unitOfMeasure} available in stock`)
+    // Don't allow negative quantities
+    if (newQuantity < 0) {
       return
     }
     
@@ -285,9 +278,8 @@ const POSCreateOrder: React.FC = () => {
   }
 
   const updateRecipeQuantity = (recipeKey: string, newQuantity: number) => {
-    if (newQuantity <= 0) {
-      const bomCode = recipeKey.replace('recipe-', '')
-      setCart(prev => prev.filter(ci => !(ci.kind==='recipe' && ci.recipe && ci.recipe.bomCode === bomCode)))
+    // Don't allow negative quantities
+    if (newQuantity < 0) {
       return
     }
     
@@ -330,6 +322,22 @@ const POSCreateOrder: React.FC = () => {
 
     if (!customer.name.trim()) {
       alert('Please enter customer name')
+      return
+    }
+
+    // Check stock availability for finished goods
+    const stockIssues = []
+    const finishedCartItems = cart.filter(ci => ci.kind==='finished' && ci.product)
+    
+    for (const item of finishedCartItems) {
+      if (item.quantity > item.product!.currentStock) {
+        stockIssues.push(`${item.product!.productName}: Requested ${item.quantity}, Available ${item.product!.currentStock} ${item.product!.unitOfMeasure}`)
+      }
+    }
+
+    if (stockIssues.length > 0) {
+      const message = `Insufficient stock for the following items:\n\n${stockIssues.join('\n')}\n\nPlease adjust quantities and try again.`
+      alert(message)
       return
     }
 
@@ -407,7 +415,7 @@ const POSCreateOrder: React.FC = () => {
       
         if (response.success) {
           const orderNumber = response.data?.orderNumber || 'N/A'
-          alert(`Order ${orderNumber} created successfully!\nTotal: $${getTotal().toFixed(2)}\n\nPlease refresh the sales orders page to see the new order.`)
+          alert(`Order ${orderNumber} created successfully!\nTotal: KWD ${getTotal().toFixed(2)}\n\nPlease refresh the sales orders page to see the new order.`)
       
       // Clear cart and reset form
       setCart([])
@@ -543,7 +551,7 @@ const POSCreateOrder: React.FC = () => {
                   >
                     <div className="flex justify-between items-start mb-2">
                         <h4 className="font-medium text-gray-900">{product.productName}</h4>
-                        <span className="text-green-600 font-semibold">${product.unitPrice.toFixed(2)}</span>
+                        <span className="text-green-600 font-semibold">KWD {product.unitPrice.toFixed(2)}</span>
                     </div>
                       <p className="text-sm text-gray-600 mb-2">Code: {product.productCode}</p>
                       <div className="flex justify-between items-center mb-2">
@@ -576,7 +584,7 @@ const POSCreateOrder: React.FC = () => {
                         onKeyDown={(e)=> e.key==='Enter' && addRecipeToCart(r)} role="button" tabIndex={0}>
                         <div className="flex justify-between items-start mb-2">
                           <h4 className="font-medium text-gray-900">{r.productName}</h4>
-                          <span className="text-green-600 font-semibold">{r.totalCost ? `$${r.totalCost.toFixed(2)}` : 'Recipe'}</span>
+                          <span className="text-green-600 font-semibold">{r.totalCost ? `KWD ${r.totalCost.toFixed(2)}` : 'Recipe'}</span>
                         </div>
                         <div className="text-sm text-gray-500">Code: {r.bomCode}</div>
                         {r.productDescription && <div className="text-xs text-gray-400 mt-1">{r.productDescription}</div>}
@@ -623,30 +631,48 @@ const POSCreateOrder: React.FC = () => {
                       <div key={item.product._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex-1">
                           <h4 className="font-medium text-sm">{item.product.productName}</h4>
-                          <p className="text-xs text-gray-600">${item.product.unitPrice.toFixed(2)} each</p>
+                          <p className="text-xs text-gray-600">KWD {item.product.unitPrice.toFixed(2)} each</p>
                           <p className="text-xs text-gray-500">Stock: {item.product.currentStock} {item.product.unitOfMeasure}</p>
                       </div>
                       <div className="flex items-center space-x-2">
-                          <button onClick={() => updateQuantity(item.product!._id, item.quantity - 1)} className="p-1 hover:bg-gray-200 rounded"><Minus className="h-3 w-3" /></button>
-                        <span className="w-8 text-center text-sm">{item.quantity}</span>
-                          <button onClick={() => updateQuantity(item.product!._id, item.quantity + 1)} className="p-1 hover:bg-gray-200 rounded"><Plus className="h-3 w-3" /></button>
+                        <input 
+                          type="number" 
+                          value={item.quantity.toString()} 
+                          onChange={(e) => {
+                            const newQuantity = parseInt(e.target.value) || 0;
+                            if (newQuantity >= 0) {
+                              updateQuantity(item.product!._id, newQuantity);
+                            }
+                          }}
+                          className="w-16 text-center text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          min="0"
+                        />
                           <button onClick={() => removeFromCart(item.product!._id)} className="p-1 text-red-600 hover:bg-red-50 rounded ml-2"><Trash2 className="h-3 w-3" /></button>
                         </div>
-                        <div className="text-right ml-4"><p className="font-medium text-sm">${item.subtotal.toFixed(2)}</p></div>
+                        <div className="text-right ml-4"><p className="font-medium text-sm">KWD {item.subtotal.toFixed(2)}</p></div>
                       </div>
                     ) : item.kind === 'recipe' && item.recipe ? (
                       <div key={`recipe-${item.recipe.bomCode}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div className="flex-1">
                           <h4 className="font-medium text-sm">{item.recipe.productName} <span className="text-xs text-gray-500">(Recipe)</span></h4>
-                          <p className="text-xs text-gray-600">{item.recipe.totalCost ? `$${item.recipe.totalCost.toFixed(2)} each` : 'Cost not set'}</p>
+                          <p className="text-xs text-gray-600">{item.recipe.totalCost ? `KWD ${item.recipe.totalCost.toFixed(2)} each` : 'Cost not set'}</p>
                       </div>
                         <div className="flex items-center space-x-2">
-                          <button onClick={() => updateRecipeQuantity(`recipe-${item.recipe!.bomCode}`, item.quantity - 1)} className="p-1 hover:bg-gray-200 rounded"><Minus className="h-3 w-3" /></button>
-                          <span className="w-8 text-center text-sm">{item.quantity}</span>
-                          <button onClick={() => updateRecipeQuantity(`recipe-${item.recipe!.bomCode}`, item.quantity + 1)} className="p-1 hover:bg-gray-200 rounded"><Plus className="h-3 w-3" /></button>
+                          <input 
+                            type="number" 
+                            value={item.quantity.toString()} 
+                            onChange={(e) => {
+                              const newQuantity = parseInt(e.target.value) || 0;
+                              if (newQuantity >= 0) {
+                                updateRecipeQuantity(`recipe-${item.recipe!.bomCode}`, newQuantity);
+                              }
+                            }}
+                            className="w-16 text-center text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            min="0"
+                          />
                           <button onClick={() => removeRecipeFromCart(item.recipe!.bomCode)} className="p-1 text-red-600 hover:bg-red-50 rounded ml-2"><Trash2 className="h-3 w-3" /></button>
                       </div>
-                        <div className="text-right ml-4"><p className="font-medium text-sm">${item.subtotal.toFixed(2)}</p></div>
+                        <div className="text-right ml-4"><p className="font-medium text-sm">KWD {item.subtotal.toFixed(2)}</p></div>
                     </div>
                     ) : null
                   ))}
@@ -662,24 +688,24 @@ const POSCreateOrder: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span>Subtotal:</span>
-                    <span>${getSubtotal().toFixed(2)}</span>
+                    <span>KWD {getSubtotal().toFixed(2)}</span>
                   </div>
                   
                   <div className="flex justify-between">
                     <span>Tax ({tax}%):</span>
-                    <span>${getTaxAmount().toFixed(2)}</span>
+                    <span>KWD {getTaxAmount().toFixed(2)}</span>
                   </div>
                   
                   <div className="flex justify-between">
                     <span>Discount ({discount}%):</span>
-                    <span className="text-red-600">-${getDiscountAmount().toFixed(2)}</span>
+                    <span className="text-red-600">-KWD {getDiscountAmount().toFixed(2)}</span>
                   </div>
                   
                   <hr className="my-2" />
                   
                   <div className="flex justify-between text-lg font-semibold">
                     <span>Total:</span>
-                    <span>${getTotal().toFixed(2)}</span>
+                    <span>KWD {getTotal().toFixed(2)}</span>
                   </div>
                 </div>
 
