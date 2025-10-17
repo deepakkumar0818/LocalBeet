@@ -32,7 +32,7 @@ router.get('/', async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
-    const query = {};
+    const query = { isActive: true }; // Only show active items by default
     
     // Add search filter
     if (search) {

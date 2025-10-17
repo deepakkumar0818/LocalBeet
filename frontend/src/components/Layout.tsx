@@ -112,7 +112,6 @@ const navigation: NavigationItem[] = [
     ]
   },
   { name: 'Inventory', href: '/inventory', icon: BarChart3 },
-  { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
@@ -468,10 +467,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             </div>
             <div className="mt-3 space-y-1">
-              <button className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg w-full">
+              <Link
+                to="/settings"
+                className={`flex items-center px-3 py-2 text-sm rounded-lg w-full ${
+                  location.pathname === '/settings'
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
                 <Settings className="mr-3 h-4 w-4" />
                 Settings
-              </button>
+              </Link>
               <button className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg w-full">
                 <LogOut className="mr-3 h-4 w-4" />
                 Sign out

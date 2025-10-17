@@ -291,24 +291,71 @@ router.post('/create', async (req, res) => {
   }
 });
 
+// Helper function to get the correct model for an outlet using the same approach as API endpoints
+async function getOutletModel(outletName) {
+  switch (outletName.toLowerCase()) {
+    case 'central kitchen':
+    case 'central-kitchen':
+      return centralKitchenModels.CentralKitchenRawMaterial;
+    case 'kuwait city':
+    case 'kuwait-city':
+      const kuwaitConnection = await connectKuwaitCityDB();
+      const kuwaitModels = getKuwaitCityModels(kuwaitConnection);
+      return kuwaitModels.KuwaitCityRawMaterial;
+    case '360 mall':
+    case '360-mall':
+      const mall360Connection = await connectMall360DB();
+      const mall360Models = getMall360Models(mall360Connection);
+      return mall360Models.Mall360RawMaterial;
+    case 'vibe complex':
+    case 'vibe-complex':
+    case 'vibes complex':
+    case 'vibes-complex':
+      const vibeConnection = await connectVibeComplexDB();
+      const vibeModels = getVibeComplexModels(vibeConnection);
+      return vibeModels.VibeComplexRawMaterial;
+    case 'taiba hospital':
+    case 'taiba-kitchen':
+      const taibaConnection = await connectTaibaKitchenDB();
+      const taibaModels = getTaibaKitchenModels(taibaConnection);
+      return taibaModels.TaibaKitchenRawMaterial;
+    default:
+      throw new Error(`Unknown outlet: ${outletName}`);
+  }
+}
+
 // Helper function to handle Raw Material transfers
 async function handleRawMaterialTransfer(sourceModels, destinationModels, itemCode, quantity, notes, isFromCentralKitchen = true) {
   console.log(`\n🔄 Starting Raw Material Transfer for ${itemCode}`);
   console.log(`   Quantity: ${quantity}`);
   console.log(`   Direction: ${isFromCentralKitchen ? 'FROM Central Kitchen TO outlet' : 'FROM outlet TO Central Kitchen'}`);
   
-  // Get source and destination models
-  const SourceRawMaterial = sourceModels.CentralKitchenRawMaterial || 
-    sourceModels.KuwaitCityRawMaterial || 
-    sourceModels.Mall360RawMaterial || 
-    sourceModels.VibeComplexRawMaterial || 
-    sourceModels.TaibaKitchenRawMaterial;
+  // Get source and destination models using the correct database connections
+  let SourceRawMaterial, DestinationRawMaterial;
+  
+  if (isFromCentralKitchen) {
+    // Transfer FROM Central Kitchen TO outlet
+    SourceRawMaterial = centralKitchenModels.CentralKitchenRawMaterial;
+    // Determine the destination outlet name from the models
+    let destinationOutletName = 'kuwait city'; // default
+    if (destinationModels.KuwaitCityRawMaterial) destinationOutletName = 'kuwait city';
+    else if (destinationModels.Mall360RawMaterial) destinationOutletName = '360 mall';
+    else if (destinationModels.VibeComplexRawMaterial) destinationOutletName = 'vibe complex';
+    else if (destinationModels.TaibaKitchenRawMaterial) destinationOutletName = 'taiba hospital';
     
-  const DestinationRawMaterial = destinationModels.CentralKitchenRawMaterial || 
-    destinationModels.KuwaitCityRawMaterial || 
-    destinationModels.Mall360RawMaterial || 
-    destinationModels.VibeComplexRawMaterial || 
-    destinationModels.TaibaKitchenRawMaterial;
+    DestinationRawMaterial = await getOutletModel(destinationOutletName);
+  } else {
+    // Transfer FROM outlet TO Central Kitchen
+    // Determine the source outlet name from the models
+    let sourceOutletName = 'kuwait city'; // default
+    if (sourceModels.KuwaitCityRawMaterial) sourceOutletName = 'kuwait city';
+    else if (sourceModels.Mall360RawMaterial) sourceOutletName = '360 mall';
+    else if (sourceModels.VibeComplexRawMaterial) sourceOutletName = 'vibe complex';
+    else if (sourceModels.TaibaKitchenRawMaterial) sourceOutletName = 'taiba hospital';
+    
+    SourceRawMaterial = await getOutletModel(sourceOutletName);
+    DestinationRawMaterial = centralKitchenModels.CentralKitchenRawMaterial;
+  }
 
   if (!SourceRawMaterial) {
     throw new Error('No valid source Raw Material model found');
@@ -316,6 +363,9 @@ async function handleRawMaterialTransfer(sourceModels, destinationModels, itemCo
   if (!DestinationRawMaterial) {
     throw new Error('No valid destination Raw Material model found');
   }
+
+  console.log(`   📊 Source Model: ${SourceRawMaterial.modelName || 'Unknown'}`);
+  console.log(`   📊 Destination Model: ${DestinationRawMaterial.modelName || 'Unknown'}`);
 
   // Find the item in source location
   const sourceItem = await SourceRawMaterial.findOne({ materialCode: itemCode });
@@ -340,50 +390,54 @@ async function handleRawMaterialTransfer(sourceModels, destinationModels, itemCo
     { new: true }
   );
 
-  // Find or create the item in the destination location
-  let destinationItem = await DestinationRawMaterial.findOne({ materialCode: itemCode });
-  
-  if (destinationItem) {
-    // Add to existing destination stock
-    console.log(`   ⬆️ Adding ${quantity} to existing destination stock (current: ${destinationItem.currentStock})`);
-    const updated = await DestinationRawMaterial.findByIdAndUpdate(
-      destinationItem._id,
-      { 
-        $inc: { currentStock: quantity },
-        updatedBy: 'Transfer System'
-      },
-      { new: true }
-    );
-    console.log(`   ✅ Updated destination stock to: ${updated.currentStock}`);
+  // Atomically upsert by materialCode so repeated transfers add to existing row
+  console.log(`   🔍 Upserting destination item for materialCode: ${itemCode}`);
+
+  // Determine the correct status based on destination model type
+  let statusValue;
+  if (destinationModels.CentralKitchenRawMaterial) {
+    statusValue = 'Active';
   } else {
-    // Create new item in destination with the transferred quantity
-    console.log(`   🆕 Creating new item in destination with quantity: ${quantity}`);
-    const newDestinationItem = {
+    statusValue = quantity > (sourceItem.minimumStock || 10) ? 'In Stock' : 'Low Stock';
+  }
+
+  const upsertDoc = {
+    $inc: { currentStock: quantity },
+    $set: {
+      updatedBy: 'Transfer System',
+      isActive: true,
+      status: statusValue
+    },
+    $setOnInsert: {
       materialCode: sourceItem.materialCode,
       materialName: sourceItem.materialName,
-      category: sourceItem.category,
+      category: sourceItem.category || sourceItem.subCategory,
       subCategory: sourceItem.subCategory,
       unitOfMeasure: sourceItem.unitOfMeasure,
       description: sourceItem.description,
       unitPrice: sourceItem.unitPrice,
-      currentStock: quantity,
-      minimumStock: sourceItem.minimumStock,
-      maximumStock: sourceItem.maximumStock,
-      reorderPoint: sourceItem.reorderPoint,
-      supplierId: sourceItem.supplierId,
-      supplierName: sourceItem.supplierName,
-      storageRequirements: sourceItem.storageRequirements,
-      shelfLife: sourceItem.shelfLife,
-      isActive: sourceItem.isActive,
-      status: quantity > sourceItem.minimumStock ? 'In Stock' : 'Low Stock',
-      notes: notes || sourceItem.notes,
-      createdBy: 'Transfer System',
-      updatedBy: 'Transfer System'
-    };
+      minimumStock: sourceItem.minimumStock || 10,
+      maximumStock: sourceItem.maximumStock || 1000,
+      reorderPoint: sourceItem.reorderPoint || 20,
+      supplierId: sourceItem.supplierId || '',
+      supplierName: sourceItem.supplierName || '',
+      storageRequirements: sourceItem.storageRequirements || {
+        temperature: 'Room Temperature',
+        humidity: 'Normal',
+        specialConditions: ''
+      },
+      shelfLife: sourceItem.shelfLife || 365,
+      notes: notes || sourceItem.notes || '',
+      createdBy: 'Transfer System'
+    }
+  };
 
-    const created = await DestinationRawMaterial.create(newDestinationItem);
-    console.log(`   ✅ Created new item in destination:`, created.materialCode, 'with stock:', created.currentStock);
-  }
+  const upsertResult = await DestinationRawMaterial.updateOne(
+    { materialCode: sourceItem.materialCode },
+    upsertDoc,
+    { upsert: true }
+  );
+  console.log(`   ✅ Upserted destination item. Matched: ${upsertResult.matchedCount || upsertResult.nMatched}, Modified: ${upsertResult.modifiedCount || upsertResult.nModified}, Upserted: ${upsertResult.upsertedCount || (upsertResult.upsertedId ? 1 : 0)}`);
 
   console.log(`✅ Successfully transferred ${quantity} ${itemCode} (Raw Material) from source to destination`);
 }

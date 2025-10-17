@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import UserPermissionModal from '../components/UserPermissionModal'
 import RoleManagementModal from '../components/RoleManagementModal'
+import { apiService } from '../services/api'
 
 interface User {
   id: string
@@ -42,35 +43,9 @@ interface Permission {
 
 const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState('users')
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: '1',
-      name: 'John Doe',
-      email: 'john.doe@company.com',
-      role: 'Admin',
-      status: 'active',
-      lastLogin: '2024-01-15 10:30',
-      permissions: ['all']
-    },
-    {
-      id: '2',
-      name: 'Jane Smith',
-      email: 'jane.smith@company.com',
-      role: 'Manager',
-      status: 'active',
-      lastLogin: '2024-01-15 09:15',
-      permissions: ['inventory.view', 'inventory.edit', 'reports.view']
-    },
-    {
-      id: '3',
-      name: 'Mike Johnson',
-      email: 'mike.johnson@company.com',
-      role: 'Staff',
-      status: 'active',
-      lastLogin: '2024-01-14 16:45',
-      permissions: ['inventory.view']
-    }
-  ])
+  const [users, setUsers] = useState<User[]>([])
+  const [showAddUser, setShowAddUser] = useState(false)
+  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'Staff', status: 'Active' as 'Active' | 'Inactive' })
 
   const [roles, setRoles] = useState<Role[]>([
     {
@@ -222,6 +197,25 @@ const Settings: React.FC = () => {
     { id: 'permissions', name: 'Permissions', icon: Key }
   ]
 
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiService.getUsers()
+        if (res?.success) {
+          setUsers(res.data.map((u: any) => ({
+            id: u._id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            status: (u.status || 'Active').toLowerCase(),
+            lastLogin: u.updatedAt ? new Date(u.updatedAt).toLocaleString() : '-',
+            permissions: []
+          })))
+        }
+      } catch {}
+    })()
+  }, [])
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -249,15 +243,15 @@ const Settings: React.FC = () => {
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex space-x-2">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
+              className={`flex items-center space-x-2 py-2 px-3 font-medium text-sm rounded-md transition-colors ${
                 activeTab === tab.id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 border border-transparent'
               }`}
             >
               <tab.icon className="h-4 w-4" />
@@ -274,7 +268,7 @@ const Settings: React.FC = () => {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">User Management</h2>
             <button
-              onClick={() => {}}
+              onClick={() => setShowAddUser(true)}
               className="btn-primary flex items-center"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -413,6 +407,59 @@ const Settings: React.FC = () => {
       )}
 
       {/* User Permission Modal */}
+      {showAddUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Add User</h2>
+              <button onClick={() => setShowAddUser(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <input className="input-field" placeholder="Full name" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input type="email" className="input-field" placeholder="you@company.com" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input type="password" className="input-field" placeholder="••••••••" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <button onClick={() => setShowAddUser(false)} className="btn-secondary">Cancel</button>
+              <button
+                onClick={async () => {
+                  const res = await apiService.createUser({ name: newUser.name, email: newUser.email, password: newUser.password, role: 'Staff', status: 'Active' })
+                  if (res?.success) {
+                    setShowAddUser(false)
+                    setNewUser({ name: '', email: '', password: '', role: 'Staff', status: 'Active' })
+                    const list = await apiService.getUsers()
+                    if (list?.success) {
+                      setUsers(list.data.map((u: any) => ({
+                        id: u._id,
+                        name: u.name,
+                        email: u.email,
+                        role: u.role,
+                        status: (u.status || 'Active').toLowerCase() as any,
+                        lastLogin: u.updatedAt ? new Date(u.updatedAt).toLocaleString() : '-',
+                        permissions: []
+                      })))
+                    }
+                  }
+                }}
+                className="btn-primary"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {editingUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
