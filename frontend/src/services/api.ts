@@ -38,6 +38,30 @@ class ApiService {
       throw error;
     }
   }
+  // Auth API
+  async login(data: { email?: string; username?: string; password: string }) {
+    return this.request<{ user: any; token: string }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async me() {
+    return this.request<any>('/auth/me');
+  }
+
+  // Users API (basic)
+  async getUsers() {
+    return this.request<any[]>('/users');
+  }
+
+  async createUser(data: { name: string; email: string; password: string; role?: string; status?: string; isAdmin?: boolean }) {
+    return this.request<any>('/users', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
 
   // Health check
   async healthCheck() {
@@ -199,6 +223,29 @@ class ApiService {
         pages: number;
       };
     }>(endpoint);
+  }
+
+  async createCentralKitchenRawMaterial(data: {
+    materialCode: string;
+    materialName: string;
+    parentCategory?: string;
+    subCategory: string;
+    unitOfMeasure: string;
+    description?: string;
+    unitPrice: number;
+    currentStock: number;
+    minimumStock?: number;
+    maximumStock?: number;
+    reorderPoint?: number;
+    supplierId?: string;
+    supplierName?: string;
+    status?: string;
+    isActive?: boolean;
+  }) {
+    return this.request<any>('/central-kitchen/raw-materials', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
   }
 
   // Kuwait City API

@@ -1,6 +1,7 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
+import Login from './pages/Login'
 import RawMaterials from './pages/RawMaterials'
 import AddMaterial from './pages/AddMaterial'
 import EditMaterial from './pages/EditMaterial'
@@ -50,6 +51,17 @@ import TaibaHospitalRequestRawMaterials from './pages/TaibaHospitalRequestRawMat
 import TaibaHospitalRequestFinishedGoods from './pages/TaibaHospitalRequestFinishedGoods'
 
 function App() {
+  const location = useLocation()
+  const isAuthRoute = location.pathname === '/login'
+
+  if (isAuthRoute) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+      </Routes>
+    )
+  }
+
   return (
     <Layout>
       <Routes>

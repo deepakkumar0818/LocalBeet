@@ -370,39 +370,39 @@ const Dashboard: React.FC = () => {
   const renderOutletContent = (outletId: string) => {
     if (outletId === 'overall') {
       if (overallLive) {
-        return (
-          <div className="space-y-6">
+  return (
+    <div className="space-y-6">
             {/* Overall Stats (dynamic) */}
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-              <div className="card p-6">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-lg bg-indigo-500">
-                    <BarChart3 className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total Sales</p>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+            <div className="card p-6">
+              <div className="flex items-center">
+                <div className="p-3 rounded-lg bg-indigo-500">
+                  <BarChart3 className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Total Sales</p>
                     <p className="text-2xl font-semibold text-gray-900">KWD {overallLive.totalSales.toLocaleString()}</p>
-                  </div>
                 </div>
               </div>
-              <div className="card p-6">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-lg bg-green-500">
-                    <ShoppingCart className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total Orders</p>
+            </div>
+            <div className="card p-6">
+              <div className="flex items-center">
+                <div className="p-3 rounded-lg bg-green-500">
+                  <ShoppingCart className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Total Orders</p>
                     <p className="text-2xl font-semibold text-gray-900">{overallLive.totalOrders}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="card p-6">
-                <div className="flex items-center">
+        </div>
+        </div>
+      </div>
+            <div className="card p-6">
+              <div className="flex items-center">
                   <div className="p-3 rounded-lg bg-purple-500">
-                    <TrendingUp className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
+                  <TrendingUp className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
                     <p className="text-2xl font-semibold text-gray-900">KWD {overallLive.avgOrderValue}</p>
                   </div>
                 </div>
@@ -410,63 +410,63 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Sales by Outlet */}
-            <div className="card p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-6">Sales by Outlet</h3>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="card p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-6">Sales by Outlet</h3>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 {overallLive.outletBreakdown.map((outlet:any, index:number) => (
-                  <div key={outlet.name} className="flex flex-col items-center p-6 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+                <div key={outlet.name} className="flex flex-col items-center p-6 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
                     <div className={`p-4 rounded-full mb-4 ${index % 2 === 0 ? 'bg-blue-100' : 'bg-green-100'}`}>
                       <Store className={`${index % 2 === 0 ? 'text-blue-600' : 'text-green-600'} h-8 w-8`} />
-                    </div>
-                    <div className="text-center space-y-2">
+                  </div>
+                  <div className="text-center space-y-2">
                       <p className="font-semibold text-gray-900">{outlet.name}</p>
-                      <p className="text-sm text-gray-600">{outlet.orders} orders</p>
+                    <p className="text-sm text-gray-600">{outlet.orders} orders</p>
                       <p className="font-bold text-gray-900">KWD {outlet.sales.toLocaleString()}</p>
-                      <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {outlet.percentage}% of total
+                    <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {outlet.percentage}% of total
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+      </div>
+
+            {/* Overall Charts dynamic */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="card p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Overall Sales Trend</h3>
+          <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={overallLive.overallTrend}>
+              <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="day" />
+              <YAxis />
+                    <Tooltip formatter={(value) => [`KWD ${value}`, 'Sales']} />
+                  <Line type="monotone" dataKey="sales" stroke="#3B82F6" strokeWidth={3} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="card p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Top Products Overall</h3>
+              <div className="space-y-4">
+                  {overallLive.topProductsOverall.map((product:any, index:number) => (
+                    <div key={`${product.name}-${product.outlet}`} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-semibold text-blue-600">{index + 1}</span>
                       </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{product.name}</p>
+                        <p className="text-sm text-gray-600">{product.outlet} • {product.orders} orders</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                        <p className="font-semibold text-gray-900">KWD {product.sales.toLocaleString()}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-
-            {/* Overall Charts dynamic */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="card p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Overall Sales Trend</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={overallLive.overallTrend}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="day" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [`KWD ${value}`, 'Sales']} />
-                    <Line type="monotone" dataKey="sales" stroke="#3B82F6" strokeWidth={3} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="card p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Top Products Overall</h3>
-                <div className="space-y-4">
-                  {overallLive.topProductsOverall.map((product:any, index:number) => (
-                    <div key={`${product.name}-${product.outlet}`} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <div className="flex items-center space-x-4">
-                        <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-semibold text-blue-600">{index + 1}</span>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{product.name}</p>
-                          <p className="text-sm text-gray-600">{product.outlet} • {product.orders} orders</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-gray-900">KWD {product.sales.toLocaleString()}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
         )
