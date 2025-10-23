@@ -165,6 +165,16 @@ const salesOrderSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  zohoIntegration: {
+    salesOrderId: { type: String, trim: true },
+    pushedAt: { type: Date },
+    status: { 
+      type: String, 
+      enum: ['pending', 'pushed', 'failed'], 
+      default: 'pending' 
+    },
+    error: { type: String, trim: true }
+  },
   createdBy: { type: String, trim: true },
   updatedBy: { type: String, trim: true },
 }, {
