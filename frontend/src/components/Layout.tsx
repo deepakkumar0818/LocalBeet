@@ -101,16 +101,16 @@ const navigation: NavigationItem[] = [
   },
   { name: 'Transfer Orders', href: '/transfer-orders', icon: Truck },
   { name: 'Purchase Orders', href: '/purchase-orders', icon: ShoppingCart },
-  { 
-    name: 'Master', 
-    icon: Database, 
-    hasDropdown: true,
-    children: [
-      { name: 'Raw Material Master', href: '/raw-materials', icon: Package },
-      { name: 'Finished Good Master', href: '/finished-goods-master', icon: Layers },
-      { name: 'Outlet Master', href: '/outlets', icon: Store },
-    ]
-  },
+  // { 
+  //   name: 'Master', 
+  //   icon: Database, 
+  //   hasDropdown: true,
+  //   children: [
+  //     { name: 'Raw Material Master', href: '/raw-materials', icon: Package },
+  //     { name: 'Finished Good Master', href: '/finished-goods-master', icon: Layers },
+  //     { name: 'Outlet Master', href: '/outlets', icon: Store },
+  //   ]
+  // },
   { name: 'Inventory', href: '/inventory', icon: BarChart3 },
 ]
 

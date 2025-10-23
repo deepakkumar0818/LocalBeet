@@ -578,7 +578,7 @@ const MallFoodCourt: React.FC = () => {
                   searchTerm === '' || 
                   item.materialCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
                   item.materialName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  item.category.toLowerCase().includes(searchTerm.toLowerCase())
+                  (item.category && item.category.toLowerCase().includes(searchTerm.toLowerCase()))
                 )
                 .map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
@@ -676,7 +676,7 @@ const MallFoodCourt: React.FC = () => {
                   searchTerm === '' || 
                   item.productCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
                   item.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  item.category.toLowerCase().includes(searchTerm.toLowerCase())
+                  (item.category && item.category.toLowerCase().includes(searchTerm.toLowerCase()))
                 )
                 .map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
