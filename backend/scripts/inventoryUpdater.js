@@ -197,20 +197,21 @@ async function updateInventoryItem(Model, item, billId, verbose = true) {
     const newQuantity = parseFloat(item.quantity) || 0;
     const updatedQuantity = currentQuantity + newQuantity;
 
-    await Model.findOneAndUpdate(
-      filter,
-      {
-        $set: {
-          currentStock: updatedQuantity,
-          updatedBy: 'bill-processor',
-          notes: `Received ${newQuantity} units from bill ${billId} on ${new Date().toLocaleDateString()}`
-        }
-      },
-      { new: true }
-    );
+        await Model.findOneAndUpdate(
+          filter,
+          {
+            $set: {
+              currentStock: updatedQuantity,
+              unitPrice: parseFloat(item.rate) || 0, // Update price from bill
+              updatedBy: 'bill-processor',
+              notes: `Received ${newQuantity} units from bill ${billId} on ${new Date().toLocaleDateString()} - Price updated to ${item.rate}`
+            }
+          },
+          { new: true }
+        );
 
     if (verbose) {
-      console.log(`   🔄 Updated ${item.sku}: ${currentQuantity} + ${newQuantity} = ${updatedQuantity}`);
+      console.log(`   🔄 Updated ${item.sku}: ${currentQuantity} + ${newQuantity} = ${updatedQuantity} (Price: ${item.rate})`);
     }
 
     return { created: false, updated: true };
@@ -237,7 +238,7 @@ async function updateInventoryItem(Model, item, billId, verbose = true) {
     await newItem.save();
 
     if (verbose) {
-      console.log(`   ➕ Created new item ${item.sku}: ${item.quantity} ${item.unit || 'pcs'}`);
+      console.log(`   ➕ Created new item ${item.sku}: ${item.quantity} ${item.unit || 'pcs'} (Price: ${item.rate})`);
     }
 
     return { created: true, updated: false };
