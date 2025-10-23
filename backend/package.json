@@ -10,7 +10,12 @@
     "seed": "node scripts/seedRawMaterials.js",
     "seed:360mall": "node scripts/seed360MallFromKuwaitCity.js",
     "zoho:token": "node scripts/getZohoAccessToken.js",
-    "zoho:fetch": "node scripts/fetchZohoItems.js"
+    "zoho:fetch": "node scripts/fetchZohoItems.js",
+    "zoho:fetch-bills": "node scripts/fetchZohoBills.js",
+    "zoho:sync-bills": "node scripts/syncZohoBillsToPurchaseOrders.js",
+    "zoho:fetch-bill": "node scripts/fetchZohoBillById.js",
+    "process:bill": "node scripts/processBillForInventory.js",
+    "clear:purchase-orders": "node scripts/clearPurchaseOrders.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

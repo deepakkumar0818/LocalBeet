@@ -1108,6 +1108,92 @@ class ApiService {
       body: JSON.stringify(data)
     });
   }
+
+  // Purchase Orders API
+  async getPurchaseOrders(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+    if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/purchase-orders${queryString ? `?${queryString}` : ''}`;
+    
+    return this.request<{
+      success: boolean;
+      data: any[];
+      pagination?: {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+      };
+    }>(endpoint);
+  }
+
+  async getPurchaseOrderById(id: string) {
+    return this.request<{
+      success: boolean;
+      data: any;
+    }>(`/purchase-orders/${id}`);
+  }
+
+  async createPurchaseOrder(data: any) {
+    return this.request<{
+      success: boolean;
+      data: any;
+      message: string;
+    }>('/purchase-orders', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updatePurchaseOrder(id: string, data: any) {
+    return this.request<{
+      success: boolean;
+      data: any;
+      message: string;
+    }>(`/purchase-orders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deletePurchaseOrder(id: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+    }>(`/purchase-orders/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async syncZohoBillsToPurchaseOrders() {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: {
+        totalBills: number;
+        addedOrders: number;
+        updatedOrders: number;
+        errorCount: number;
+        syncTimestamp: string;
+      };
+    }>('/sync-zoho-bills/purchase-orders', {
+      method: 'POST'
+    });
+  }
 }
 
 export const apiService = new ApiService();

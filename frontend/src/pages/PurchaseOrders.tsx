@@ -1,22 +1,44 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit, Trash2, Eye, Filter, Download, Upload, X, RefreshCw } from 'lucide-react'
-import { PurchaseOrder } from '../types'
+import { Search, Filter, Download, RefreshCw, Package, MapPin, User, DollarSign, Hash, Calendar, AlertCircle } from 'lucide-react'
 import { apiService } from '../services/api'
+
+interface PurchaseOrder {
+  id: string
+  poNumber: string
+  supplierId: string
+  supplierName: string
+  supplierEmail?: string
+  orderDate: string
+  expectedDeliveryDate: string
+  status: string
+  totalAmount: number
+  items: any[]
+  terms?: string
+  notes?: string
+  zohoBillId?: string
+  zohoLocationName?: string
+  lastSyncedAt?: string
+  syncStatus?: 'syncing' | 'synced' | 'not_synced' | 'sync_failed'
+  processingStatus?: 'processing' | 'processed' | 'not_processed' | 'failed'
+  lastProcessedAt?: string
+  processedBy?: string
+  createdAt: string
+  updatedAt: string
+}
 
 const PurchaseOrders: React.FC = () => {
   const navigate = useNavigate()
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null)
-  const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [statusFilter, setStatusFilter] = useState('')
+  const [syncStatusFilter, setSyncStatusFilter] = useState('')
+  const [processingStatusFilter, setProcessingStatusFilter] = useState('')
   const [sortBy, setSortBy] = useState('createdAt')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [importing, setImporting] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     loadPurchaseOrders()
@@ -27,7 +49,7 @@ const PurchaseOrders: React.FC = () => {
     if (!loading) {
       loadPurchaseOrders()
     }
-  }, [searchTerm, statusFilter, sortBy, sortOrder])
+  }, [searchTerm, statusFilter, syncStatusFilter, processingStatusFilter, sortBy, sortOrder])
 
   const loadPurchaseOrders = async () => {
     try {
@@ -43,15 +65,7 @@ const PurchaseOrders: React.FC = () => {
 
       if (response.success) {
         console.log('Loaded Purchase Orders:', response.data)
-        // Convert string dates to Date objects
-        const formattedData = response.data.map((po: any) => ({
-          ...po,
-          orderDate: new Date(po.orderDate),
-          expectedDeliveryDate: new Date(po.expectedDeliveryDate),
-          createdAt: new Date(po.createdAt),
-          updatedAt: new Date(po.updatedAt)
-        }))
-        setPurchaseOrders(formattedData)
+        setPurchaseOrders(response.data)
       } else {
         setError('Failed to load purchase orders')
       }
@@ -63,43 +77,107 @@ const PurchaseOrders: React.FC = () => {
     }
   }
 
-  // Data is already filtered and sorted by the backend API
-  const displayedPOs = purchaseOrders
+  const handleSyncWithZoho = async () => {
+    if (!window.confirm('This will fetch all bills from Zoho Inventory and sync them to Purchase Orders. Continue?')) {
+      return
+    }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Completed': return 'bg-green-100 text-green-800'
-      case 'Confirmed': return 'bg-blue-100 text-blue-800'
-      case 'Sent': return 'bg-yellow-100 text-yellow-800'
-      case 'Partial': return 'bg-orange-100 text-orange-800'
-      case 'Draft': return 'bg-gray-100 text-gray-800'
-      case 'Cancelled': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
+    try {
+      setSyncing(true)
+      console.log('🔄 Starting Zoho Bills sync...')
+      
+      const response = await apiService.syncZohoBillsToPurchaseOrders()
+      
+      if (response.success) {
+        const { totalBills, addedOrders, updatedOrders, errorCount, processingResult } = response.data
+        let message = `✅ Sync Completed Successfully!\n\n` +
+          `📦 Total Bills: ${totalBills}\n` +
+          `➕ Added: ${addedOrders}\n` +
+          `🔄 Updated: ${updatedOrders}\n` +
+          `❌ Errors: ${errorCount}\n\n`
+        
+        if (processingResult) {
+          message += `📋 Inventory Processing:\n` +
+            `✅ Processed: ${processingResult.processedBills}/${processingResult.totalProcessedBills} bills\n` +
+            `📍 ${processingResult.processingMessage}\n\n`
+        }
+        
+        message += `Refreshing purchase orders...`
+        
+        alert(message)
+        
+        // Reload purchase orders
+        await loadPurchaseOrders()
+      } else {
+        alert(`❌ Sync Failed: ${response.message}`)
+      }
+    } catch (err) {
+      console.error('Sync error:', err)
+      alert(`Error syncing with Zoho: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setSyncing(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this purchase order?')) {
-      try {
-        const response = await apiService.deletePurchaseOrder(id)
-        if (response.success) {
-          await loadPurchaseOrders() // Reload the list
-        } else {
-          alert('Failed to delete purchase order')
-        }
-      } catch (err) {
-        alert('Error deleting purchase order: ' + (err instanceof Error ? err.message : 'Unknown error'))
-        console.error('Error deleting purchase order:', err)
-      }
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Completed': return 'bg-green-100 text-green-800 border-green-200'
+      case 'Confirmed': return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'Sent': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'Partial': return 'bg-orange-100 text-orange-800 border-orange-200'
+      case 'Draft': return 'bg-gray-100 text-gray-800 border-gray-200'
+      case 'Cancelled': return 'bg-red-100 text-red-800 border-red-200'
+      default: return 'bg-gray-100 text-gray-800 border-gray-200'
+    }
+  }
+
+  const getSyncStatusColor = (syncStatus: string) => {
+    switch (syncStatus) {
+      case 'syncing': return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'synced': return 'bg-green-100 text-green-800 border-green-200'
+      case 'not_synced': return 'bg-gray-100 text-gray-800 border-gray-200'
+      case 'sync_failed': return 'bg-red-100 text-red-800 border-red-200'
+      default: return 'bg-gray-100 text-gray-800 border-gray-200'
+    }
+  }
+
+  const getSyncStatusText = (syncStatus: string) => {
+    switch (syncStatus) {
+      case 'syncing': return 'Syncing'
+      case 'synced': return 'Synced'
+      case 'not_synced': return 'Not Synced'
+      case 'sync_failed': return 'Sync Failed'
+      default: return 'Unknown'
+    }
+  }
+
+  const getProcessingStatusColor = (processingStatus: string) => {
+    switch (processingStatus) {
+      case 'processing': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'processed': return 'bg-green-100 text-green-800 border-green-200'
+      case 'not_processed': return 'bg-gray-100 text-gray-800 border-gray-200'
+      case 'failed': return 'bg-red-100 text-red-800 border-red-200'
+      default: return 'bg-gray-100 text-gray-800 border-gray-200'
+    }
+  }
+
+  const getProcessingStatusText = (processingStatus: string) => {
+    switch (processingStatus) {
+      case 'processing': return 'Processing'
+      case 'processed': return 'Processed'
+      case 'not_processed': return 'Not Processed'
+      case 'failed': return 'Failed'
+      default: return 'Unknown'
     }
   }
 
   const clearFilters = () => {
     setSearchTerm('')
     setStatusFilter('')
+    setSyncStatusFilter('')
+    setProcessingStatusFilter('')
     setSortBy('createdAt')
     setSortOrder('desc')
-    loadPurchaseOrders() // Reload data with cleared filters
   }
 
   const handleExport = () => {
@@ -111,29 +189,29 @@ const PurchaseOrders: React.FC = () => {
     const csvContent = [
       // Header row
       [
-        'PO Number',
-        'Supplier Name',
-        'Order Date',
-        'Expected Delivery Date',
-        'Status',
-        'Payment Terms',
+        'Bill ID',
+        'Vendor ID',
+        'Vendor Name',
         'Total Amount',
-        'Created At',
-        'Updated At',
-        'Notes'
+        'Location',
+        'PO Number',
+        'Status',
+        'Order Date',
+        'Expected Delivery',
+        'Last Synced'
       ].join(','),
       // Data rows
       ...purchaseOrders.map(po => [
-        po.poNumber,
-        po.supplierName,
-        new Date(po.orderDate).toLocaleDateString(),
-        new Date(po.expectedDeliveryDate).toLocaleDateString(),
-        po.status,
-        po.terms,
-        po.totalAmount.toFixed(2),
-        new Date(po.createdAt).toLocaleDateString(),
-        new Date(po.updatedAt).toLocaleDateString(),
-        po.notes || ''
+        po.zohoBillId || '-',
+        po.supplierId || '-',
+        po.supplierName || '-',
+        po.totalAmount?.toFixed(2) || '0.00',
+        po.zohoLocationName || '-',
+        po.poNumber || '-',
+        po.status || '-',
+        po.orderDate ? new Date(po.orderDate).toLocaleDateString() : '-',
+        po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate).toLocaleDateString() : '-',
+        po.lastSyncedAt ? new Date(po.lastSyncedAt).toLocaleString() : '-'
       ].map(field => `"${field}"`).join(','))
     ].join('\n')
 
@@ -148,201 +226,24 @@ const PurchaseOrders: React.FC = () => {
     document.body.removeChild(link)
   }
 
-  const handleImport = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      alert('Please select a CSV file')
-      return
-    }
-
-    try {
-      setImporting(true)
-      const text = await file.text()
-      const lines = text.split('\n').filter(line => line.trim())
-      
-      if (lines.length < 2) {
-        alert('CSV file must contain at least a header row and one data row')
-        return
-      }
-
-      // const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim())
-      const dataRows = lines.slice(1)
-
-      let successCount = 0
-      let errorCount = 0
-
-      for (const row of dataRows) {
-        try {
-          const values = row.split(',').map(v => v.replace(/"/g, '').trim())
-          const poData = {
-            poNumber: values[0] || '',
-            supplierName: values[1] || '',
-            orderDate: values[2] || new Date().toISOString().split('T')[0],
-            expectedDeliveryDate: values[3] || new Date().toISOString().split('T')[0],
-            status: values[4] || 'Draft',
-            terms: values[5] || 'Net 30',
-            totalAmount: parseFloat(values[6]) || 0,
-            notes: values[9] || ''
-          }
-
-          // Create Purchase Order via API
-          const response = await apiService.createPurchaseOrder(poData)
-          if (response.success) {
-            successCount++
-          } else {
-            errorCount++
-          }
-        } catch (err) {
-          errorCount++
-        }
-      }
-
-      alert(`Import completed!\n\nSuccessfully imported: ${successCount} Purchase Orders\nErrors: ${errorCount}`)
-      
-      // Reload Purchase Orders
-      await loadPurchaseOrders()
-    } catch (err) {
-      alert('Error importing file: ' + (err instanceof Error ? err.message : 'Unknown error'))
-    } finally {
-      setImporting(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    }
-  }
-
-  const downloadSampleCSV = () => {
-    const sampleData = [
-      ['PO Number', 'Supplier Name', 'Order Date', 'Expected Delivery Date', 'Status', 'Payment Terms', 'Total Amount', 'Created At', 'Updated At', 'Notes'],
-      ['PO-001', 'Fresh Foods Ltd', '2024-01-15', '2024-01-20', 'Draft', 'Net 30', '1500.00', '2024-01-15', '2024-01-15', 'Monthly produce order'],
-      ['PO-002', 'Kitchen Supplies Co', '2024-01-16', '2024-01-22', 'Confirmed', 'Net 15', '2500.00', '2024-01-16', '2024-01-16', 'Equipment purchase']
-    ]
-
-    const csvContent = sampleData.map(row => 
-      row.map(field => `"${field}"`).join(',')
-    ).join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', 'purchase-orders-sample-template.csv')
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
-  const PODetailsModal: React.FC = () => (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
-        <div className="mt-3">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium text-gray-900">Purchase Order Details</h3>
-            <button
-              onClick={() => setShowDetailsModal(false)}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <X className="h-6 w-6" />
-            </button>
-          </div>
-          
-          {selectedPO && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">PO Number</label>
-                  <p className="text-sm text-gray-900">{selectedPO.poNumber}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Supplier</label>
-                  <p className="text-sm text-gray-900">{selectedPO.supplierName}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Order Date</label>
-                  <p className="text-sm text-gray-900">{new Date(selectedPO.orderDate).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Expected Delivery</label>
-                  <p className="text-sm text-gray-900">{new Date(selectedPO.expectedDeliveryDate).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Status</label>
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedPO.status)}`}>
-                    {selectedPO.status}
-                  </span>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Payment Terms</label>
-                  <p className="text-sm text-gray-900">{selectedPO.terms}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Source</label>
-                  {false ? (
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                      📦 Auto-Generated from Forecast
-                    </span>
-                  ) : (
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
-                      Manual Creation
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-md font-medium text-gray-900 mb-3">Purchase Items</h4>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="table-header">Material Code</th>
-                        <th className="table-header">Material Name</th>
-                        <th className="table-header">Quantity</th>
-                        <th className="table-header">Unit Price</th>
-                        <th className="table-header">Received</th>
-                        <th className="table-header">Total Price</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {selectedPO.items.map((item, index) => (
-                        <tr key={index}>
-                          <td className="table-cell">{item.materialCode}</td>
-                          <td className="table-cell">{item.materialName}</td>
-                          <td className="table-cell">{item.quantity}</td>
-                          <td className="table-cell">{item.unitPrice.toFixed(2)} KWD</td>
-                          <td className="table-cell">{item.receivedQuantity || 0}</td>
-                          <td className="table-cell font-medium">{item.totalPrice.toFixed(2)} KWD</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="mt-4 text-right">
-                  <span className="text-lg font-semibold text-gray-900">
-                    Total Amount: {selectedPO.totalAmount.toFixed(2)} KWD
-                  </span>
-                </div>
-              </div>
-
-              {selectedPO.notes && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Notes</label>
-                  <p className="text-sm text-gray-900">{selectedPO.notes}</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
+  const filteredOrders = purchaseOrders.filter(po => {
+    // Search filter
+    const matchesSearch = !searchTerm || 
+      po.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      po.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (po.zohoBillId && po.zohoBillId.toLowerCase().includes(searchTerm.toLowerCase()))
+    
+    // Status filter
+    const matchesStatus = !statusFilter || po.status === statusFilter
+    
+    // Sync status filter
+    const matchesSyncStatus = !syncStatusFilter || (po.syncStatus || 'not_synced') === syncStatusFilter
+    
+    // Processing status filter
+    const matchesProcessingStatus = !processingStatusFilter || (po.processingStatus || 'not_processed') === processingStatusFilter
+    
+    return matchesSearch && matchesStatus && matchesSyncStatus && matchesProcessingStatus
+  })
 
   if (loading) {
     return (
@@ -382,23 +283,34 @@ const PurchaseOrders: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Purchase Orders</h1>
-          <p className="text-gray-600">Manage supplier orders and procurement</p>
+          <p className="text-gray-600">Bills synced from Zoho Inventory</p>
         </div>
         <div className="flex gap-3">
           <button
             onClick={loadPurchaseOrders}
             className="btn-secondary flex items-center"
             title="Refresh purchase orders"
+            disabled={loading || syncing}
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         <button
-          onClick={() => navigate('/purchase-orders/add')}
+            onClick={handleSyncWithZoho}
           className="btn-primary flex items-center"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Create Purchase Order
+            disabled={syncing}
+          >
+            {syncing ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                <Package className="h-4 w-4 mr-2" />
+                Sync from Zoho
+              </>
+            )}
         </button>
         </div>
       </div>
@@ -411,7 +323,7 @@ const PurchaseOrders: React.FC = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search purchase orders..."
+                placeholder="Search by PO number, vendor, or bill ID..."
                 className="input-field pl-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -432,39 +344,44 @@ const PurchaseOrders: React.FC = () => {
               <option value="Completed">Completed</option>
               <option value="Cancelled">Cancelled</option>
             </select>
+            <select
+              className="input-field"
+              value={syncStatusFilter}
+              onChange={(e) => setSyncStatusFilter(e.target.value)}
+            >
+              <option value="">All Sync Status</option>
+              <option value="syncing">Syncing</option>
+              <option value="synced">Synced</option>
+              <option value="not_synced">Not Synced</option>
+              <option value="sync_failed">Sync Failed</option>
+            </select>
+            <select
+              className="input-field"
+              value={processingStatusFilter}
+              onChange={(e) => setProcessingStatusFilter(e.target.value)}
+            >
+              <option value="">All Processing Status</option>
+              <option value="processing">Processing</option>
+              <option value="processed">Processed</option>
+              <option value="not_processed">Not Processed</option>
+              <option value="failed">Failed</option>
+            </select>
             <button
               onClick={clearFilters}
               className="btn-secondary flex items-center"
               title="Clear all filters"
             >
               <Filter className="h-4 w-4 mr-2" />
-              Clear Filters
+              Clear
             </button>
             <button 
               onClick={handleExport}
               className="btn-secondary flex items-center"
-              title="Export purchase orders to CSV"
+              title="Export to CSV"
               disabled={purchaseOrders.length === 0}
             >
               <Download className="h-4 w-4 mr-2" />
               Export
-            </button>
-            <button 
-              onClick={handleImport}
-              className="btn-secondary flex items-center"
-              title="Import purchase orders from CSV"
-              disabled={importing}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              {importing ? 'Importing...' : 'Import'}
-            </button>
-            <button 
-              onClick={downloadSampleCSV}
-              className="btn-secondary flex items-center"
-              title="Download sample CSV template"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Sample CSV
             </button>
           </div>
         </div>
@@ -472,14 +389,14 @@ const PurchaseOrders: React.FC = () => {
         {/* Results Summary */}
         <div className="flex items-center justify-between text-sm text-gray-600 mt-4">
           <span>
-            Showing {displayedPOs.length} purchase orders
-            {(searchTerm || statusFilter) && (
+            Showing {filteredOrders.length} purchase order{filteredOrders.length !== 1 ? 's' : ''}
+            {(searchTerm || statusFilter || syncStatusFilter || processingStatusFilter) && (
               <span className="ml-2 text-blue-600">
                 (filtered)
               </span>
             )}
           </span>
-          {(searchTerm || statusFilter) && (
+          {(searchTerm || statusFilter || syncStatusFilter || processingStatusFilter) && (
             <button
               onClick={clearFilters}
               className="text-blue-600 hover:text-blue-800 underline"
@@ -490,91 +407,166 @@ const PurchaseOrders: React.FC = () => {
         </div>
       </div>
 
-      {/* Purchase Orders Table */}
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="table-header">PO Number</th>
-                <th className="table-header">Supplier</th>
-                <th className="table-header">Order Date</th>
-                <th className="table-header">Expected Delivery</th>
-                <th className="table-header">Status</th>
-                <th className="table-header">Total Amount</th>
-                <th className="table-header">Source</th>
-                <th className="table-header">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {displayedPOs.map((po) => (
-                <tr key={po.id} className="hover:bg-gray-50">
-                  <td className="table-cell font-medium">{po.poNumber}</td>
-                  <td className="table-cell">{po.supplierName}</td>
-                <td className="table-cell">{new Date(po.orderDate).toLocaleDateString()}</td>
-                <td className="table-cell">{new Date(po.expectedDeliveryDate).toLocaleDateString()}</td>
-                  <td className="table-cell">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(po.status)}`}>
-                      {po.status}
-                    </span>
-                  </td>
-                  <td className="table-cell font-medium">{po.totalAmount.toFixed(2)} KWD</td>
-                  <td className="table-cell">
-                    {false ? (
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                        📦 Auto-Generated
-                      </span>
-                    ) : (
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
-                        Manual
-                      </span>
-                    )}
-                  </td>
-                  <td className="table-cell">
-                    <div className="flex space-x-2">
+      {/* Purchase Orders Grid - Card Format */}
+      {filteredOrders.length === 0 ? (
+        <div className="card p-12">
+          <div className="text-center">
+            <Package className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Purchase Orders Found</h3>
+            <p className="text-gray-600 mb-6">
+              {searchTerm || statusFilter 
+                ? 'Try adjusting your search or filters' 
+                : 'Click "Sync from Zoho" to fetch bills from Zoho Inventory'}
+            </p>
+            {!searchTerm && !statusFilter && (
                       <button
-                        onClick={() => {
-                          setSelectedPO(po)
-                          setShowDetailsModal(true)
-                        }}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="View Details"
-                      >
-                        <Eye className="h-4 w-4" />
+                onClick={handleSyncWithZoho}
+                className="btn-primary inline-flex items-center"
+                disabled={syncing}
+              >
+                <Package className="h-4 w-4 mr-2" />
+                Sync from Zoho
                       </button>
-                      <button
-                        onClick={() => navigate(`/purchase-orders/edit/${po.id}`)}
-                        className="text-green-600 hover:text-green-900"
-                        title="Edit"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(po.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+            )}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filteredOrders.map((po) => (
+            <div
+              key={po.id}
+              className="card p-6 hover:shadow-lg transition-shadow duration-200 border-l-4 border-blue-500"
+            >
+              {/* Status Badges */}
+              <div className="flex justify-end gap-2 mb-3">
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getSyncStatusColor(po.syncStatus || 'not_synced')}`}>
+                  {getSyncStatusText(po.syncStatus || 'not_synced')}
+                </span>
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getProcessingStatusColor(po.processingStatus || 'not_processed')}`}>
+                  {getProcessingStatusText(po.processingStatus || 'not_processed')}
+                </span>
+              </div>
+
+              {/* Bill ID */}
+              <div className="mb-2">
+                <div className="flex items-center text-xs text-gray-600 mb-1">
+                  <Hash className="h-3 w-3 mr-1 text-gray-400" />
+                  <span className="font-medium">Bill ID</span>
+                </div>
+                <p className="text-sm font-semibold text-gray-900 ml-4">
+                  {po.zohoBillId || 'N/A'}
+                </p>
+              </div>
+
+              {/* Vendor ID */}
+              <div className="mb-2">
+                <div className="flex items-center text-xs text-gray-600 mb-1">
+                  <User className="h-3 w-3 mr-1 text-gray-400" />
+                  <span className="font-medium">Vendor ID</span>
+                </div>
+                <p className="text-xs text-gray-900 ml-4">
+                  {po.supplierId || 'N/A'}
+                </p>
+              </div>
+
+              {/* Vendor Name */}
+              <div className="mb-2">
+                <div className="flex items-center text-xs text-gray-600 mb-1">
+                  <User className="h-3 w-3 mr-1 text-gray-400" />
+                  <span className="font-medium">Vendor Name</span>
+                </div>
+                <p className="text-sm font-medium text-gray-900 ml-4">
+                  {po.supplierName || 'Unknown Vendor'}
+                </p>
+              </div>
+
+              {/* Total Amount */}
+              <div className="mb-2">
+                <div className="flex items-center text-xs text-gray-600 mb-1">
+                  <DollarSign className="h-3 w-3 mr-1 text-gray-400" />
+                  <span className="font-medium">Total</span>
+                </div>
+                <p className="text-lg font-bold text-green-600 ml-4">
+                  {po.totalAmount?.toFixed(3) || '0.000'} KWD
+                </p>
+              </div>
+
+              {/* Location Name */}
+              <div className="mb-3">
+                <div className="flex items-center text-xs text-gray-600 mb-1">
+                  <MapPin className="h-3 w-3 mr-1 text-gray-400" />
+                  <span className="font-medium">Location</span>
+                </div>
+                <p className="text-xs text-gray-900 ml-4">
+                  {po.zohoLocationName || 'Not specified'}
+                </p>
       </div>
 
-      {showDetailsModal && <PODetailsModal />}
+              {/* Divider */}
+              <div className="border-t border-gray-200 my-4"></div>
 
-      {/* Hidden file input for import */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileUpload}
-        accept=".csv"
-        style={{ display: 'none' }}
-      />
+              {/* Additional Info */}
+              <div className="space-y-1 text-xs text-gray-600">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center text-xs">
+                    <Calendar className="h-2 w-2 mr-1" />
+                    Order Date
+                  </span>
+                  <span className="font-medium text-gray-900 text-xs">
+                    {po.orderDate ? new Date(po.orderDate).toLocaleDateString() : 'N/A'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center text-xs">
+                    <Calendar className="h-2 w-2 mr-1" />
+                    Expected Delivery
+                  </span>
+                  <span className="font-medium text-gray-900 text-xs">
+                    {po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate).toLocaleDateString() : 'N/A'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs">PO Number</span>
+                  <span className="font-medium text-gray-900 text-xs">
+                    {po.poNumber}
+                  </span>
+                </div>
+                {po.items && po.items.length > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs">Line Items</span>
+                    <span className="font-medium text-gray-900 text-xs">
+                      {po.items.length}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Sync Info Banner */}
+      {purchaseOrders.length > 0 && (
+        <div className="card p-4 bg-blue-50 border-blue-200">
+          <div className="flex items-start">
+            <AlertCircle className="h-5 w-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-blue-900 mb-1">
+                Synced from Zoho Inventory
+              </h4>
+              <p className="text-sm text-blue-700">
+                These purchase orders are automatically synced from Zoho Inventory bills. 
+                Click "Sync from Zoho" to fetch the latest bills.
+                {purchaseOrders[0]?.lastSyncedAt && (
+                  <span className="ml-2 font-medium">
+                    Last synced: {new Date(purchaseOrders[0].lastSyncedAt).toLocaleString()}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
