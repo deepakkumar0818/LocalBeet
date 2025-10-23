@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Eye, ShoppingCart, RefreshCw, X } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, ShoppingCart, RefreshCw, X, Upload, CheckCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { apiService } from '../services/api';
 
@@ -52,6 +52,12 @@ interface SalesOrder {
     completedAt?: string;
   };
   notes?: string;
+  zohoIntegration?: {
+    salesOrderId?: string;
+    pushedAt?: string;
+    status?: 'pending' | 'pushed' | 'failed';
+    error?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -71,6 +77,9 @@ const SalesOrders: React.FC = () => {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [outlets, setOutlets] = useState<any[]>([]);
   const [currentOutlet, setCurrentOutlet] = useState<any>(null);
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [isPushing, setIsPushing] = useState(false);
+  const [pushStatus, setPushStatus] = useState<{[key: string]: 'idle' | 'pushing' | 'success' | 'error'}>({});
 
   // Detect outlet from URL
   const getOutletFromPath = () => {
@@ -399,7 +408,7 @@ const SalesOrders: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this sales order?')) {
+    if (globalThis.confirm('Are you sure you want to delete this sales order?')) {
       try {
         const response = await apiService.deleteSalesOrder(id);
         if (response.success) {
@@ -411,6 +420,63 @@ const SalesOrders: React.FC = () => {
       } catch (err: any) {
         alert(err.message || 'An error occurred during deletion');
       }
+    }
+  };
+
+  const handlePushToZoho = async (orderId: string) => {
+    setPushStatus(prev => ({ ...prev, [orderId]: 'pushing' }));
+    try {
+      const response = await apiService.pushSalesOrderToZoho(orderId);
+      if (response.success) {
+        setPushStatus(prev => ({ ...prev, [orderId]: 'success' }));
+        alert(`Sales order pushed to Zoho as Invoice successfully! Zoho Invoice ID: ${response.data.zohoInvoiceId}`);
+        loadSalesOrders(); // Refresh to show updated status
+      } else {
+        setPushStatus(prev => ({ ...prev, [orderId]: 'error' }));
+        alert(response.message || 'Failed to push sales order to Zoho');
+      }
+    } catch (err: any) {
+      setPushStatus(prev => ({ ...prev, [orderId]: 'error' }));
+      alert(err.message || 'An error occurred while pushing to Zoho');
+    }
+  };
+
+  const handleBulkPushToZoho = async () => {
+    if (selectedOrders.length === 0) {
+      alert('Please select at least one sales order to push to Zoho');
+      return;
+    }
+
+    setIsPushing(true);
+    try {
+      const response = await apiService.pushBulkSalesOrdersToZoho(selectedOrders);
+      if (response.success) {
+        alert(`Bulk push to Zoho Invoices completed! ${response.data.successful.length} successful, ${response.data.failed.length} failed`);
+        setSelectedOrders([]);
+        loadSalesOrders(); // Refresh to show updated status
+      } else {
+        alert(response.message || 'Failed to push sales orders to Zoho');
+      }
+    } catch (err: any) {
+      alert(err.message || 'An error occurred during bulk push to Zoho');
+    } finally {
+      setIsPushing(false);
+    }
+  };
+
+  const handleSelectOrder = (orderId: string) => {
+    setSelectedOrders(prev => 
+      prev.includes(orderId) 
+        ? prev.filter(id => id !== orderId)
+        : [...prev, orderId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedOrders.length === salesOrders.length) {
+      setSelectedOrders([]);
+    } else {
+      setSelectedOrders(salesOrders.map(order => order._id));
     }
   };
 
@@ -479,28 +545,49 @@ const SalesOrders: React.FC = () => {
             </p>
           )}
         </div>
-        <button
-          onClick={() => {
-            const outletFromPath = getOutletFromPath()
-            if (outletFromPath) {
-              // Map outlet names to correct URL paths
-              const outletPathMap: Record<string, string> = {
-                'Kuwait City': 'kuwait-city',
-                '360 Mall': '360-mall', 
-                'Vibes Complex': 'vibes-complex',
-                'Taiba Hospital': 'taiba-hospital'
+        <div className="flex space-x-3">
+          {selectedOrders.length > 0 && (
+            <button
+              onClick={handleBulkPushToZoho}
+              disabled={isPushing}
+              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+            >
+              {isPushing ? (
+                <>
+                  <div className="animate-spin -ml-1 mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  Pushing...
+                </>
+              ) : (
+                <>
+                  <Upload className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+                  Push to Zoho Invoices ({selectedOrders.length})
+                </>
+              )}
+            </button>
+          )}
+          <button
+            onClick={() => {
+              const outletFromPath = getOutletFromPath()
+              if (outletFromPath) {
+                // Map outlet names to correct URL paths
+                const outletPathMap: Record<string, string> = {
+                  'Kuwait City': 'kuwait-city',
+                  '360 Mall': '360-mall', 
+                  'Vibes Complex': 'vibes-complex',
+                  'Taiba Hospital': 'taiba-hospital'
+                }
+                const outletPath = outletPathMap[outletFromPath] || outletFromPath.toLowerCase().replace(/\s+/g, '-')
+                navigate(`/${outletPath}/pos-sales/create-order`)
+              } else {
+                navigate('/sales-orders/add')
               }
-              const outletPath = outletPathMap[outletFromPath] || outletFromPath.toLowerCase().replace(/\s+/g, '-')
-              navigate(`/${outletPath}/pos-sales/create-order`)
-            } else {
-              navigate('/sales-orders/add')
-            }
-          }}
-          className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-        >
-          <Plus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-          Create Order
-        </button>
+            }}
+            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <Plus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+            Create Order
+          </button>
+        </div>
       </div>
 
       <div className="bg-white shadow-md rounded-lg p-6 mb-6">
@@ -640,6 +727,14 @@ const SalesOrders: React.FC = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <input
+                    type="checkbox"
+                    checked={selectedOrders.length === salesOrders.length && salesOrders.length > 0}
+                    onChange={handleSelectAll}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Order #
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -666,6 +761,9 @@ const SalesOrders: React.FC = () => {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Invoice Status
+                </th>
                 <th scope="col" className="relative px-6 py-3">
                   <span className="sr-only">Actions</span>
                 </th>
@@ -674,6 +772,14 @@ const SalesOrders: React.FC = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {salesOrders.map((order) => (
                 <tr key={order._id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={selectedOrders.includes(order._id)}
+                      onChange={() => handleSelectOrder(order._id)}
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {order.orderNumber}
                   </td>
@@ -713,28 +819,60 @@ const SalesOrders: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(order.orderTiming.orderDate).toLocaleDateString()}
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {order.zohoIntegration?.status === 'pushed' ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Invoice Created
+                      </span>
+                    ) : order.zohoIntegration?.status === 'failed' ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        Failed
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        Not Pushed
+                      </span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => handleViewDetails(order)}
-                      className="text-indigo-600 hover:text-indigo-900 mr-3"
-                      title="View Details"
-                    >
-                      <Eye className="h-5 w-5" />
-                    </button>
-                    <button
-                      onClick={() => navigate(`/sales-orders/edit/${order._id}`)}
-                      className="text-indigo-600 hover:text-indigo-900 mr-3"
-                      title="Edit"
-                    >
-                      <Edit className="h-5 w-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(order._id)}
-                      className="text-red-600 hover:text-red-900"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      {order.zohoIntegration?.status !== 'pushed' && (
+                        <button
+                          onClick={() => handlePushToZoho(order._id)}
+                          disabled={pushStatus[order._id] === 'pushing'}
+                          className="text-green-600 hover:text-green-900 disabled:opacity-50"
+                          title="Push to Zoho as Invoice"
+                        >
+                          {pushStatus[order._id] === 'pushing' ? (
+                            <div className="animate-spin h-4 w-4 border-2 border-green-600 border-t-transparent rounded-full"></div>
+                          ) : (
+                            <Upload className="h-5 w-5" />
+                          )}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleViewDetails(order)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                        title="View Details"
+                      >
+                        <Eye className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => navigate(`/sales-orders/edit/${order._id}`)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                        title="Edit"
+                      >
+                        <Edit className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(order._id)}
+                        className="text-red-600 hover:text-red-900"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

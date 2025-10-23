@@ -4,6 +4,8 @@ const router = express.Router();
 const SalesOrder = require('../models/SalesOrder');
 const FinishedGood = require('../models/FinishedGood');
 const Outlet = require('../models/Outlet');
+const https = require('https');
+const querystring = require('querystring');
 
 // Outlet-specific finished product DB connectors and model getters
 const connectKuwaitCityDB = require('../config/kuwaitCityDB');
@@ -496,6 +498,405 @@ router.put('/:id/status', async (req, res) => {
     res.json({ success: true, data: updatedSalesOrder, message: 'Order status updated successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error updating order status', error: error.message });
+  }
+});
+
+// Zoho OAuth Configuration
+const ZOHO_CONFIG = {
+  clientId: '1000.9PCENBUXUOJMQHEN6B3RUY7JN0I7FX',
+  clientSecret: 'f44f221c557e91e014628f8e167d9670f3829d404e',
+  redirectUri: 'https://crm.zoho.in/',
+  refreshToken: '1000.290798381d3ce40167663108992d1c34.45ae01167ce2db8b1c8e2d9fb905f0a3',
+  tokenUrl: 'https://accounts.zoho.com/oauth/v2/token',
+  organizationId: '888785593'
+};
+
+/**
+ * Get access token from Zoho using refresh token
+ */
+async function getZohoAccessToken() {
+  return new Promise((resolve, reject) => {
+    const postData = querystring.stringify({
+      grant_type: 'refresh_token',
+      client_id: ZOHO_CONFIG.clientId,
+      client_secret: ZOHO_CONFIG.clientSecret,
+      redirect_uri: ZOHO_CONFIG.redirectUri,
+      refresh_token: ZOHO_CONFIG.refreshToken
+    });
+
+    const options = {
+      hostname: 'accounts.zoho.com',
+      port: 443,
+      path: '/oauth/v2/token',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          const response = JSON.parse(data);
+          
+          if (response.access_token) {
+            resolve({
+              access_token: response.access_token,
+              expires_in: response.expires_in,
+              token_type: response.token_type,
+              api_domain: response.api_domain || 'inventory.zoho.com'
+            });
+          } else {
+            reject(new Error('Failed to get access token'));
+          }
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      reject(error);
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+/**
+ * Mark invoice as sent in Zoho Inventory
+ */
+async function markZohoInvoiceAsSent(invoiceId, accessToken) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'www.zohoapis.com',
+      port: 443,
+      path: `/inventory/v1/invoices/${invoiceId}/status/sent?organization_id=${ZOHO_CONFIG.organizationId}`,
+      method: 'POST',
+      headers: {
+        'Authorization': `Zoho-oauthtoken ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    };
+
+    console.log(`Marking invoice ${invoiceId} as sent...`);
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        try {
+          console.log(`Mark Invoice as Sent Response Status: ${res.statusCode}`);
+          console.log('Mark Invoice as Sent Response Data:', data);
+
+          if (res.statusCode === 200) {
+            const response = JSON.parse(data);
+            console.log('Invoice marked as sent successfully:', JSON.stringify(response, null, 2));
+            resolve(response);
+          } else {
+            console.error(`Mark invoice as sent failed with status: ${res.statusCode}`);
+            console.error('Response:', data);
+
+            let errorMessage = `Mark invoice as sent failed: ${res.statusCode}`;
+            try {
+              const errorResponse = JSON.parse(data);
+              if (errorResponse.message) {
+                errorMessage += ` - ${errorResponse.message}`;
+              }
+            } catch (parseError) {
+              errorMessage += ` - Raw response: ${data}`;
+            }
+            reject(new Error(errorMessage));
+          }
+        } catch (error) {
+          console.error('Error parsing mark invoice as sent response:', error);
+          console.error('Raw response:', data);
+          reject(error);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('Error marking invoice as sent:', error);
+      reject(error);
+    });
+
+    req.end();
+  });
+}
+
+/**
+ * Create invoice in Zoho Inventory
+ */
+async function createZohoInvoice(salesOrder, accessToken) {
+  return new Promise((resolve, reject) => {
+    // Map local sales order to Zoho invoice format
+    const zohoInvoiceData = {
+      customer_id: '6531063000000140061', // TLB City customer ID from Zoho
+      invoice_number: salesOrder.orderNumber,
+      date: new Date(salesOrder.orderTiming.orderDate).toISOString().split('T')[0],
+      reference_number: `REF-${salesOrder.orderNumber}`,
+      line_items: salesOrder.orderItems.map(item => ({
+        name: item.productName,
+        description: item.specialInstructions || `Product: ${item.productName}`,
+        rate: item.unitPrice,
+        quantity: item.quantity,
+        unit: 'qty',
+        item_total: item.totalPrice
+      })),
+      notes: salesOrder.notes || `Invoice from ${salesOrder.outletName}`,
+      discount: salesOrder.orderSummary.discountAmount > 0 ? `${(salesOrder.orderSummary.discountAmount / salesOrder.orderSummary.subtotal * 100).toFixed(2)}%` : '0%',
+      is_discount_before_tax: true,
+      discount_type: 'entity_level',
+      shipping_charge: 0,
+      adjustment: 0,
+      is_inclusive_tax: false,
+      exchange_rate: 1
+    };
+
+    console.log('Zoho Invoice Data:', JSON.stringify(zohoInvoiceData, null, 2));
+    const postData = JSON.stringify(zohoInvoiceData);
+
+    const options = {
+      hostname: 'www.zohoapis.com',
+      port: 443,
+      path: `/inventory/v1/invoices?organization_id=${ZOHO_CONFIG.organizationId}&ignore_auto_number_generation=true`,
+      method: 'POST',
+      headers: {
+        'Authorization': `Zoho-oauthtoken ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          console.log(`Zoho API Response Status: ${res.statusCode}`);
+          console.log('Zoho API Response Data:', data);
+          
+          if (res.statusCode === 201) {
+            const response = JSON.parse(data);
+            console.log('Zoho Invoice API Success Response:', JSON.stringify(response, null, 2));
+            resolve(response);
+          } else {
+            console.error(`Zoho API request failed with status: ${res.statusCode}`);
+            console.error('Response:', data);
+            
+            let errorMessage = `Zoho API request failed: ${res.statusCode}`;
+            try {
+              const errorResponse = JSON.parse(data);
+              if (errorResponse.message) {
+                errorMessage += ` - ${errorResponse.message}`;
+              }
+              if (errorResponse.errors) {
+                errorMessage += ` - Errors: ${JSON.stringify(errorResponse.errors)}`;
+              }
+            } catch (parseError) {
+              // If we can't parse the error response, use the raw data
+              errorMessage += ` - Raw response: ${data}`;
+            }
+            
+            reject(new Error(errorMessage));
+          }
+        } catch (error) {
+          console.error('Error parsing Zoho response:', error);
+          console.error('Raw response:', data);
+          reject(error);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      reject(error);
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+// POST /api/sales-orders/:id/push-to-zoho - Push sales order to Zoho Inventory
+router.post('/:id/push-to-zoho', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Find the sales order
+    const salesOrder = await SalesOrder.findById(id)
+      .populate('outletId', 'outletCode outletName')
+      .populate('orderItems.productId', 'productCode productName category');
+
+    if (!salesOrder) {
+      return res.status(404).json({ success: false, message: 'Sales order not found' });
+    }
+
+    // Get Zoho access token
+    const tokenData = await getZohoAccessToken();
+    
+    // Create invoice in Zoho
+    const zohoResponse = await createZohoInvoice(salesOrder, tokenData.access_token);
+    
+    // Mark invoice as sent to reduce inventory
+    const invoiceId = zohoResponse.invoice?.invoice_id;
+    if (invoiceId) {
+      try {
+        await markZohoInvoiceAsSent(invoiceId, tokenData.access_token);
+        console.log(`Invoice ${invoiceId} marked as sent successfully`);
+      } catch (markSentError) {
+        console.error(`Failed to mark invoice ${invoiceId} as sent:`, markSentError);
+        // Continue with success response even if marking as sent fails
+        // The invoice is still created, just not marked as sent
+      }
+    }
+    
+    // Update local sales order with Zoho reference
+    await SalesOrder.findByIdAndUpdate(id, {
+      $set: {
+        'zohoIntegration.salesOrderId': invoiceId,
+        'zohoIntegration.pushedAt': new Date(),
+        'zohoIntegration.status': 'pushed'
+      }
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'Sales order pushed to Zoho Inventory as Invoice and marked as sent successfully',
+      data: {
+        localOrderId: salesOrder._id,
+        zohoInvoiceId: invoiceId,
+        zohoInvoiceNumber: zohoResponse.invoice?.invoice_number
+      }
+    });
+  } catch (error) {
+    console.error('Error pushing sales order to Zoho:', error);
+    
+    // Update local sales order with failed status
+    try {
+      await SalesOrder.findByIdAndUpdate(id, {
+        $set: {
+          'zohoIntegration.status': 'failed',
+          'zohoIntegration.error': error.message
+        }
+      });
+    } catch (updateError) {
+      console.error(`Error updating sales order ${id} status:`, updateError);
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error pushing sales order to Zoho Inventory as Invoice', 
+      error: error.message 
+    });
+  }
+});
+
+// POST /api/sales-orders/push-bulk-to-zoho - Push multiple sales orders to Zoho Inventory
+router.post('/push-bulk-to-zoho', async (req, res) => {
+  try {
+    const { orderIds } = req.body;
+    
+    if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'Order IDs array is required' });
+    }
+
+    // Get Zoho access token once for all orders
+    const tokenData = await getZohoAccessToken();
+    
+    const results = [];
+    const errors = [];
+
+    for (const orderId of orderIds) {
+      try {
+        // Find the sales order
+        const salesOrder = await SalesOrder.findById(orderId)
+          .populate('outletId', 'outletCode outletName')
+          .populate('orderItems.productId', 'productCode productName category');
+
+        if (!salesOrder) {
+          errors.push({ orderId, error: 'Sales order not found' });
+          continue;
+        }
+
+        // Create invoice in Zoho
+        const zohoResponse = await createZohoInvoice(salesOrder, tokenData.access_token);
+        
+        // Mark invoice as sent to reduce inventory
+        const invoiceId = zohoResponse.invoice?.invoice_id;
+        if (invoiceId) {
+          try {
+            await markZohoInvoiceAsSent(invoiceId, tokenData.access_token);
+            console.log(`Invoice ${invoiceId} marked as sent successfully`);
+          } catch (markSentError) {
+            console.error(`Failed to mark invoice ${invoiceId} as sent:`, markSentError);
+            // Continue with success response even if marking as sent fails
+          }
+        }
+        
+        // Update local sales order with Zoho reference
+        await SalesOrder.findByIdAndUpdate(orderId, {
+          $set: {
+            'zohoIntegration.salesOrderId': invoiceId,
+            'zohoIntegration.pushedAt': new Date(),
+            'zohoIntegration.status': 'pushed'
+          }
+        });
+
+        results.push({
+          orderId,
+          orderNumber: salesOrder.orderNumber,
+          zohoInvoiceId: invoiceId,
+          zohoInvoiceNumber: zohoResponse.invoice?.invoice_number
+        });
+        } catch (error) {
+          console.error(`Error pushing order ${orderId} to Zoho:`, error);
+          
+          // Update local sales order with failed status
+          try {
+            await SalesOrder.findByIdAndUpdate(orderId, {
+              $set: {
+                'zohoIntegration.status': 'failed',
+                'zohoIntegration.error': error.message
+              }
+            });
+          } catch (updateError) {
+            console.error(`Error updating sales order ${orderId} status:`, updateError);
+          }
+          
+          errors.push({ orderId, error: error.message });
+        }
+    }
+
+    res.json({ 
+      success: true, 
+      message: `Bulk push to Zoho Invoices completed. ${results.length} successful, ${errors.length} failed`,
+      data: {
+        successful: results,
+        failed: errors
+      }
+    });
+  } catch (error) {
+    console.error('Error in bulk push to Zoho:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error in bulk push to Zoho Inventory as Invoices', 
+      error: error.message 
+    });
   }
 });
 

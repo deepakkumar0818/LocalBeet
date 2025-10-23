@@ -1194,6 +1194,43 @@ class ApiService {
       method: 'POST'
     });
   }
+
+  // Zoho Sales Order Push API
+  async pushSalesOrderToZoho(id: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: {
+        localOrderId: string;
+        zohoOrderId: string;
+        zohoOrderNumber: string;
+      };
+    }>(`/sales-orders/${id}/push-to-zoho`, {
+      method: 'POST'
+    });
+  }
+
+  async pushBulkSalesOrdersToZoho(orderIds: string[]) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: {
+        successful: Array<{
+          orderId: string;
+          orderNumber: string;
+          zohoOrderId: string;
+          zohoOrderNumber: string;
+        }>;
+        failed: Array<{
+          orderId: string;
+          error: string;
+        }>;
+      };
+    }>('/sales-orders/push-bulk-to-zoho', {
+      method: 'POST',
+      body: JSON.stringify({ orderIds })
+    });
+  }
 }
 
 export const apiService = new ApiService();
