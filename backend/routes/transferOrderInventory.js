@@ -250,65 +250,25 @@ router.put('/:id/approve', ensureConnections, async (req, res) => {
           }
         }
       } else if (item.itemType === 'Finished Goods') {
-        // Subtract from Central Kitchen Finished Products
-        const centralKitchenProduct = await req.centralKitchenModels.CentralKitchenFinishedProduct.findOne({ productCode: item.itemCode });
-        if (centralKitchenProduct) {
-          console.log(`Central Kitchen Finished Product BEFORE: ${centralKitchenProduct.productCode} - Stock: ${centralKitchenProduct.currentStock}`);
-          centralKitchenProduct.currentStock -= item.quantity;
-          await centralKitchenProduct.save();
-          console.log(`Central Kitchen Finished Product AFTER: ${centralKitchenProduct.productCode} - Stock: ${centralKitchenProduct.currentStock}`);
-        } else {
-          console.log(`Central Kitchen finished product not found: ${item.itemCode}`);
-        }
-
-        // Add to requesting outlet (fromOutlet) Finished Products
-        let FinishedProductModel;
-        if (fromOutletName.toLowerCase().includes('kuwait')) {
-          FinishedProductModel = requestingOutletModels.KuwaitCityFinishedProduct;
-        } else if (fromOutletName.toLowerCase().includes('360') || fromOutletName.toLowerCase().includes('mall')) {
-          FinishedProductModel = requestingOutletModels.Mall360FinishedProduct;
-        } else if (fromOutletName.toLowerCase().includes('vibe') || fromOutletName.toLowerCase().includes('complex')) {
-          FinishedProductModel = requestingOutletModels.VibeComplexFinishedProduct;
-        } else if (fromOutletName.toLowerCase().includes('taiba')) {
-          FinishedProductModel = requestingOutletModels.TaibaKitchenFinishedProduct;
-        } else {
-          throw new Error(`Unknown finished product model for requesting outlet: ${fromOutletName}`);
-        }
+        // Use the proper transfer logic from transfers.js
+        console.log(`🔄 Using proper finished goods transfer logic for ${item.itemCode}`);
         
-        if (!FinishedProductModel) {
-          throw new Error(`Finished product model not found for requesting outlet: ${fromOutletName}`);
-        }
+        // Get source and destination models
+        const sourceModels = req.centralKitchenModels;
+        const destinationModels = requestingOutletModels;
         
-        let outletProduct = await FinishedProductModel.findOne({ productCode: item.itemCode });
-        if (outletProduct) {
-          console.log(`➕ ${fromOutletName} Finished Product BEFORE: ${outletProduct.productCode} - Stock: ${outletProduct.currentStock}`);
-          outletProduct.currentStock += item.quantity;
-          await outletProduct.save();
-          console.log(`➕ ${fromOutletName} Finished Product AFTER: ${outletProduct.productCode} - Stock: ${outletProduct.currentStock}`);
-        } else {
-          console.log(`➕ Creating new ${fromOutletName} finished product: ${item.itemCode}`);
-          // Create new product in the outlet if it doesn't exist
-          outletProduct = new FinishedProductModel({
-            productCode: item.itemCode,
-            productName: item.itemName,
-            category: item.category || 'General',
-            subCategory: item.subCategory || 'General',
-            unitOfMeasure: item.unitOfMeasure,
-            currentStock: item.quantity,
-            unitPrice: item.unitPrice,
-            costPrice: item.unitPrice * 0.8, // Assume 20% margin
-            minimumStock: 5,
-            maximumStock: 500,
-            reorderPoint: 10,
-            shelfLife: 7, // 7 days default
-            status: 'Active',
-            isActive: true,
-            createdBy: 'System',
-            updatedBy: 'System'
-          });
-          await outletProduct.save();
-          console.log(`➕ New ${fromOutletName} finished product created: ${outletProduct.productCode} - Stock: ${outletProduct.currentStock}`);
-        }
+        // Use the handleFinishedGoodsTransfer function
+        const transfersModule = require('./transfers');
+        await transfersModule.handleFinishedGoodsTransfer(
+          sourceModels,
+          destinationModels,
+          item.itemCode,
+          item.quantity,
+          item.notes || '',
+          true // isFromCentralKitchen = true
+        );
+        
+        console.log(`✅ Finished goods transfer completed for ${item.itemCode}`);
       }
     }
     } catch (inventoryError) {
@@ -327,9 +287,35 @@ router.put('/:id/approve', ensureConnections, async (req, res) => {
     transferOrder.transferStartedAt = new Date();
     await transferOrder.save();
 
-    // TODO: Create notification for the destination outlet
-    // For now, skip notification creation to avoid errors
-    console.log(`📢 Notification would be sent to ${transferOrder.toOutlet}: Transfer approved from ${transferOrder.fromOutlet}`);
+    // Create notification for the requesting outlet (fromOutlet) that their request was approved
+    try {
+      console.log(`📢 Creating approval notification for ${fromOutletName}...`);
+      
+      // Determine the item type for the notification
+      const itemType = transferOrder.items[0]?.itemType || 'Mixed';
+      const itemDetails = transferOrder.items.map(item => `${item.itemName} (${item.quantity} ${item.unitOfMeasure || 'pcs'})`).join(', ');
+      
+      const notificationData = {
+        title: 'Transfer Request Approved',
+        message: `Your transfer request #${transferOrder.transferNumber} has been approved by Central Kitchen. Items: ${itemDetails}`,
+        type: 'transfer_acceptance',
+        targetOutlet: fromOutletName, // Send back to the requesting outlet
+        sourceOutlet: 'Central Kitchen',
+        transferOrderId: transferOrder._id.toString(),
+        itemType: itemType,
+        priority: 'normal'
+      };
+      
+      // Use the persistent notification service
+      const notificationService = require('../services/persistentNotificationService');
+      const notification = await notificationService.createNotification(notificationData);
+      
+      console.log(`✅ Approval notification created for ${fromOutletName}: Transfer approved`);
+      
+    } catch (notificationError) {
+      console.error('⚠️  Failed to create approval notification:', notificationError);
+      // Don't fail the entire operation if notification creation fails
+    }
 
     console.log('✅ Transfer order approved successfully');
     res.status(200).json({
@@ -372,6 +358,36 @@ router.put('/:id/reject', ensureConnections, async (req, res) => {
     transferOrder.approvedBy = 'Central Kitchen Manager';
     transferOrder.notes = 'Transfer order rejected by Central Kitchen';
     await transferOrder.save();
+
+    // Create notification for the requesting outlet (fromOutlet) that their request was rejected
+    try {
+      console.log(`📢 Creating rejection notification for ${transferOrder.fromOutlet}...`);
+      
+      // Determine the item type for the notification
+      const itemType = transferOrder.items[0]?.itemType || 'Mixed';
+      const itemDetails = transferOrder.items.map(item => `${item.itemName} (${item.quantity} ${item.unitOfMeasure || 'pcs'})`).join(', ');
+      
+      const notificationData = {
+        title: 'Transfer Request Rejected',
+        message: `Your transfer request #${transferOrder.transferNumber} has been rejected by Central Kitchen. Items: ${itemDetails}. Reason: ${transferOrder.notes}`,
+        type: 'transfer_rejection',
+        targetOutlet: transferOrder.fromOutlet, // Send back to the requesting outlet
+        sourceOutlet: 'Central Kitchen',
+        transferOrderId: transferOrder._id.toString(),
+        itemType: itemType,
+        priority: 'normal'
+      };
+      
+      // Use the persistent notification service
+      const notificationService = require('../services/persistentNotificationService');
+      const notification = await notificationService.createNotification(notificationData);
+      
+      console.log(`✅ Rejection notification created for ${transferOrder.fromOutlet}: Transfer rejected`);
+      
+    } catch (notificationError) {
+      console.error('⚠️  Failed to create rejection notification:', notificationError);
+      // Don't fail the entire operation if notification creation fails
+    }
 
     // No inventory changes for rejected orders
 

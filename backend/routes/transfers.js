@@ -491,34 +491,32 @@ async function handleFinishedGoodsTransfer(sourceModels, destinationModels, item
     { new: true }
   );
 
-  // Find or create the item in the destination location
-  let destinationItem = await DestinationFinishedProduct.findOne({ productCode: itemCode });
-  
-  if (destinationItem) {
-    // Add to existing destination stock
-    console.log(`   ⬆️ Adding ${quantity} to existing destination stock (current: ${destinationItem.currentStock})`);
-    const updated = await DestinationFinishedProduct.findByIdAndUpdate(
-      destinationItem._id,
-      { 
-        $inc: { currentStock: quantity },
-        updatedBy: 'Transfer System'
-      },
-      { new: true }
-    );
-    console.log(`   ✅ Updated destination stock to: ${updated.currentStock}`);
+  // Atomically upsert by productCode so repeated transfers add to the same row
+  console.log(`   🔍 Upserting destination finished good for productCode: ${itemCode}`);
+
+  let fgStatus;
+  if (destinationModels.CentralKitchenFinishedProduct) {
+    fgStatus = 'Active';
   } else {
-    // Create new item in destination with the transferred quantity
-    console.log(`   🆕 Creating new item in destination with quantity: ${quantity}`);
-    const newDestinationItem = {
+    fgStatus = quantity > (sourceItem.minimumStock || 10) ? 'In Stock' : 'Low Stock';
+  }
+
+  const fgUpsertDoc = {
+    $inc: { currentStock: quantity },
+    $set: {
+      updatedBy: 'Transfer System',
+      isActive: true,
+      status: fgStatus
+    },
+    $setOnInsert: {
       productCode: sourceItem.productCode,
       productName: sourceItem.productName,
       salesDescription: sourceItem.salesDescription,
-      category: sourceItem.category,
+      category: sourceItem.category || sourceItem.subCategory || 'General',
       subCategory: sourceItem.subCategory,
       unitOfMeasure: sourceItem.unitOfMeasure,
       unitPrice: sourceItem.unitPrice,
       costPrice: sourceItem.costPrice,
-      currentStock: quantity,
       minimumStock: sourceItem.minimumStock,
       maximumStock: sourceItem.maximumStock,
       reorderPoint: sourceItem.reorderPoint,
@@ -527,16 +525,17 @@ async function handleFinishedGoodsTransfer(sourceModels, destinationModels, item
       storageRequirements: sourceItem.storageRequirements,
       dietaryRestrictions: sourceItem.dietaryRestrictions,
       allergens: sourceItem.allergens,
-      isActive: sourceItem.isActive,
-      status: quantity > sourceItem.minimumStock ? 'In Stock' : 'Low Stock',
       notes: notes || sourceItem.notes,
-      createdBy: 'Transfer System',
-      updatedBy: 'Transfer System'
-    };
+      createdBy: 'Transfer System'
+    }
+  };
 
-    const created = await DestinationFinishedProduct.create(newDestinationItem);
-    console.log(`   ✅ Created new item in destination:`, created.productCode, 'with stock:', created.currentStock);
-  }
+  const fgUpsertRes = await DestinationFinishedProduct.updateOne(
+    { productCode: sourceItem.productCode },
+    fgUpsertDoc,
+    { upsert: true }
+  );
+  console.log(`   ✅ Upserted FG. Matched: ${fgUpsertRes.matchedCount || fgUpsertRes.nMatched}, Modified: ${fgUpsertRes.modifiedCount || fgUpsertRes.nModified}, Upserted: ${fgUpsertRes.upsertedCount || (fgUpsertRes.upsertedId ? 1 : 0)}`);
 
   console.log(`✅ Successfully transferred ${quantity} ${itemCode} (Finished Goods) from source to destination`);
 }
@@ -637,4 +636,7 @@ const getOutletLocation = (outletName) => {
   return outletLocations[outletName] || 'Kuwait';
 };
 
+// Export the transfer functions for use in other modules
 module.exports = router;
+module.exports.handleRawMaterialTransfer = handleRawMaterialTransfer;
+module.exports.handleFinishedGoodsTransfer = handleFinishedGoodsTransfer;
