@@ -36,6 +36,22 @@ const purchaseOrderSchema = new mongoose.Schema({
   // Reference to the forecast that generated this PO
   generatedFromForecast: { type: String },
   forecastNumber: { type: String },
+  // Zoho sync tracking fields
+  zohoBillId: { type: String, sparse: true },
+  zohoLocationName: { type: String },
+  lastSyncedAt: { type: Date },
+  syncStatus: { 
+    type: String, 
+    enum: ['syncing', 'synced', 'not_synced', 'sync_failed'],
+    default: 'not_synced' 
+  },
+  processingStatus: { 
+    type: String, 
+    enum: ['processing', 'processed', 'not_processed', 'failed'],
+    default: 'not_processed' 
+  },
+  lastProcessedAt: { type: Date },
+  processedBy: { type: String },
   createdBy: { type: String, default: 'admin' },
   updatedBy: { type: String, default: 'admin' }
 }, {

@@ -45,6 +45,12 @@ app.use('/api/central-kitchen/finished-products', require('./routes/centralKitch
 // Zoho Sync routes (Ingredient Master only)
 app.use('/api/sync-zoho', require('./routes/syncZohoRawMaterials'));
 
+// Zoho Bills Sync routes (Purchase Orders)
+app.use('/api/sync-zoho-bills', require('./routes/syncZohoBills'));
+
+// Bill Processing routes (Inventory Updates)
+app.use('/api/bill-processing', require('./routes/billProcessing'));
+
 // Ingredient Master Transfer routes
 app.use('/api/ingredient-master', require('./routes/ingredientMasterTransfers'));
 
