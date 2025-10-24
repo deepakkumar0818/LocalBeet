@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Package, TrendingDown, AlertTriangle, RefreshCw, Upload } from 'lucide-react'
+import { Package, TrendingDown, AlertTriangle, RefreshCw, Upload, Download } from 'lucide-react'
 import { apiService } from '../services/api'
 import { useConfirmation } from '../hooks/useConfirmation'
 import ConfirmationModal from '../components/ConfirmationModal'
@@ -67,6 +67,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
   const [showTransferOrderModal, setShowTransferOrderModal] = useState(false)
   const [selectedTransferOrder, setSelectedTransferOrder] = useState<TransferOrder | null>(null)
   const [transferOrderLoading, setTransferOrderLoading] = useState(false)
+  const [exportLoading, setExportLoading] = useState(false)
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Central Kitchen')
   
   // Filter notifications to show Finished Goods transfer requests only
@@ -494,6 +495,25 @@ const CentralKitchenFinishedGoods: React.FC = () => {
     }
   }
 
+  const handleExport = async () => {
+    try {
+      setExportLoading(true)
+      console.log('Starting export of finished goods...')
+      
+      await apiService.exportCentralKitchenFinishedProducts({
+        search: searchTerm,
+        subCategory: filterCategory,
+        status: filterStatus
+      })
+      
+      console.log('Export completed successfully')
+    } catch (error) {
+      console.error('Error exporting finished goods:', error)
+      alert(`Failed to export finished goods: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setExportLoading(false)
+    }
+  }
 
   // Calculate summary statistics
   const totalItems = inventoryItems.length
@@ -553,6 +573,15 @@ const CentralKitchenFinishedGoods: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-3">
+          <button
+            onClick={handleExport}
+            disabled={exportLoading}
+            className="btn-primary flex items-center"
+            title="Export finished goods to Excel"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {exportLoading ? 'Exporting...' : 'Export'}
+          </button>
           <button
             onClick={loadCentralKitchenData}
             className="btn-secondary flex items-center"

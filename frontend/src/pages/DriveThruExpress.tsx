@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Package, Truck, RefreshCw, Car, ShoppingCart, Search } from 'lucide-react'
+import { Package, Truck, RefreshCw, Car, ShoppingCart, Search, Download } from 'lucide-react'
 import { apiService } from '../services/api'
 import NotificationDropdown from '../components/NotificationDropdown'
 import { useNotifications } from '../hooks/useNotifications'
@@ -88,6 +88,7 @@ const DriveThruExpress: React.FC = () => {
   const [sortBy, setSortBy] = useState('materialName')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [, setImporting] = useState(false)
+  const [exportLoading, setExportLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Taiba Hospital')
   const [editingItem, setEditingItem] = useState<OutletInventoryItem | null>(null)
@@ -211,6 +212,38 @@ const DriveThruExpress: React.FC = () => {
     setSortBy('materialName')
     setSortOrder('asc')
     loadInventory()
+  }
+
+  const handleExportRawMaterials = async () => {
+    try {
+      setExportLoading(true)
+      await apiService.exportTaibaHospitalRawMaterials({
+        search: searchTerm,
+        category: filterCategory,
+        status: filterStatus
+      })
+    } catch (error) {
+      console.error('Error exporting raw materials:', error)
+      alert('Error exporting raw materials: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
+  const handleExportFinishedGoods = async () => {
+    try {
+      setExportLoading(true)
+      await apiService.exportTaibaHospitalFinishedProducts({
+        search: searchTerm,
+        category: filterCategory,
+        status: filterStatus
+      })
+    } catch (error) {
+      console.error('Error exporting finished goods:', error)
+      alert('Error exporting finished goods: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    } finally {
+      setExportLoading(false)
+    }
   }
 
   const loadInventory = async () => {
@@ -611,6 +644,15 @@ const DriveThruExpress: React.FC = () => {
       <div className="card p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Raw Materials Inventory</h2>
+          <button
+            onClick={handleExportRawMaterials}
+            disabled={exportLoading}
+            className="btn-primary flex items-center"
+            title="Export raw materials to Excel"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {exportLoading ? 'Exporting...' : 'Export'}
+          </button>
         </div>
         
         {/* (Removed duplicate top search bar) */}
@@ -718,6 +760,15 @@ const DriveThruExpress: React.FC = () => {
               <Package className="h-6 w-6 text-green-600" />
               <h2 className="text-xl font-semibold text-gray-900">Finished Goods Inventory</h2>
             </div>
+            <button
+              onClick={handleExportFinishedGoods}
+              disabled={exportLoading}
+              className="btn-primary flex items-center"
+              title="Export finished goods to Excel"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {exportLoading ? 'Exporting...' : 'Export'}
+            </button>
           </div>
         </div>
         

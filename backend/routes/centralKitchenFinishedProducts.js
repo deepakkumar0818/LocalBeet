@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const XLSX = require('xlsx');
 const { connectCentralKitchenDB } = require('../config/centralKitchenDB');
 const { initializeCentralKitchenModels, getCentralKitchenModels } = require('../models/centralKitchenModels');
 
@@ -165,6 +166,139 @@ router.get('/dietary/:restriction', ensureConnection, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Server Error', 
+      error: error.message 
+    });
+  }
+});
+
+// GET /api/central-kitchen/finished-products/export - Export finished products to Excel
+router.get('/export', ensureConnection, async (req, res) => {
+  try {
+    const { 
+      search, 
+      subCategory, 
+      status,
+      dietaryRestriction 
+    } = req.query;
+
+    const query = { isActive: true };
+
+    // Add search filter
+    if (search) {
+      query.$or = [
+        { productName: { $regex: search, $options: 'i' } },
+        { productCode: { $regex: search, $options: 'i' } },
+        { salesDescription: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Add category filter
+    if (subCategory) {
+      query.subCategory = subCategory;
+    }
+
+    // Add status filter
+    if (status) {
+      query.status = status;
+    }
+
+    // Add dietary restriction filter
+    if (dietaryRestriction) {
+      switch (dietaryRestriction) {
+        case 'vegan':
+          query['dietaryInfo.isVegan'] = true;
+          break;
+        case 'vegetarian':
+          query['dietaryInfo.isVegetarian'] = true;
+          break;
+        case 'gluten-free':
+          query['dietaryInfo.isGlutenFree'] = true;
+          break;
+        case 'halal':
+          query['dietaryInfo.isHalal'] = true;
+          break;
+      }
+    }
+
+    // Get all finished products (no pagination for export)
+    const finishedProducts = await req.finishedProductModel.find(query).sort({ productName: 1 });
+
+    // Prepare data for Excel export
+    const exportData = finishedProducts.map((item, index) => ({
+      'S.No': index + 1,
+      'Product Code': item.productCode || '',
+      'Product Name': item.productName || '',
+      'Category': item.subCategory || '',
+      'Sales Description': item.salesDescription || '',
+      'Unit of Measure': item.unitOfMeasure || '',
+      'Current Stock': item.currentStock || 0,
+      'Minimum Stock': item.minimumStock || 0,
+      'Maximum Stock': item.maximumStock || 0,
+      'Reorder Point': item.reorderPoint || 0,
+      'Unit Price': item.unitPrice || 0,
+      'Total Value': (item.currentStock || 0) * (item.unitPrice || 0),
+      'Status': item.status || '',
+      'Location': item.location || '',
+      'Batch Number': item.batchNumber || '',
+      'Vegan': item.dietaryInfo?.isVegan ? 'Yes' : 'No',
+      'Vegetarian': item.dietaryInfo?.isVegetarian ? 'Yes' : 'No',
+      'Gluten Free': item.dietaryInfo?.isGlutenFree ? 'Yes' : 'No',
+      'Halal': item.dietaryInfo?.isHalal ? 'Yes' : 'No',
+      'Last Updated': item.lastStockUpdate ? new Date(item.lastStockUpdate).toLocaleDateString() : '',
+      'Created Date': item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '',
+      'Notes': item.notes || ''
+    }));
+
+    // Create workbook and worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+    // Set column widths
+    const columnWidths = [
+      { wch: 8 },   // S.No
+      { wch: 15 },  // Product Code
+      { wch: 25 },  // Product Name
+      { wch: 20 },  // Category
+      { wch: 30 },  // Sales Description
+      { wch: 15 },  // Unit of Measure
+      { wch: 12 },  // Current Stock
+      { wch: 12 },  // Minimum Stock
+      { wch: 12 },  // Maximum Stock
+      { wch: 12 },  // Reorder Point
+      { wch: 12 },  // Unit Price
+      { wch: 12 },  // Total Value
+      { wch: 10 },  // Status
+      { wch: 15 },  // Location
+      { wch: 15 },  // Batch Number
+      { wch: 8 },   // Vegan
+      { wch: 10 },  // Vegetarian
+      { wch: 12 },  // Gluten Free
+      { wch: 8 },   // Halal
+      { wch: 12 },  // Last Updated
+      { wch: 12 },  // Created Date
+      { wch: 30 }   // Notes
+    ];
+    worksheet['!cols'] = columnWidths;
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Finished Products');
+
+    // Generate Excel file buffer
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    // Set response headers for file download
+    const fileName = `Central_Kitchen_Finished_Products_${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Length', excelBuffer.length);
+
+    // Send the Excel file
+    res.send(excelBuffer);
+  } catch (error) {
+    console.error('Error exporting finished products:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error exporting finished products', 
       error: error.message 
     });
   }

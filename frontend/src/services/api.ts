@@ -248,6 +248,80 @@ class ApiService {
     });
   }
 
+  // Export Central Kitchen Raw Materials to Excel
+  async exportCentralKitchenRawMaterials(params?: {
+    search?: string;
+    subCategory?: string;
+    status?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.subCategory) queryParams.append('subCategory', params.subCategory);
+    if (params?.status) queryParams.append('status', params.status);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/central-kitchen/raw-materials/export${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Export failed: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Central_Kitchen_Raw_Materials_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  // Export Central Kitchen Finished Products to Excel
+  async exportCentralKitchenFinishedProducts(params?: {
+    search?: string;
+    subCategory?: string;
+    status?: string;
+    dietaryRestriction?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.subCategory) queryParams.append('subCategory', params.subCategory);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.dietaryRestriction) queryParams.append('dietaryRestriction', params.dietaryRestriction);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/central-kitchen/finished-products/export${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Export failed: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Central_Kitchen_Finished_Products_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
   // Kuwait City API
   async getKuwaitCityRawMaterials(params?: {
     page?: number;
@@ -313,6 +387,300 @@ class ApiService {
         pages: number;
       };
     }>(endpoint);
+  }
+
+  // Export Kuwait City Raw Materials to Excel
+  async exportKuwaitCityRawMaterials(params?: {
+    search?: string;
+    subCategory?: string;
+    status?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.subCategory) queryParams.append('subCategory', params.subCategory);
+    if (params?.status) queryParams.append('status', params.status);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/kuwait-city/raw-materials/export${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Export failed: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Kuwait_City_Raw_Materials_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  // Export Kuwait City Finished Products to Excel
+  async exportKuwaitCityFinishedProducts(params?: {
+    search?: string;
+    subCategory?: string;
+    status?: string;
+    dietaryRestriction?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.subCategory) queryParams.append('subCategory', params.subCategory);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.dietaryRestriction) queryParams.append('dietaryRestriction', params.dietaryRestriction);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/kuwait-city/finished-products/export${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Export failed: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Kuwait_City_Finished_Products_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  // Export Mall360 Raw Materials to Excel
+  async exportMall360RawMaterials(params?: {
+    search?: string;
+    subCategory?: string;
+    status?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.subCategory) queryParams.append('subCategory', params.subCategory);
+    if (params?.status) queryParams.append('status', params.status);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/360-mall/raw-materials/export${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Export failed: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Mall360_Raw_Materials_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  // Export Mall360 Finished Products to Excel
+  async exportMall360FinishedProducts(params?: {
+    search?: string;
+    subCategory?: string;
+    status?: string;
+    dietaryRestriction?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.subCategory) queryParams.append('subCategory', params.subCategory);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.dietaryRestriction) queryParams.append('dietaryRestriction', params.dietaryRestriction);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/360-mall/finished-products/export${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Export failed: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Mall360_Finished_Products_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  // Export Vibes Complex Raw Materials to Excel
+  async exportVibesComplexRawMaterials(params?: {
+    search?: string;
+    subCategory?: string;
+    status?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.subCategory) queryParams.append('subCategory', params.subCategory);
+    if (params?.status) queryParams.append('status', params.status);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/vibe-complex/raw-materials/export${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Export failed: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Vibes_Complex_Raw_Materials_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  // Export Vibes Complex Finished Products to Excel
+  async exportVibesComplexFinishedProducts(params?: {
+    search?: string;
+    subCategory?: string;
+    status?: string;
+    dietaryRestriction?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.subCategory) queryParams.append('subCategory', params.subCategory);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.dietaryRestriction) queryParams.append('dietaryRestriction', params.dietaryRestriction);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/vibe-complex/finished-products/export${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Export failed: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Vibes_Complex_Finished_Products_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  // Export Taiba Hospital Raw Materials to Excel
+  async exportTaibaHospitalRawMaterials(params?: {
+    search?: string;
+    category?: string;
+    status?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.category) queryParams.append('category', params.category);
+    if (params?.status) queryParams.append('status', params.status);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/taiba-kitchen/raw-materials/export${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Export failed: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Taiba_Hospital_Raw_Materials_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  // Export Taiba Hospital Finished Products to Excel
+  async exportTaibaHospitalFinishedProducts(params?: {
+    search?: string;
+    category?: string;
+    status?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.category) queryParams.append('category', params.category);
+    if (params?.status) queryParams.append('status', params.status);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/taiba-kitchen/finished-products/export${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Export failed: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Taiba_Hospital_Finished_Products_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   }
 
   // 360 Mall API
