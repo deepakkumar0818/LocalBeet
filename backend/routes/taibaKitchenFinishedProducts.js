@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const connectTaibaKitchenDB = require('../config/taibaKitchenDB');
 const { initializeTaibaKitchenModels, getTaibaKitchenModels } = require('../models/taibaKitchenModels');
+const XLSX = require('xlsx');
 
 // Middleware to ensure models are initialized
 let taibaKitchenModels = null;
@@ -75,6 +76,118 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error('Error fetching Taiba Kitchen finished products:', error);
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+  }
+});
+
+// GET /api/taiba-hospital/finished-products/export - Export finished products to Excel
+router.get('/export', async (req, res) => {
+  try {
+    const { 
+      search, 
+      category, 
+      status
+    } = req.query;
+
+    const query = {};
+
+    // Add search filter
+    if (search) {
+      query.$or = [
+        { productName: { $regex: search, $options: 'i' } },
+        { productCode: { $regex: search, $options: 'i' } },
+        { salesDescription: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Add category filter
+    if (category) {
+      query.category = category;
+    }
+
+    // Add status filter
+    if (status) {
+      query.status = status;
+    }
+
+    // Get all finished products (no pagination for export)
+    const finishedProducts = await taibaKitchenModels.TaibaKitchenFinishedProduct.find(query).sort({ productName: 1 });
+
+    // Prepare data for Excel export
+    const exportData = finishedProducts.map((item, index) => ({
+      'S.No': index + 1,
+      'Product Code': item.productCode || '',
+      'Product Name': item.productName || '',
+      'Category': item.category || '',
+      'Sales Description': item.salesDescription || '',
+      'Unit of Measure': item.unitOfMeasure || '',
+      'Current Stock': item.currentStock || 0,
+      'Minimum Stock': item.minimumStock || 0,
+      'Maximum Stock': item.maximumStock || 0,
+      'Reorder Point': item.reorderPoint || 0,
+      'Unit Price': item.unitPrice || 0,
+      'Total Value': (item.currentStock || 0) * (item.unitPrice || 0),
+      'Status': item.status || '',
+      'Dietary Restrictions': Array.isArray(item.dietaryRestrictions) ? item.dietaryRestrictions.join(', ') : (item.dietaryRestrictions || ''),
+      'Allergens': Array.isArray(item.allergens) ? item.allergens.join(', ') : (item.allergens || ''),
+      'Preparation Time': item.preparationTime || '',
+      'Shelf Life': item.shelfLife || '',
+      'Storage Conditions': item.storageConditions || '',
+      'Last Updated': item.lastStockUpdate ? new Date(item.lastStockUpdate).toLocaleDateString() : '',
+      'Created Date': item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '',
+      'Notes': item.notes || ''
+    }));
+
+    // Create workbook and worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+    // Set column widths
+    const columnWidths = [
+      { wch: 8 },   // S.No
+      { wch: 15 },  // Product Code
+      { wch: 25 },  // Product Name
+      { wch: 20 },  // Category
+      { wch: 30 },  // Sales Description
+      { wch: 15 },  // Unit of Measure
+      { wch: 12 },  // Current Stock
+      { wch: 12 },  // Minimum Stock
+      { wch: 12 },  // Maximum Stock
+      { wch: 12 },  // Reorder Point
+      { wch: 12 },  // Unit Price
+      { wch: 12 },  // Total Value
+      { wch: 10 },  // Status
+      { wch: 20 },  // Dietary Restrictions
+      { wch: 20 },  // Allergens
+      { wch: 15 },  // Preparation Time
+      { wch: 12 },  // Shelf Life
+      { wch: 20 },  // Storage Conditions
+      { wch: 12 },  // Last Updated
+      { wch: 12 },  // Created Date
+      { wch: 30 }   // Notes
+    ];
+    worksheet['!cols'] = columnWidths;
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Finished Products');
+
+    // Generate Excel file buffer
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    // Set response headers for file download
+    const fileName = `Taiba_Hospital_Finished_Products_${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Length', excelBuffer.length);
+
+    // Send the Excel file
+    res.send(excelBuffer);
+  } catch (error) {
+    console.error('Error exporting finished products:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error exporting finished products', 
+      error: error.message 
+    });
   }
 });
 

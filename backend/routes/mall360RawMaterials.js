@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const connectMall360DB = require('../config/mall360DB');
 const { getMall360Models, initializeMall360Models } = require('../models/mall360Models');
+const XLSX = require('xlsx');
 
 let Mall360RawMaterial;
 
@@ -93,6 +94,114 @@ router.get('/', async (req, res) => {
       success: false,
       message: 'Error fetching raw materials',
       error: error.message
+    });
+  }
+});
+
+// GET /api/mall360/raw-materials/export - Export raw materials to Excel
+router.get('/export', async (req, res) => {
+  try {
+    const { 
+      search, 
+      subCategory, 
+      status 
+    } = req.query;
+
+    const query = { isActive: true };
+
+    // Add search filter
+    if (search) {
+      query.$or = [
+        { materialName: { $regex: search, $options: 'i' } },
+        { materialCode: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Add category filter
+    if (subCategory) {
+      query.subCategory = subCategory;
+    }
+
+    // Add status filter
+    if (status) {
+      query.status = status;
+    }
+
+    // Get all raw materials (no pagination for export)
+    const rawMaterials = await Mall360RawMaterial.find(query).sort({ materialName: 1 });
+
+    // Prepare data for Excel export
+    const exportData = rawMaterials.map((item, index) => ({
+      'S.No': index + 1,
+      'Material Code': item.materialCode || '',
+      'Material Name': item.materialName || '',
+      'Category': item.subCategory || '',
+      'Description': item.description || '',
+      'Unit of Measure': item.unitOfMeasure || '',
+      'Current Stock': item.currentStock || 0,
+      'Minimum Stock': item.minimumStock || 0,
+      'Maximum Stock': item.maximumStock || 0,
+      'Reorder Point': item.reorderPoint || 0,
+      'Unit Price': item.unitPrice || 0,
+      'Total Value': (item.currentStock || 0) * (item.unitPrice || 0),
+      'Status': item.status || '',
+      'Supplier': item.supplier || '',
+      'Location': item.location || '',
+      'Batch Number': item.batchNumber || '',
+      'Last Updated': item.lastStockUpdate ? new Date(item.lastStockUpdate).toLocaleDateString() : '',
+      'Created Date': item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '',
+      'Notes': item.notes || ''
+    }));
+
+    // Create workbook and worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+    // Set column widths
+    const columnWidths = [
+      { wch: 8 },   // S.No
+      { wch: 15 },  // Material Code
+      { wch: 25 },  // Material Name
+      { wch: 20 },  // Category
+      { wch: 30 },  // Description
+      { wch: 15 },  // Unit of Measure
+      { wch: 12 },  // Current Stock
+      { wch: 12 },  // Minimum Stock
+      { wch: 12 },  // Maximum Stock
+      { wch: 12 },  // Reorder Point
+      { wch: 12 },  // Unit Price
+      { wch: 12 },  // Total Value
+      { wch: 10 },  // Status
+      { wch: 20 },  // Supplier
+      { wch: 15 },  // Location
+      { wch: 15 },  // Batch Number
+      { wch: 12 },  // Last Updated
+      { wch: 12 },  // Created Date
+      { wch: 30 }   // Notes
+    ];
+    worksheet['!cols'] = columnWidths;
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Raw Materials');
+
+    // Generate Excel file buffer
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    // Set response headers for file download
+    const fileName = `Mall360_Raw_Materials_${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Length', excelBuffer.length);
+
+    // Send the Excel file
+    res.send(excelBuffer);
+  } catch (error) {
+    console.error('Error exporting raw materials:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error exporting raw materials', 
+      error: error.message 
     });
   }
 });

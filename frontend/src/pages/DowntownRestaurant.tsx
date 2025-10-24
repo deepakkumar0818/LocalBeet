@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Package, AlertTriangle, Store, Truck, RefreshCw, ShoppingCart, Receipt, CreditCard, Plus } from 'lucide-react'
+import { Package, AlertTriangle, Store, Truck, RefreshCw, ShoppingCart, Receipt, CreditCard, Plus, Download } from 'lucide-react'
 import { apiService } from '../services/api'
 import NotificationDropdown from '../components/NotificationDropdown'
 import { useNotifications } from '../hooks/useNotifications'
@@ -86,6 +86,7 @@ const DowntownRestaurant: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('')
   const [sortBy, setSortBy] = useState('materialName')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [exportLoading, setExportLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Kuwait City')
   
@@ -449,6 +450,45 @@ const DowntownRestaurant: React.FC = () => {
     }
   }
 
+  const handleExportRawMaterials = async () => {
+    try {
+      setExportLoading(true)
+      console.log('Starting export of Kuwait City raw materials...')
+      
+      await apiService.exportKuwaitCityRawMaterials({
+        search: searchTerm,
+        subCategory: filterCategory,
+        status: filterStatus
+      })
+      
+      console.log('Export completed successfully')
+    } catch (error) {
+      console.error('Error exporting raw materials:', error)
+      alert(`Failed to export raw materials: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
+  const handleExportFinishedGoods = async () => {
+    try {
+      setExportLoading(true)
+      console.log('Starting export of Kuwait City finished goods...')
+      
+      await apiService.exportKuwaitCityFinishedProducts({
+        search: searchTerm,
+        subCategory: filterCategory,
+        status: filterStatus
+      })
+      
+      console.log('Export completed successfully')
+    } catch (error) {
+      console.error('Error exporting finished goods:', error)
+      alert(`Failed to export finished goods: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setExportLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -505,6 +545,17 @@ const DowntownRestaurant: React.FC = () => {
             <div className="flex items-center space-x-3">
               <Package className="h-6 w-6 text-blue-600" />
               <h2 className="text-xl font-semibold text-gray-900">Raw Materials Inventory</h2>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleExportRawMaterials}
+                disabled={exportLoading}
+                className="btn-primary flex items-center"
+                title="Export raw materials to Excel"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {exportLoading ? 'Exporting...' : 'Export'}
+              </button>
             </div>
           </div>
         </div>
@@ -598,7 +649,18 @@ const DowntownRestaurant: React.FC = () => {
             <div className="flex items-center space-x-3">
               <Package className="h-6 w-6 text-green-600" />
               <h2 className="text-xl font-semibold text-gray-900">Finished Goods Inventory</h2>
-        </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleExportFinishedGoods}
+                disabled={exportLoading}
+                className="btn-primary flex items-center"
+                title="Export finished goods to Excel"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {exportLoading ? 'Exporting...' : 'Export'}
+              </button>
+            </div>
           </div>
         </div>
         {/* Search & Filters */}
