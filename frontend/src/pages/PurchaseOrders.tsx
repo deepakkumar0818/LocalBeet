@@ -489,14 +489,14 @@ const PurchaseOrders: React.FC = () => {
                 <p className="text-lg font-bold text-green-600 ml-4">
                   {po.totalAmount?.toFixed(3) || '0.000'} KWD
                 </p>
-              </div>
+                    </div>
 
               {/* Location Name */}
               <div className="mb-3">
                 <div className="flex items-center text-xs text-gray-600 mb-1">
                   <MapPin className="h-3 w-3 mr-1 text-gray-400" />
                   <span className="font-medium">Location</span>
-                </div>
+        </div>
                 <p className="text-xs text-gray-900 ml-4">
                   {po.zohoLocationName || 'Not specified'}
                 </p>

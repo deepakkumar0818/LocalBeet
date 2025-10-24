@@ -71,6 +71,11 @@ async function updateBillProcessingStatus(billId, status, verbose = true) {
  * @returns {Promise<Object>} - Update statistics
  */
 async function updateInventoryForModule(moduleName, lineItems, billId, verbose = true) {
+  // Special handling for Central Kitchen to distinguish Raw Materials vs Finished Goods
+  if (moduleName === 'central-kitchen') {
+    return await updateCentralKitchenInventory(lineItems, billId, verbose);
+  }
+
   const stats = {
     module: moduleName,
     totalItems: lineItems.length,
@@ -129,6 +134,192 @@ async function updateInventoryForModule(moduleName, lineItems, billId, verbose =
       console.error(`❌ Error updating module ${moduleName}:`, error.message);
     }
     throw error;
+  }
+}
+
+/**
+ * Update Central Kitchen inventory with Raw Materials and Finished Goods distinction
+ * @param {Array} lineItems - Array of line items from the bill
+ * @param {string} billId - The bill ID for reference
+ * @param {boolean} verbose - Whether to log detailed information
+ * @returns {Promise<Object>} - Update statistics
+ */
+async function updateCentralKitchenInventory(lineItems, billId, verbose = true) {
+  const stats = {
+    module: 'central-kitchen',
+    totalItems: lineItems.length,
+    rawMaterialsUpdated: 0,
+    rawMaterialsCreated: 0,
+    finishedGoodsUpdated: 0,
+    finishedGoodsCreated: 0,
+    skippedItems: 0,
+    errors: 0,
+    errorDetails: []
+  };
+
+  try {
+    // Get Central Kitchen database connection
+    const connection = await connectCentralKitchenDB();
+    
+    // Get both models for Central Kitchen
+    const RawMaterialModel = require('../models/CentralKitchenRawMaterial')(connection);
+    const FinishedGoodModel = require('../models/CentralKitchenFinishedProduct')(connection);
+
+    if (verbose) {
+      console.log(`📦 Updating Central Kitchen inventory (Raw Materials + Finished Goods)`);
+    }
+
+    // Process each line item
+    for (const item of lineItems) {
+      try {
+        const accountName = item.account_name || '';
+        
+        if (verbose) {
+          console.log(`   🔍 Processing ${item.sku} (${item.name}) - Account: ${accountName}`);
+        }
+
+        let updateResult;
+        
+        // Only process items with specific account names
+        if (accountName === 'Inventory Raw') {
+          // Add to Raw Materials
+          updateResult = await updateInventoryItem(RawMaterialModel, item, billId, verbose);
+          
+          if (updateResult.created) {
+            stats.rawMaterialsCreated++;
+          } else {
+            stats.rawMaterialsUpdated++;
+          }
+          
+          if (verbose) {
+            console.log(`   📦 Added to Raw Materials`);
+          }
+          
+        } else if (accountName === 'Inventory Asset') {
+          // Add to Finished Goods (uses productCode field)
+          updateResult = await updateFinishedGoodItem(FinishedGoodModel, item, billId, verbose);
+          
+          if (updateResult.created) {
+            stats.finishedGoodsCreated++;
+          } else {
+            stats.finishedGoodsUpdated++;
+          }
+          
+          if (verbose) {
+            console.log(`   🏭 Added to Finished Goods`);
+          }
+          
+        } else {
+          // Skip items with other account types
+          stats.skippedItems++;
+          if (verbose) {
+            console.log(`   ⏭️  Skipping item with account type "${accountName}" - not Inventory Raw or Inventory Asset`);
+          }
+          continue; // Skip this item entirely
+        }
+        
+      } catch (itemError) {
+        stats.errors++;
+        stats.errorDetails.push({
+          itemId: item.item_id,
+          sku: item.sku,
+          name: item.name,
+          accountName: item.account_name,
+          error: itemError.message
+        });
+        
+        if (verbose) {
+          console.error(`   ❌ Error updating item ${item.sku}:`, itemError.message);
+        }
+      }
+    }
+
+    if (verbose) {
+      console.log(`✅ Central Kitchen completed:`);
+      console.log(`   📦 Raw Materials: ${stats.rawMaterialsUpdated} updated, ${stats.rawMaterialsCreated} created`);
+      console.log(`   🏭 Finished Goods: ${stats.finishedGoodsUpdated} updated, ${stats.finishedGoodsCreated} created`);
+      console.log(`   ⏭️  Skipped: ${stats.skippedItems} items (non-inventory accounts)`);
+      console.log(`   ❌ Errors: ${stats.errors}`);
+    }
+
+    return stats;
+
+  } catch (error) {
+    if (verbose) {
+      console.error(`❌ Error updating Central Kitchen inventory:`, error.message);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Update a single finished good item (uses productCode field)
+ * @param {Object} Model - The Mongoose model for finished goods
+ * @param {Object} item - The line item from the bill
+ * @param {string} billId - The bill ID for reference
+ * @param {boolean} verbose - Whether to log detailed information
+ * @returns {Promise<Object>} - Update result
+ */
+async function updateFinishedGoodItem(Model, item, billId, verbose = true) {
+  const filter = {
+    productCode: item.sku  // Finished goods use productCode instead of materialCode
+  };
+
+  // Check if item exists
+  const existingItem = await Model.findOne(filter);
+
+  if (existingItem) {
+    // Update existing item
+    const currentQuantity = parseFloat(existingItem.currentStock) || 0;
+    const newQuantity = parseFloat(item.quantity) || 0;
+    const updatedQuantity = currentQuantity + newQuantity;
+
+    await Model.findOneAndUpdate(
+      filter,
+      {
+        $set: {
+          currentStock: updatedQuantity,
+          unitPrice: parseFloat(item.rate) || 0, // Update price from bill
+          updatedBy: 'bill-processor',
+          notes: `Received ${newQuantity} units from bill ${billId} on ${new Date().toLocaleDateString()} - Price updated to ${item.rate}`
+        }
+      },
+      { new: true }
+    );
+
+    if (verbose) {
+      console.log(`   🔄 Updated finished good ${item.sku}: ${currentQuantity} + ${newQuantity} = ${updatedQuantity} (Price: ${item.rate})`);
+    }
+
+    return { created: false, updated: true };
+
+  } else {
+    // Create new item
+    const newItem = new Model({
+      productCode: item.sku,  // Finished goods use productCode
+      productName: item.name, // Finished goods use productName
+      category: 'General', // Default category
+      subCategory: 'General',
+      unitOfMeasure: item.unit || 'pcs',
+      unitPrice: parseFloat(item.rate) || 0,
+      currentStock: parseFloat(item.quantity) || 0,
+      minimumStock: 0,
+      maximumStock: 1000,
+      reorderPoint: 10,
+      isActive: true,
+      status: 'In Stock',
+      notes: `Created from bill ${billId} - Initial stock: ${item.quantity}`,
+      createdBy: 'bill-processor',
+      updatedBy: 'bill-processor'
+    });
+
+    await newItem.save();
+
+    if (verbose) {
+      console.log(`   ➕ Created new finished good ${item.sku}: ${item.quantity} ${item.unit || 'pcs'} (Price: ${item.rate})`);
+    }
+
+    return { created: true, updated: false };
   }
 }
 
@@ -331,5 +522,7 @@ module.exports = {
   updateInventoryFromBill,
   getModelForModule,
   updateInventoryItem,
-  updateBillProcessingStatus
+  updateBillProcessingStatus,
+  updateCentralKitchenInventory,
+  updateFinishedGoodItem
 };
