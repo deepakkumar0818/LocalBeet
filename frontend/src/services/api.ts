@@ -1599,6 +1599,43 @@ class ApiService {
       body: JSON.stringify({ orderIds })
     });
   }
+
+  // Central Kitchen Import API
+  async importCentralKitchenExcel(file: File) {
+    const formData = new FormData();
+    formData.append('excelFile', file);
+
+    const url = `${this.baseURL}/central-kitchen/import-excel`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Excel import failed:', error);
+      throw error;
+    }
+  }
+
+  async getCentralKitchenImportStatus() {
+    return this.request<{
+      success: boolean;
+      statistics: {
+        totalItems: number;
+        activeItems: number;
+        lowStockItems: number;
+      };
+    }>('/central-kitchen/import-status');
+  }
 }
 
 export const apiService = new ApiService();
