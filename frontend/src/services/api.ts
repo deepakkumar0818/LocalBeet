@@ -1600,41 +1600,32 @@ class ApiService {
     });
   }
 
-  // Central Kitchen Import API
-  async importCentralKitchenExcel(file: File) {
-    const formData = new FormData();
-    formData.append('excelFile', file);
-
-    const url = `${this.baseURL}/central-kitchen/import-excel`;
-    
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Excel import failed:', error);
-      throw error;
-    }
-  }
-
-  async getCentralKitchenImportStatus() {
+  // Update Central Kitchen Finished Product
+  async updateCentralKitchenFinishedProduct(id: string, data: any) {
     return this.request<{
       success: boolean;
-      statistics: {
-        totalItems: number;
-        activeItems: number;
-        lowStockItems: number;
+      data: any;
+      message: string;
+    }>(`/central-kitchen/finished-products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  // Import Central Kitchen Finished Products from Excel/CSV
+  async importCentralKitchenFinishedProducts(products: any[]) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: {
+        successCount: number;
+        errorCount: number;
+        errors: string[];
       };
-    }>('/central-kitchen/import-status');
+    }>('/central-kitchen/finished-products/import', {
+      method: 'POST',
+      body: JSON.stringify({ products })
+    });
   }
 }
 
