@@ -213,4 +213,7 @@ CentralKitchenRawMaterialSchema.statics.findLowStock = function() {
   });
 };
 
+// Add pagination plugin
+CentralKitchenRawMaterialSchema.plugin(mongoosePaginate);
+
 module.exports = (connection) => connection.model('CentralKitchenRawMaterial', CentralKitchenRawMaterialSchema);
