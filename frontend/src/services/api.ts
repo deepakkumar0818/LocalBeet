@@ -16,11 +16,14 @@ class ApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
     
+    // Don't set Content-Type for FormData, let the browser set it with boundary
+    const isFormData = options.body instanceof FormData;
+    const headers = isFormData 
+      ? { ...options.headers } 
+      : { 'Content-Type': 'application/json', ...options.headers };
+    
     const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
       ...options,
     };
 
@@ -1014,27 +1017,6 @@ class ApiService {
     }>(`/transfer-orders/${id}`);
   }
 
-  async createTransferOrder(data: any) {
-    return this.request<{
-      success: boolean;
-      data: any;
-      message: string;
-    }>(`/transfers/create`, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  }
-
-  async updateTransferOrderStatus(id: string, data: any) {
-    return this.request<{
-      success: boolean;
-      data: any;
-      message: string;
-    }>(`/transfer-orders/${id}/status`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
-  }
 
   async updateTransferOrderInventory(id: string, action: 'approve' | 'reject') {
     return this.request<{
@@ -1625,6 +1607,45 @@ class ApiService {
     }>('/central-kitchen/finished-products/import', {
       method: 'POST',
       body: JSON.stringify({ products })
+    });
+  }
+
+  // Import Central Kitchen Raw Materials from Excel
+  async importCentralKitchenExcel(file: File) {
+    const formData = new FormData();
+    formData.append('excelFile', file);
+
+    return this.request<{
+      success: boolean;
+      message: string;
+      results: {
+        totalRows: number;
+        totalProcessed: number;
+        created: number;
+        updated: number;
+        skipped: number;
+        errors: number;
+        skippedReasons?: string[];
+        errorDetails?: string[];
+      };
+    }>('/central-kitchen/import-excel', {
+      method: 'POST',
+      body: formData
+    });
+  }
+
+  // Get Central Kitchen Import Status
+  async getCentralKitchenImportStatus() {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: {
+        totalItems: number;
+        categories: string[];
+        lastImported?: string;
+      };
+    }>('/central-kitchen/import-status', {
+      method: 'GET'
     });
   }
 }
