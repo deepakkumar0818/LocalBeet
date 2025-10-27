@@ -68,6 +68,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
   const [selectedTransferOrder, setSelectedTransferOrder] = useState<TransferOrder | null>(null)
   const [transferOrderLoading, setTransferOrderLoading] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
+  const [importLoading, setImportLoading] = useState(false)
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Central Kitchen')
   
   // Filter notifications to show Finished Goods transfer requests only
@@ -118,7 +119,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       
       // Get central kitchen outlet from backend
       const outletsResponse = await apiService.getCentralKitchens()
-      if (outletsResponse.success && outletsResponse.data.length > 0) {
+      if (outletsResponse.success && outletsResponse.data && Array.isArray(outletsResponse.data) && outletsResponse.data.length > 0) {
         const centralKitchen = outletsResponse.data[0]
         setOutlet({
           id: centralKitchen._id,
@@ -156,7 +157,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       if (inventoryResponse.success) {
         console.log('Loaded Central Kitchen Finished Goods:', inventoryResponse.data)
         
-        if (inventoryResponse.data && inventoryResponse.data.length > 0) {
+        if (inventoryResponse.data && Array.isArray(inventoryResponse.data) && inventoryResponse.data.length > 0) {
           // Transform the data to match the expected interface
           const transformedItems: OutletInventoryItem[] = inventoryResponse.data.map((item: any) => ({
             id: item._id || item.id,
@@ -230,29 +231,29 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       
       // Update the inventory item
       const updateData = {
-        currentStock: parseFloat(editFormData.currentStock) || 0,
-        minimumStock: parseFloat(editFormData.minimumStock) || 0,
-        maximumStock: parseFloat(editFormData.maximumStock) || 0,
-        reorderPoint: parseFloat(editFormData.reorderPoint) || 0,
-        unitPrice: parseFloat(editFormData.unitPrice) || 0,
+        currentStock: Number.parseFloat(editFormData.currentStock) || 0,
+        minimumStock: Number.parseFloat(editFormData.minimumStock) || 0,
+        maximumStock: Number.parseFloat(editFormData.maximumStock) || 0,
+        reorderPoint: Number.parseFloat(editFormData.reorderPoint) || 0,
+        unitPrice: Number.parseFloat(editFormData.unitPrice) || 0,
         notes: editFormData.notes,
         updatedBy: 'user'
       }
 
-      const response = await apiService.updateCentralKitchenRawMaterial(editingItem.id, updateData)
+      const response = await apiService.updateCentralKitchenFinishedProduct(editingItem.id, updateData)
       
       if (response.success) {
-        alert('Raw material updated successfully!')
+        alert('Finished product updated successfully!')
         setShowEditModal(false)
         setEditingItem(null)
         // Reload the inventory data
         await loadInventory()
       } else {
-        throw new Error(response.message || 'Failed to update raw material')
+        throw new Error(response.message || 'Failed to update finished product')
       }
     } catch (err) {
-      console.error('Error updating raw material:', err)
-      alert(`Failed to update raw material: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      console.error('Error updating finished product:', err)
+      alert(`Failed to update finished product: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
       setLoading(false)
     }
@@ -275,16 +276,96 @@ const CentralKitchenFinishedGoods: React.FC = () => {
     fileInputRef.current?.click()
   }
 
+  const handleDownloadTemplate = async () => {
+    try {
+      // Create sample data for template
+      const templateData = [
+        {
+          'SKU': 'psk-001',
+          'Product Name': 'Sample Finished Good',
+          'Sales Description': 'Sample finished good description',
+          'Parent Category': 'Finish Product',
+          'SubCategory Name': 'MAIN COURSES',
+          'Unit': 'piece',
+          'Unit Price': 10.50,
+          'Cost Price': 7.25,
+          'Current Quantity': 100,
+          'Minimum Stock': 10,
+          'Maximum Stock': 500,
+          'Reorder Point': 25,
+          'Status': 'Active',
+          'Description': 'Sample product description',
+          'Notes': 'Sample notes'
+        }
+      ]
+
+      // Create workbook
+      const XLSX = await import('xlsx')
+      const workbook = XLSX.utils.book_new()
+      const worksheet = XLSX.utils.json_to_sheet(templateData)
+      
+      // Set column widths
+      const columnWidths = [
+        { wch: 15 }, // SKU
+        { wch: 25 }, // Product Name
+        { wch: 30 }, // Sales Description
+        { wch: 20 }, // Parent Category
+        { wch: 20 }, // SubCategory Name
+        { wch: 15 }, // Unit
+        { wch: 12 }, // Unit Price
+        { wch: 12 }, // Cost Price
+        { wch: 12 }, // Current Quantity
+        { wch: 12 }, // Minimum Stock
+        { wch: 12 }, // Maximum Stock
+        { wch: 12 }, // Reorder Point
+        { wch: 10 }, // Status
+        { wch: 30 }, // Description
+        { wch: 30 }  // Notes
+      ]
+      worksheet['!cols'] = columnWidths
+
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Finished Goods Template')
+
+      // Generate Excel file
+      const excelBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' })
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      
+      // Download file
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'Central_Kitchen_Finished_Goods_Template.xlsx'
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Error downloading template:', error)
+      alert('Error downloading template: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    }
+  }
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      alert('Please select a CSV file')
+    // Check file type
+    const validTypes = ['.xlsx', '.xls', '.csv']
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'))
+    
+    if (!validTypes.includes(fileExtension)) {
+      alert('Please select an Excel file (.xlsx, .xls) or CSV file')
       return
     }
 
     try {
+      setImportLoading(true)
+      let products: any[] = []
+      let parseErrors: string[] = []
+
+      if (fileExtension === '.csv') {
+        // Handle CSV files
       const text = await file.text()
       const lines = text.split('\n').filter(line => line.trim())
       
@@ -294,65 +375,146 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       }
 
       const dataRows = lines.slice(1)
-      let successCount = 0
-      let errorCount = 0
-
-      for (const row of dataRows) {
+        products = dataRows.map((row, index) => {
         try {
+            // Skip empty rows
+            if (!row || row.trim() === '') {
+              return null
+            }
+            
           const values = row.split(',').map(v => v.replace(/"/g, '').trim())
           
-          const materialData = {
-            materialCode: values[0],
-            materialName: values[1],
-            category: values[3], // SubCategory Name
-            unitOfMeasure: values[4], // Unit
-            unitPrice: 0,
-            currentStock: 0,
-            minimumStock: 0,
-            maximumStock: 0,
-            supplier: '',
-            notes: ''
+            // Validate required fields
+            if (!values[0] || !values[1] || values[0] === '' || values[1] === '') {
+              parseErrors.push(`Row ${index + 2}: Missing product code or name`)
+              return null
+            }
+
+            return {
+              productCode: String(values[0] || '').trim(),
+              productName: String(values[1] || '').trim(),
+              salesDescription: String(values[2] || values[1] || '').trim(),
+              subCategory: String(values[3] || 'MAIN COURSES').trim(), // Assuming SubCategory Name is in column 3
+              unitOfMeasure: String(values[4] || 'piece').trim(),
+              unitPrice: Number.parseFloat(values[5] || '0') || 0,
+              costPrice: Number.parseFloat(values[6] || '0') || 0,
+              currentStock: Number.parseFloat(values[7] || '0') || 0,
+              minimumStock: Number.parseFloat(values[8] || '5') || 5,
+              maximumStock: Number.parseFloat(values[9] || '100') || 100,
+              reorderPoint: Number.parseFloat(values[10] || '10') || 10,
+              status: String(values[11] || 'Active').trim(),
+              description: String(values[12] || '').trim(),
+              notes: String(values[13] || '').trim()
+            }
+          } catch (error) {
+            parseErrors.push(`Row ${index + 2}: ${error instanceof Error ? error.message : 'Parse error'}`)
+            return null
           }
-          
-          // Add to local state
-          const newItem: OutletInventoryItem = {
-            id: `rm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            outletId: outlet?.id || 'central-kitchen-001',
-            outletCode: outlet?.outletCode || '',
-            outletName: outlet?.outletName || '',
-            materialId: materialData.materialCode,
-            materialCode: materialData.materialCode,
-            materialName: materialData.materialName,
-            category: materialData.category,
-            unitOfMeasure: materialData.unitOfMeasure,
-            unitPrice: materialData.unitPrice,
-            currentStock: materialData.currentStock,
-            reservedStock: 0,
-            availableStock: materialData.currentStock,
-            minimumStock: materialData.minimumStock,
-            maximumStock: materialData.maximumStock,
-            reorderPoint: Math.ceil(materialData.minimumStock * 1.5),
-            totalValue: materialData.currentStock * materialData.unitPrice,
-            location: 'Main Storage',
-            batchNumber: `BATCH-${Date.now()}`,
-            supplier: materialData.supplier,
-            lastUpdated: new Date().toISOString(),
-            status: 'In Stock',
-            notes: materialData.notes,
-            isActive: true
-          }
-          
-          setInventoryItems(prev => [...prev, newItem])
-          successCount++
-        } catch (err) {
-          errorCount++
+        }).filter(Boolean)
+      } else {
+        // Handle Excel files
+        const XLSX = await import('xlsx')
+        const data = await file.arrayBuffer()
+        const workbook = XLSX.read(data, { type: 'array' })
+        const sheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[sheetName]
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+        
+        if (jsonData.length < 2) {
+          alert('Excel file must contain at least a header row and one data row')
+          return
         }
+
+        const headers = jsonData[0] as string[]
+        const dataRows = jsonData.slice(1)
+        
+        products = (dataRows as any[]).map((row: any[], index) => {
+          try {
+            // Skip empty rows
+            if (!row || row.every(cell => !cell || cell === '')) {
+              return null
+            }
+            
+            const getValue = (headerName: string) => {
+              const headerIndex = headers.findIndex(h => 
+                h && h.toLowerCase().includes(headerName.toLowerCase())
+              )
+              return headerIndex >= 0 ? String(row[headerIndex] || '') : ''
+            }
+
+            const productCode = getValue('sku') || getValue('product code') || ''
+            const productName = getValue('product name') || getValue('item name') || getValue('sales description') || ''
+
+            // Validate required fields
+            if (!productCode || !productName || productCode === '' || productName === '') {
+              parseErrors.push(`Row ${index + 2}: Missing product code or name`)
+              return null
+            }
+
+            return {
+              productCode: String(productCode || '').trim(),
+              productName: String(productName || '').trim(),
+              salesDescription: String(getValue('sales description') || productName || getValue('description') || '').trim(),
+              subCategory: String(getValue('subcategory name') || getValue('subcategory') || getValue('category') || 'MAIN COURSES').trim(),
+              unitOfMeasure: String(getValue('unit') || getValue('unit of measure') || 'piece').trim(),
+              unitPrice: Number.parseFloat(getValue('unit price') || getValue('price') || '0') || 0,
+              costPrice: Number.parseFloat(getValue('cost price') || getValue('cost') || '0') || 0,
+              currentStock: Number.parseFloat(getValue('current quantity') || getValue('current stock') || getValue('quantity') || '0') || 0,
+              minimumStock: Number.parseFloat(getValue('minimum stock') || '5') || 5,
+              maximumStock: Number.parseFloat(getValue('maximum stock') || '100') || 100,
+              reorderPoint: Number.parseFloat(getValue('reorder point') || '10') || 10,
+              status: String(getValue('status') || 'Active').trim(),
+              description: String(getValue('description') || '').trim(),
+              notes: String(getValue('notes') || '').trim()
+            }
+          } catch (error) {
+            parseErrors.push(`Row ${index + 2}: ${error instanceof Error ? error.message : 'Parse error'}`)
+            return null
+          }
+        }).filter(Boolean)
       }
 
-      alert(`Import completed!\n\nSuccessfully imported: ${successCount} items\nErrors: ${errorCount}`)
+      // Show parse errors if any
+      if (parseErrors.length > 0) {
+        console.warn('Parse errors:', parseErrors)
+        const errorMessage = `Found ${parseErrors.length} parsing errors:\n\n${parseErrors.slice(0, 10).join('\n')}${parseErrors.length > 10 ? `\n... and ${parseErrors.length - 10} more errors` : ''}`
+        alert(errorMessage)
+      }
+
+      if (products.length === 0) {
+        alert('No valid products found in the file. Please check that your file has the required columns: Product Code, Product Name')
+        return
+      }
+
+      console.log(`Parsed ${products.length} products for import`)
+
+      // Send to backend for import
+      const response = await apiService.importCentralKitchenFinishedProducts(products)
+      
+      if (response.success) {
+        const responseData = response.data as { successCount: number; errorCount: number; errors: string[] }
+        const successCount = responseData?.successCount || 0
+        const errorCount = responseData?.errorCount || 0
+        
+        let message = `Import completed!\n\nSuccessfully imported: ${successCount} items\nErrors: ${errorCount}`
+        
+        if (responseData?.errors && responseData.errors.length > 0) {
+          console.warn('Import errors:', responseData.errors)
+          message += `\n\nFirst few errors:\n${responseData.errors.slice(0, 5).join('\n')}`
+        }
+        
+        alert(message)
+        
+        // Reload inventory to show imported items
+        await loadInventory()
+      } else {
+        throw new Error(response.message || 'Import failed')
+      }
     } catch (err) {
+      console.error('Error importing file:', err)
       alert('Error importing file: ' + (err instanceof Error ? err.message : 'Unknown error'))
     } finally {
+      setImportLoading(false)
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -360,20 +522,6 @@ const CentralKitchenFinishedGoods: React.FC = () => {
   }
 
 
-  // Get transfer order details from API
-  const getTransferOrderDetails = async (transferOrderId: string): Promise<TransferOrder> => {
-    try {
-      const response = await apiService.getTransferOrderById(transferOrderId)
-      if (response.success) {
-        return response.data
-      } else {
-        throw new Error((response as any).error || 'Failed to fetch transfer order')
-      }
-    } catch (error) {
-      console.error('Error fetching transfer order:', error)
-      throw error
-    }
-  }
 
   const handleViewTransferOrder = async (transferOrderId: string) => {
     try {
@@ -381,7 +529,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       setTransferOrderLoading(true)
       const response = await apiService.getTransferOrderById(transferOrderId)
       if (response.success) {
-        setSelectedTransferOrder(response.data)
+        setSelectedTransferOrder(response.data as unknown as TransferOrder)
         setShowTransferOrderModal(true)
         console.log('✅ Central Kitchen Raw Materials: Transfer order modal opened successfully')
       } else {
@@ -560,7 +708,20 @@ const CentralKitchenFinishedGoods: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Import Loading Overlay */}
+      {importLoading && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md mx-4 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Importing Finished Goods</h3>
+            <p className="text-gray-600">Please wait while we process your file...</p>
+            <div className="mt-4 text-sm text-gray-500">
+              This may take a few moments for large files
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
@@ -677,12 +838,21 @@ const CentralKitchenFinishedGoods: React.FC = () => {
               Clear Filters
             </button>
             <button 
-              onClick={handleImport}
+              onClick={handleDownloadTemplate}
               className="btn-secondary flex items-center"
-              title="Import inventory from CSV"
+              title="Download Excel template"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Template
+            </button>
+            <button 
+              onClick={handleImport}
+              disabled={importLoading}
+              className="btn-secondary flex items-center disabled:opacity-50"
+              title="Import finished goods from Excel/CSV"
             >
               <Upload className="h-4 w-4 mr-2" />
-              Import
+              {importLoading ? 'Importing...' : 'Import'}
             </button>
           </div>
         </div>
@@ -840,7 +1010,7 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".csv"
+        accept=".xlsx,.xls,.csv"
         onChange={handleFileUpload}
         style={{ display: 'none' }}
       />

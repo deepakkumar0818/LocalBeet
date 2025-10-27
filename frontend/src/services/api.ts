@@ -1599,6 +1599,34 @@ class ApiService {
       body: JSON.stringify({ orderIds })
     });
   }
+
+  // Update Central Kitchen Finished Product
+  async updateCentralKitchenFinishedProduct(id: string, data: any) {
+    return this.request<{
+      success: boolean;
+      data: any;
+      message: string;
+    }>(`/central-kitchen/finished-products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  // Import Central Kitchen Finished Products from Excel/CSV
+  async importCentralKitchenFinishedProducts(products: any[]) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: {
+        successCount: number;
+        errorCount: number;
+        errors: string[];
+      };
+    }>('/central-kitchen/finished-products/import', {
+      method: 'POST',
+      body: JSON.stringify({ products })
+    });
+  }
 }
 
 export const apiService = new ApiService();

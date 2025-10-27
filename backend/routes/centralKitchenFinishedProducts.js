@@ -480,4 +480,109 @@ router.post('/:id/produce', ensureConnection, async (req, res) => {
   }
 });
 
+// POST /api/central-kitchen/finished-products/import - Import finished products from Excel/CSV
+router.post('/import', ensureConnection, async (req, res) => {
+  try {
+    const { products } = req.body;
+    
+    if (!products || !Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No products provided for import'
+      });
+    }
+
+    let successCount = 0;
+    let errorCount = 0;
+    const errors = [];
+
+    for (let i = 0; i < products.length; i++) {
+      try {
+        const productData = products[i];
+        
+        // Validate required fields
+        if (!productData.productCode || !productData.productName) {
+          errors.push(`Row ${i + 1}: Product code and name are required`);
+          errorCount++;
+          continue;
+        }
+
+        // Check if product already exists
+        const existingProduct = await req.finishedProductModel.findOne({ 
+          productCode: productData.productCode 
+        });
+
+        if (existingProduct) {
+          // Update existing product
+          const updateData = {
+            productName: productData.productName || existingProduct.productName,
+            salesDescription: productData.salesDescription || productData.productName || existingProduct.salesDescription,
+            subCategory: productData.subCategory || existingProduct.subCategory,
+            unitOfMeasure: productData.unitOfMeasure || existingProduct.unitOfMeasure,
+            unitPrice: Number.parseFloat(productData.unitPrice) || existingProduct.unitPrice,
+            costPrice: Number.parseFloat(productData.costPrice) || existingProduct.costPrice,
+            currentStock: Number.parseFloat(productData.currentStock) || existingProduct.currentStock,
+            minimumStock: Number.parseFloat(productData.minimumStock) || existingProduct.minimumStock,
+            maximumStock: Number.parseFloat(productData.maximumStock) || existingProduct.maximumStock,
+            reorderPoint: Number.parseFloat(productData.reorderPoint) || existingProduct.reorderPoint,
+            status: productData.status || existingProduct.status,
+            description: productData.description || existingProduct.description,
+            notes: productData.notes || existingProduct.notes,
+            updatedBy: 'System Import'
+          };
+
+          await req.finishedProductModel.findByIdAndUpdate(existingProduct._id, updateData);
+          successCount++;
+        } else {
+          // Create new product
+          const newProductData = {
+            productCode: productData.productCode,
+            productName: productData.productName,
+            salesDescription: productData.salesDescription || productData.productName,
+            parentCategory: 'Finish Product',
+            subCategory: productData.subCategory || 'MAIN COURSES',
+            unitOfMeasure: productData.unitOfMeasure || 'piece',
+            unitPrice: Number.parseFloat(productData.unitPrice) || 0,
+            costPrice: Number.parseFloat(productData.costPrice) || 0,
+            currentStock: Number.parseFloat(productData.currentStock) || 0,
+            minimumStock: Number.parseFloat(productData.minimumStock) || 5,
+            maximumStock: Number.parseFloat(productData.maximumStock) || 100,
+            reorderPoint: Number.parseFloat(productData.reorderPoint) || 10,
+            status: productData.status || 'Active',
+            description: productData.description || '',
+            notes: productData.notes || '',
+            createdBy: 'System Import',
+            updatedBy: 'System Import'
+          };
+
+          const newProduct = new req.finishedProductModel(newProductData);
+          await newProduct.save();
+          successCount++;
+        }
+      } catch (error) {
+        console.error(`Error processing product ${i + 1}:`, error);
+        errors.push(`Row ${i + 1}: ${error.message}`);
+        errorCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Import completed. Success: ${successCount}, Errors: ${errorCount}`,
+      data: {
+        successCount,
+        errorCount,
+        errors: errors.slice(0, 10) // Limit errors to first 10
+      }
+    });
+  } catch (error) {
+    console.error('Error importing finished products:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error importing finished products',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
