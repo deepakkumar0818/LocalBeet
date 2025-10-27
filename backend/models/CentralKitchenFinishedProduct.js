@@ -274,4 +274,7 @@ CentralKitchenFinishedProductSchema.statics.findByDietaryRestriction = function(
   return this.find(query);
 };
 
+// Add pagination plugin
+CentralKitchenFinishedProductSchema.plugin(mongoosePaginate);
+
 module.exports = (connection) => connection.model('CentralKitchenFinishedProduct', CentralKitchenFinishedProductSchema);

@@ -68,6 +68,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
   const [selectedTransferOrder, setSelectedTransferOrder] = useState<TransferOrder | null>(null)
   const [transferOrderLoading, setTransferOrderLoading] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
+  const [importLoading, setImportLoading] = useState(false)
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Central Kitchen')
   
   // Filter notifications to show Raw Material transfer requests and items received from Ingredient Master
@@ -279,80 +280,115 @@ const CentralKitchenRawMaterials: React.FC = () => {
     const file = event.target.files?.[0]
     if (!file) return
 
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      alert('Please select a CSV file')
+    // Check if file is Excel format
+    const isExcel = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')
+    const isCSV = file.name.toLowerCase().endsWith('.csv')
+
+    if (!isExcel && !isCSV) {
+      alert('Please select an Excel (.xlsx, .xls) or CSV file')
       return
     }
 
     try {
-      const text = await file.text()
-      const lines = text.split('\n').filter(line => line.trim())
+      setImportLoading(true) // Start loading
       
-      if (lines.length < 2) {
-        alert('CSV file must contain at least a header row and one data row')
-        return
-      }
-
-      const dataRows = lines.slice(1)
-      let successCount = 0
-      let errorCount = 0
-
-      for (const row of dataRows) {
-        try {
-          const values = row.split(',').map(v => v.replace(/"/g, '').trim())
+      if (isExcel) {
+        // Use the new Excel import API
+        const result = await apiService.importCentralKitchenExcel(file)
+        
+        if (result.success) {
+          const { results } = result
+          let message = `Excel Import completed!\n\n` +
+                `Total Rows: ${results.totalRows}\n` +
+                `Processed: ${results.totalProcessed}\n` +
+                `Created: ${results.created}\n` +
+                `Updated: ${results.updated}\n` +
+                `Skipped: ${results.skipped}\n` +
+                `Errors: ${results.errors}`
           
-          const materialData = {
-            materialCode: values[0],
-            materialName: values[1],
-            category: values[3], // SubCategory Name
-            unitOfMeasure: values[4], // Unit
-            unitPrice: 0,
-            currentStock: 0,
-            minimumStock: 0,
-            maximumStock: 0,
-            supplier: '',
-            notes: ''
+          if (results.skippedReasons && results.skippedReasons.length > 0) {
+            message += `\n\nSkipped Reasons:\n${results.skippedReasons.join('\n')}`
           }
           
-          // Add to local state
-          const newItem: OutletInventoryItem = {
-            id: `rm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            outletId: outlet?.id || 'central-kitchen-001',
-            outletCode: outlet?.outletCode || '',
-            outletName: outlet?.outletName || '',
-            materialId: materialData.materialCode,
-            materialCode: materialData.materialCode,
-            materialName: materialData.materialName,
-            category: materialData.category,
-            unitOfMeasure: materialData.unitOfMeasure,
-            unitPrice: materialData.unitPrice,
-            currentStock: materialData.currentStock,
-            reservedStock: 0,
-            availableStock: materialData.currentStock,
-            minimumStock: materialData.minimumStock,
-            maximumStock: materialData.maximumStock,
-            reorderPoint: Math.ceil(materialData.minimumStock * 1.5),
-            totalValue: materialData.currentStock * materialData.unitPrice,
-            location: 'Main Storage',
-            batchNumber: `BATCH-${Date.now()}`,
-            supplier: materialData.supplier,
-            lastUpdated: new Date().toISOString(),
-            status: 'In Stock',
-            notes: materialData.notes,
-            isActive: true
-          }
+          alert(message)
           
-          setInventoryItems(prev => [...prev, newItem])
-          successCount++
-        } catch (err) {
-          errorCount++
+          // Refresh the inventory data
+          await loadInventory()
+        } else {
+          alert('Import failed: ' + result.message)
         }
-      }
+      } else {
+        // Handle CSV files (existing logic)
+        const text = await file.text()
+        const lines = text.split('\n').filter(line => line.trim())
+        
+        if (lines.length < 2) {
+          alert('CSV file must contain at least a header row and one data row')
+          return
+        }
 
-      alert(`Import completed!\n\nSuccessfully imported: ${successCount} items\nErrors: ${errorCount}`)
+        const dataRows = lines.slice(1)
+        let successCount = 0
+        let errorCount = 0
+
+        for (const row of dataRows) {
+          try {
+            const values = row.split(',').map(v => v.replace(/"/g, '').trim())
+            
+            const materialData = {
+              materialCode: values[0],
+              materialName: values[1],
+              category: values[3], // SubCategory Name
+              unitOfMeasure: values[4], // Unit
+              unitPrice: 0,
+              currentStock: 0,
+              minimumStock: 0,
+              maximumStock: 0,
+              supplier: '',
+              notes: ''
+            }
+            
+            // Add to local state
+            const newItem: OutletInventoryItem = {
+              id: `rm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              outletId: outlet?.id || 'central-kitchen-001',
+              outletCode: outlet?.outletCode || '',
+              outletName: outlet?.outletName || '',
+              materialId: materialData.materialCode,
+              materialCode: materialData.materialCode,
+              materialName: materialData.materialName,
+              category: materialData.category,
+              unitOfMeasure: materialData.unitOfMeasure,
+              unitPrice: materialData.unitPrice,
+              currentStock: materialData.currentStock,
+              reservedStock: 0,
+              availableStock: materialData.currentStock,
+              minimumStock: materialData.minimumStock,
+              maximumStock: materialData.maximumStock,
+              reorderPoint: Math.ceil(materialData.minimumStock * 1.5),
+              totalValue: materialData.currentStock * materialData.unitPrice,
+              location: 'Main Storage',
+              batchNumber: `BATCH-${Date.now()}`,
+              supplier: materialData.supplier,
+              lastUpdated: new Date().toISOString(),
+              status: 'In Stock',
+              notes: materialData.notes,
+              isActive: true
+            }
+            
+            setInventoryItems(prev => [...prev, newItem])
+            successCount++
+          } catch (err) {
+            errorCount++
+          }
+        }
+
+        alert(`CSV Import completed!\n\nSuccessfully imported: ${successCount} items\nErrors: ${errorCount}`)
+      }
     } catch (err) {
       alert('Error importing file: ' + (err instanceof Error ? err.message : 'Unknown error'))
     } finally {
+      setImportLoading(false) // Stop loading
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -708,11 +744,21 @@ const CentralKitchenRawMaterials: React.FC = () => {
             </button>
             <button 
               onClick={handleImport}
-              className="btn-secondary flex items-center"
-              title="Import inventory from CSV"
+              disabled={importLoading}
+              className={`btn-secondary flex items-center ${importLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title="Import inventory from Excel or CSV"
             >
-              <Upload className="h-4 w-4 mr-2" />
-              Import
+              {importLoading ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -866,11 +912,32 @@ const CentralKitchenRawMaterials: React.FC = () => {
         </div>
       </div>
 
+      {/* Import Loading Overlay */}
+      {importLoading && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-center mb-4">
+              <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-center mb-2">Importing Excel File</h3>
+            <p className="text-gray-600 text-center mb-4">
+              Please wait while we process your Excel file...
+            </p>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+            </div>
+            <p className="text-sm text-gray-500 text-center mt-2">
+              This may take a few moments depending on file size
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Hidden file input for import */}
       <input
         ref={fileInputRef}
         type="file"
-        accept=".csv"
+        accept=".xlsx,.xls,.csv"
         onChange={handleFileUpload}
         style={{ display: 'none' }}
       />
