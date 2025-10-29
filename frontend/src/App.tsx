@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
@@ -22,7 +22,7 @@ import AddWarehouse from './pages/AddWarehouse'
 import EditWarehouse from './pages/EditWarehouse'
 import TransferOrders from './pages/TransferOrders'
 import EditTransferOrder from './pages/EditTransferOrder'
-import Inventory from './pages/Inventory'
+// import Inventory from './pages/Inventory'
 import OutletMaster from './pages/OutletMaster'
 import AddOutlet from './pages/AddOutlet'
 import EditOutlet from './pages/EditOutlet'
@@ -53,11 +53,22 @@ import TaibaHospitalRequestFinishedGoods from './pages/TaibaHospitalRequestFinis
 function App() {
   const location = useLocation()
   const isAuthRoute = location.pathname === '/login'
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+  const authUser = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('auth_user') || 'null') } catch { return null } })() : null
+  const isAdmin = Boolean(authUser?.isAdmin)
 
   if (isAuthRoute) {
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
+      </Routes>
+    )
+  }
+
+  if (!token) {
+    return (
+      <Routes>
+        <Route path="*" element={<Login />} />
       </Routes>
     )
   }
@@ -87,7 +98,7 @@ function App() {
         <Route path="/warehouse-master/edit/:id" element={<EditWarehouse />} />
         <Route path="/transfer-orders" element={<TransferOrders />} />
         <Route path="/transfer-orders/edit/:id" element={<EditTransferOrder />} />
-        <Route path="/inventory" element={<Inventory />} />
+        {/* <Route path="/inventory" element={<Inventory />} /> */}
         <Route path="/outlets" element={<OutletMaster />} />
         <Route path="/outlets/add" element={<AddOutlet />} />
         <Route path="/outlets/edit/:id" element={<EditOutlet />} />
@@ -166,7 +177,11 @@ function App() {
         <Route path="/taiba-hospital/sales-orders" element={<SalesOrders />} />
         <Route path="/taiba-hospital/sales-orders/add" element={<AddSalesOrder />} />
         <Route path="/taiba-hospital/pos-sales/create-order" element={<POSCreateOrder />} />
-        <Route path="/settings" element={<Settings />} />
+        {isAdmin ? (
+          <Route path="/settings" element={<Settings />} />
+        ) : (
+          <Route path="/settings" element={<Navigate to="/dashboard" replace />} />
+        )}
       </Routes>
     </Layout>
   )

@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Lock, Mail, LogIn } from 'lucide-react'
 import { apiService } from '../services/api'
 
 const Login: React.FC = () => {
@@ -18,7 +17,10 @@ const Login: React.FC = () => {
     setLoading(true)
     try {
       const res = await apiService.login({ email, password })
-      if (res?.success) {
+      if (res?.success && (res as any).data?.token) {
+        const { token, user } = (res as any).data
+        localStorage.setItem('auth_token', token)
+        localStorage.setItem('auth_user', JSON.stringify(user))
         const redirectTo = (location.state as any)?.from || '/dashboard'
         navigate(redirectTo)
       } else {
@@ -37,7 +39,7 @@ const Login: React.FC = () => {
         <div className="bg-white shadow rounded-lg p-8">
           <div className="mb-6 text-center">
             <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 text-indigo-600 mb-3">
-              <Lock className="h-6 w-6" />
+              <span className="font-bold">LB</span>
             </div>
             <h1 className="text-xl font-semibold text-gray-900">Sign in to your account</h1>
             <p className="mt-1 text-sm text-gray-500">Use your work email to continue</p>
@@ -47,9 +49,7 @@ const Login: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-                  <Mail className="h-4 w-4" />
-                </span>
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">@</span>
                 <input
                   type="email"
                   autoComplete="email"
@@ -65,9 +65,7 @@ const Login: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-                  <Lock className="h-4 w-4" />
-                </span>
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">*</span>
                 <input
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
@@ -96,7 +94,6 @@ const Login: React.FC = () => {
               disabled={loading}
               className="btn-primary w-full inline-flex items-center justify-center"
             >
-              <LogIn className="h-4 w-4 mr-2" />
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>

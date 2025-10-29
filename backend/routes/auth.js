@@ -1,66 +1,55 @@
 const express = require('express');
 const router = express.Router();
-
-// Mock users for demonstration
-const users = [
-  {
-    id: '1',
-    username: 'admin',
-    email: 'admin@locbeat.com',
-    firstName: 'Admin',
-    lastName: 'User',
-    role: 'Admin',
-    department: 'IT',
-    isActive: true,
-    password: 'admin123' // In real app, this would be hashed
-  }
-];
+const User = require('../models/User');
+const jwt = require('jsonwebtoken');
+const { JWT_SECRET } = require('../middlewares/auth');
 
 // POST /api/auth/login - User login
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, email, password } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Username and password are required'
-      });
+    if ((!username && !email) || !password) {
+      return res.status(400).json({ success: false, message: 'Email/username and password are required' });
     }
 
-    const user = users.find(u => u.username === username && u.isActive);
-    if (!user || user.password !== password) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+    // Primary: DB-backed login by email
+    let dbUser = null;
+    if (email) {
+      dbUser = await User.findOne({ email: String(email).toLowerCase(), status: 'Active' });
+    }
+    // Fallback: DB-backed login by username (if provided as email alternative)
+    if (!dbUser && username) {
+      dbUser = await User.findOne({ email: String(username).toLowerCase(), status: 'Active' });
     }
 
-    // In real app, generate JWT token here
-    const token = 'mock-jwt-token-' + Date.now();
+    if (!dbUser) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    if (dbUser.password !== password) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign({ userId: String(dbUser._id) }, JWT_SECRET, { expiresIn: '12h' });
 
     res.json({
       success: true,
       data: {
         user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          department: user.department
+          id: dbUser._id,
+          email: dbUser.email,
+          name: dbUser.name,
+          role: dbUser.role,
+          isAdmin: dbUser.isAdmin,
+          assignedOutletCode: dbUser.assignedOutletCode || ''
         },
         token
       },
       message: 'Login successful'
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error during login',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Error during login', error: error.message });
   }
 });
 
@@ -81,29 +70,12 @@ router.post('/logout', (req, res) => {
 });
 
 // GET /api/auth/me - Get current user
-router.get('/me', (req, res) => {
+const { verifyToken } = require('../middlewares/auth');
+router.get('/me', verifyToken, async (req, res) => {
   try {
-    // In real app, verify JWT token here
-    const user = users[0]; // Mock current user
-
-    res.json({
-      success: true,
-      data: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        department: user.department
-      }
-    });
+    return res.json({ success: true, data: req.user });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching user data',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Error fetching user data', error: error.message });
   }
 });
 
