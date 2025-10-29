@@ -33,6 +33,17 @@ const userSchema = new mongoose.Schema({
     enum: ['Admin', 'Manager', 'Staff', 'Viewer'],
     default: 'Staff',
     index: true
+  },
+  assignedOutletCode: {
+    type: String,
+    enum: [
+      'KUWAIT_CITY',
+      'MALL_360',
+      'VIBE_COMPLEX',
+      'TAIBA_HOSPITAL',
+      ''
+    ],
+    default: ''
   }
 }, {
   timestamps: true

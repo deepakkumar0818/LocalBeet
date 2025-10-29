@@ -6,7 +6,6 @@ import {
   FileText, 
   ShoppingCart, 
   Truck,
-  BarChart3,
   Menu,
   X,
   Settings,
@@ -35,7 +34,7 @@ interface NavigationItem {
   children?: NavigationItem[];
 }
 
-const navigation: NavigationItem[] = [
+const baseNavigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Recipe Master', href: '/bill-of-materials', icon: FileText },
   // { name: 'Job Orders', href: '/job-orders', icon: ClipboardList },
@@ -111,13 +110,45 @@ const navigation: NavigationItem[] = [
   //     { name: 'Outlet Master', href: '/outlets', icon: Store },
   //   ]
   // },
-  { name: 'Inventory', href: '/inventory', icon: BarChart3 },
+  // Inventory removed per requirement
 ]
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set())
   const location = useLocation()
+
+  const authUser = (() => {
+    try { return JSON.parse(localStorage.getItem('auth_user') || 'null') } catch { return null }
+  })()
+
+  const isAdmin = Boolean(authUser?.isAdmin)
+  const assignedOutlet: string = String(authUser?.assignedOutletCode || '')
+
+  const navigation: NavigationItem[] = React.useMemo(() => {
+    if (isAdmin) return baseNavigation
+
+    const allowedOutletName = assignedOutlet === 'KUWAIT_CITY' ? 'Kuwait City'
+      : assignedOutlet === 'MALL_360' ? '360 Mall'
+      : assignedOutlet === 'VIBE_COMPLEX' ? 'Vibes Complex'
+      : assignedOutlet === 'TAIBA_HOSPITAL' ? 'Taiba Hospital'
+      : ''
+
+    const filtered: NavigationItem[] = []
+    // Always allow Dashboard
+    filtered.push(baseNavigation[0])
+    // Hide Central Kitchen for outlet managers
+    // Keep Outlets -> only assigned outlet
+    const outlets = baseNavigation.find(n => n.name === 'Outlets')
+    if (outlets && outlets.children && allowedOutletName) {
+      const onlyAssigned = outlets.children.filter(c => c.name === allowedOutletName)
+      if (onlyAssigned.length) {
+        filtered.push({ ...outlets, children: onlyAssigned })
+      }
+    }
+    // For managers: do not show Transfer Orders or Inventory
+    return filtered
+  }, [isAdmin, assignedOutlet])
 
   const toggleDropdown = (itemName: string) => {
     const newOpenDropdowns = new Set(openDropdowns)
@@ -462,23 +493,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <User className="h-8 w-8 text-gray-400" />
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-700">Admin User</p>
-                <p className="text-xs text-gray-500">admin@locbeat.com</p>
+                <p className="text-sm font-medium text-gray-700">{authUser?.name || 'User'}</p>
+                <p className="text-xs text-gray-500">{authUser?.email || ''}</p>
               </div>
             </div>
             <div className="mt-3 space-y-1">
-              <Link
-                to="/settings"
-                className={`flex items-center px-3 py-2 text-sm rounded-lg w-full ${
-                  location.pathname === '/settings'
-                    ? 'bg-primary-100 text-primary-700'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <Settings className="mr-3 h-4 w-4" />
-                Settings
-              </Link>
-              <button className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg w-full">
+              {isAdmin && (
+                <Link
+                  to="/settings"
+                  className={`flex items-center px-3 py-2 text-sm rounded-lg w-full ${
+                    location.pathname === '/settings'
+                      ? 'bg-primary-100 text-primary-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Settings className="mr-3 h-4 w-4" />
+                  Settings
+                </Link>
+              )}
+              <button onClick={() => { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_user'); window.location.href = '/login' }} className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg w-full">
                 <LogOut className="mr-3 h-4 w-4" />
                 Sign out
               </button>

@@ -18,9 +18,11 @@ class ApiService {
     
     // Don't set Content-Type for FormData, let the browser set it with boundary
     const isFormData = options.body instanceof FormData;
+    const token = localStorage.getItem('auth_token');
+    const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
     const headers = isFormData 
-      ? { ...options.headers } 
-      : { 'Content-Type': 'application/json', ...options.headers };
+      ? { ...authHeader, ...options.headers } 
+      : { 'Content-Type': 'application/json', ...authHeader, ...options.headers };
     
     const config: RequestInit = {
       headers,

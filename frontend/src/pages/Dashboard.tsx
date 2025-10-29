@@ -14,7 +14,21 @@ import { useNotifications } from '../hooks/useNotifications'
 import { apiService } from '../services/api'
 
 const Dashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('overall')
+  const authUser = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('auth_user') || 'null') } catch { return null }
+  }, [])
+  const isAdmin = Boolean(authUser?.isAdmin)
+  const assignedOutlet: string = String(authUser?.assignedOutletCode || '')
+
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (!isAdmin) {
+      if (assignedOutlet === 'KUWAIT_CITY') return 'kuwait-city'
+      if (assignedOutlet === 'MALL_360') return '360-mall'
+      if (assignedOutlet === 'VIBE_COMPLEX') return 'vibes-complex'
+      if (assignedOutlet === 'TAIBA_HOSPITAL') return 'taiba-hospital'
+    }
+    return 'overall'
+  })
   // Dashboard filter: all | finished | recipe
   const [productFilter, setProductFilter] = useState<'all' | 'finished' | 'recipe'>('all')
   const [liveByTab, setLiveByTab] = useState<Record<string, any>>({})
@@ -23,13 +37,23 @@ const Dashboard: React.FC = () => {
   const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications('System')
 
   // Tab configuration
-  const tabs = [
-    { id: 'overall', name: 'Overall Sales', icon: BarChart3, color: 'text-indigo-600' },
-    { id: 'kuwait-city', name: 'Kuwait City', icon: Store, color: 'text-blue-600' },
-    { id: '360-mall', name: '360 Mall', icon: Coffee, color: 'text-green-600' },
-    { id: 'vibes-complex', name: 'Vibes Complex', icon: ShoppingBag, color: 'text-orange-600' },
-    { id: 'taiba-hospital', name: 'Taiba Hospital', icon: Car, color: 'text-purple-600' }
-  ]
+  const tabs = useMemo(() => {
+    const all = [
+      { id: 'overall', name: 'Overall Sales', icon: BarChart3, color: 'text-indigo-600' },
+      { id: 'kuwait-city', name: 'Kuwait City', icon: Store, color: 'text-blue-600' },
+      { id: '360-mall', name: '360 Mall', icon: Coffee, color: 'text-green-600' },
+      { id: 'vibes-complex', name: 'Vibes Complex', icon: ShoppingBag, color: 'text-orange-600' },
+      { id: 'taiba-hospital', name: 'Taiba Hospital', icon: Car, color: 'text-purple-600' }
+    ]
+    if (isAdmin) return all
+    // Manager: only own outlet tab (no Overall)
+    const allowId = assignedOutlet === 'KUWAIT_CITY' ? 'kuwait-city'
+      : assignedOutlet === 'MALL_360' ? '360-mall'
+      : assignedOutlet === 'VIBE_COMPLEX' ? 'vibes-complex'
+      : assignedOutlet === 'TAIBA_HOSPITAL' ? 'taiba-hospital'
+      : 'kuwait-city'
+    return all.filter(t => t.id === allowId)
+  }, [isAdmin, assignedOutlet])
 
   // Mock sales data for each outlet
   const outletSalesData = {

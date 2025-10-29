@@ -40,8 +40,9 @@ app.use('/api/finished-good-inventory', require('./routes/finishedGoodInventory'
 app.use('/api/sales-orders', require('./routes/salesOrders'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 // Central Kitchen dedicated database routes (must come before general central-kitchen routes)
-app.use('/api/central-kitchen/raw-materials', require('./routes/centralKitchenRawMaterials'));
-app.use('/api/central-kitchen/finished-products', require('./routes/centralKitchenFinishedProducts'));
+const { verifyToken } = require('./middlewares/auth');
+app.use('/api/central-kitchen/raw-materials', verifyToken, require('./routes/centralKitchenRawMaterials'));
+app.use('/api/central-kitchen/finished-products', verifyToken, require('./routes/centralKitchenFinishedProducts'));
 app.use('/api/central-kitchen', require('./routes/centralKitchenImport'));
 
 // Zoho Sync routes (Ingredient Master only)
