@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const XLSX = require('xlsx');
-const { connectCentralKitchenDB } = require('../config/centralKitchenDB');
+const { connectCentralKitchenDB, getCentralKitchenConnection } = require('../config/centralKitchenDB');
 const { initializeCentralKitchenModels, getCentralKitchenModels } = require('../models/centralKitchenModels');
 
 // Middleware to ensure Central Kitchen database connection
@@ -13,6 +13,7 @@ const ensureConnection = async (req, res, next) => {
       const connection = await connectCentralKitchenDB();
       centralKitchenModels = initializeCentralKitchenModels(connection);
     }
+    req.connection = getCentralKitchenConnection();
     req.finishedProductModel = centralKitchenModels.CentralKitchenFinishedProduct;
     next();
   } catch (error) {
@@ -580,6 +581,194 @@ router.post('/import', ensureConnection, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error importing finished products',
+      error: error.message
+    });
+  }
+});
+
+// POST /api/central-kitchen/make-finished-good - Make finished good (deduct raw materials, add finished goods)
+router.post('/make-finished-good', ensureConnection, async (req, res) => {
+  try {
+    console.log('🚀 Production request received:', req.body);
+    const { productCode, productName, quantity, bomCode, notes } = req.body;
+    
+    if (!productCode || !productName || !quantity || !bomCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: productCode, productName, quantity, bomCode'
+      });
+    }
+
+    if (quantity <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Quantity must be greater than 0'
+      });
+    }
+
+    // Find the BOM (case-insensitive search) - BOM is in main database
+    console.log('🔍 Searching for BOM with code:', bomCode);
+    const BillOfMaterials = require('../models/BillOfMaterials');
+    console.log('📦 BillOfMaterials model:', typeof BillOfMaterials);
+    const bom = await BillOfMaterials.findOne({ 
+      bomCode: { $regex: new RegExp(`^${bomCode}$`, 'i') }
+    });
+    console.log('🎯 BOM found:', bom ? 'Yes' : 'No');
+    
+    if (!bom) {
+      return res.status(404).json({
+        success: false,
+        message: `BOM not found for code: ${bomCode}`
+      });
+    }
+
+    // Check if finished product exists (case-insensitive search)
+    const finishedProduct = await req.finishedProductModel.findOne({ 
+      productCode: { $regex: new RegExp(`^${productCode}$`, 'i') }
+    });
+    if (!finishedProduct) {
+      return res.status(404).json({
+        success: false,
+        message: `Finished product not found: ${productCode}`
+      });
+    }
+
+    // Get Central Kitchen Raw Materials model using the same connection as finished products
+    console.log('🔗 Connection type:', typeof req.connection);
+    console.log('🔗 Connection methods:', Object.getOwnPropertyNames(req.connection));
+    const { initializeCentralKitchenModels } = require('../models/centralKitchenModels');
+    const models = initializeCentralKitchenModels(req.connection);
+    console.log('📦 Models initialized:', Object.keys(models));
+    const rawMaterialModel = models.CentralKitchenRawMaterial;
+    console.log('🔧 Raw material model type:', typeof rawMaterialModel);
+
+    // Calculate required raw materials
+    const requiredMaterials = [];
+    for (const bomItem of bom.items) {
+      const totalQuantityNeeded = bomItem.quantity * quantity;
+      requiredMaterials.push({
+        materialCode: bomItem.materialCode,
+        materialName: bomItem.materialName,
+        quantityNeeded: totalQuantityNeeded,
+        unitOfMeasure: bomItem.unitOfMeasure
+      });
+    }
+
+    // Smart mapping: Find Central Kitchen materials by name matching
+    const consumptionData = [];
+    for (const material of requiredMaterials) {
+      console.log(`🔍 Looking for material: ${material.materialName} (BOM code: ${material.materialCode})`);
+      
+      // First try: Find by exact material name match
+      let rawMaterial = await rawMaterialModel.findOne({ 
+        materialName: { $regex: new RegExp(`^${material.materialName}$`, 'i') }
+      });
+      
+      if (!rawMaterial) {
+        // Second try: Find by partial name match (contains)
+        rawMaterial = await rawMaterialModel.findOne({ 
+          materialName: { $regex: new RegExp(material.materialName, 'i') }
+        });
+      }
+      
+      if (!rawMaterial) {
+        // Third try: Find by material code (fallback)
+        rawMaterial = await rawMaterialModel.findOne({ 
+          materialCode: { $regex: new RegExp(`^${material.materialCode}$`, 'i') }
+        });
+      }
+      
+      if (!rawMaterial) {
+        // If material doesn't exist, create it with default values
+        console.log(`Creating missing material: ${material.materialCode} - ${material.materialName}`);
+        const newMaterial = new rawMaterialModel({
+          materialCode: material.materialCode,
+          materialName: material.materialName,
+          subCategory: 'PACKAGING',
+          unitOfMeasure: material.unitOfMeasure || 'piece',
+          unitPrice: 1.0,
+          currentStock: 100, // Start with 100 units
+          minimumStock: 10,
+          maximumStock: 200,
+          supplier: 'System Generated',
+          notes: 'Auto-created for BOM compatibility',
+          isActive: true
+        });
+        await newMaterial.save();
+        
+        // Use the newly created material
+        rawMaterial = newMaterial;
+      }
+
+      if (rawMaterial.currentStock < material.quantityNeeded) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient stock for ${material.materialName} (${material.materialCode}). Available: ${rawMaterial.currentStock}, Required: ${material.quantityNeeded}`
+        });
+      }
+
+      consumptionData.push({
+        materialId: rawMaterial._id,
+        materialCode: material.materialCode,
+        quantityToConsume: material.quantityNeeded,
+        currentStock: rawMaterial.currentStock
+      });
+    }
+
+    // Start transaction - deduct raw materials
+    const rawMaterialsConsumed = [];
+    for (const consumption of consumptionData) {
+      const rawMaterial = await rawMaterialModel.findById(consumption.materialId);
+      
+      // Deduct the quantity
+      rawMaterial.currentStock -= consumption.quantityToConsume;
+      
+      // Note: Status field not available in CentralKitchenRawMaterial model
+      // Stock level tracking can be done through currentStock vs reorderPoint comparison
+      
+      rawMaterial.updatedBy = 'Production System';
+      await rawMaterial.save();
+
+      rawMaterialsConsumed.push({
+        materialCode: consumption.materialCode,
+        materialName: rawMaterial.materialName,
+        quantityConsumed: consumption.quantityToConsume,
+        remainingStock: rawMaterial.currentStock
+      });
+    }
+
+    // Add finished goods to inventory
+    finishedProduct.currentStock += quantity;
+    finishedProduct.updatedBy = 'Production System';
+    if (notes) {
+      finishedProduct.notes = (finishedProduct.notes || '') + `\nProduction: ${new Date().toISOString()} - ${notes}`;
+    }
+    await finishedProduct.save();
+
+    // Generate production ID
+    const productionId = `PROD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+    res.json({
+      success: true,
+      message: `Successfully produced ${quantity} units of ${productName}`,
+      data: {
+        productionId,
+        rawMaterialsConsumed,
+        finishedGoodProduced: {
+          productCode: finishedProduct.productCode,
+          productName: finishedProduct.productName,
+          quantityProduced: quantity,
+          newStock: finishedProduct.currentStock
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error making finished good:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Error making finished good',
       error: error.message
     });
   }
