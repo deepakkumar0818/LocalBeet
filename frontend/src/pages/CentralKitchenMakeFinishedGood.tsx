@@ -24,6 +24,36 @@ interface ProductionItem {
   notes: string
 }
 
+interface FinishedGood {
+  _id: string
+  productCode: string
+  productName: string
+  subCategory: string
+  unitOfMeasure: string
+  unitPrice: number
+  costPrice: number
+  bomCode?: string
+}
+
+interface BOMItem {
+  materialId: string
+  materialCode: string
+  materialName: string
+  quantity: number
+  unitOfMeasure: string
+  unitCost: number
+  totalCost: number
+}
+
+interface BOM {
+  _id: string
+  bomCode: string
+  productName: string
+  productDescription: string
+  totalCost: number
+  items: BOMItem[]
+}
+
 const CentralKitchenMakeFinishedGood: React.FC = () => {
   const navigate = useNavigate()
   const [outlet, setOutlet] = useState<Outlet | null>(null)
@@ -31,6 +61,9 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [productionItems, setProductionItems] = useState<ProductionItem[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
+  const [finishedGoods, setFinishedGoods] = useState<FinishedGood[]>([])
+  const [selectedBOM, setSelectedBOM] = useState<BOM | null>(null)
+  const [bomLoading, setBomLoading] = useState(false)
   const [newItem, setNewItem] = useState<Partial<ProductionItem>>({
     productCode: '',
     productName: '',
@@ -60,6 +93,14 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
       } else {
         setError('Central Kitchen not found')
       }
+
+      // Load finished goods for dropdown
+      const finishedGoodsResponse = await apiService.getCentralKitchenFinishedProducts({
+        limit: 1000
+      })
+      if (finishedGoodsResponse.success && finishedGoodsResponse.data) {
+        setFinishedGoods(finishedGoodsResponse.data)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load central kitchen data')
       console.error('Error loading central kitchen data:', err)
@@ -69,16 +110,16 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
   }
 
   const handleAddItem = () => {
-    if (!newItem.productCode || !newItem.productName || !newItem.category) {
-      alert('Please fill in all required fields (Product Code, Product Name, Category)')
+    if (!newItem.productCode || !newItem.productName || !newItem.quantity) {
+      alert('Please select a finished good and enter quantity')
       return
     }
 
     const item: ProductionItem = {
-      id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      productCode: newItem.productCode!,
-      productName: newItem.productName!,
-      category: newItem.category!,
+      id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+      productCode: newItem.productCode,
+      productName: newItem.productName,
+      category: newItem.category || '',
       unitOfMeasure: newItem.unitOfMeasure || 'pcs',
       quantity: newItem.quantity || 1,
       costPrice: newItem.costPrice || 0,
@@ -101,6 +142,7 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
       expiryDays: 1,
       notes: ''
     })
+    setSelectedBOM(null)
     setShowAddForm(false)
   }
 
@@ -114,6 +156,64 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
     ))
   }
 
+  const handleFinishedGoodChange = async (productCode: string) => {
+    const selectedGood = finishedGoods.find(good => good.productCode === productCode)
+    if (selectedGood) {
+      setNewItem(prev => ({
+        ...prev,
+        productCode: selectedGood.productCode,
+        productName: selectedGood.productName,
+        category: selectedGood.subCategory,
+        unitOfMeasure: selectedGood.unitOfMeasure,
+        unitPrice: selectedGood.unitPrice,
+        costPrice: selectedGood.costPrice
+      }))
+
+      // Fetch BOM data - try multiple search methods
+      try {
+        setBomLoading(true)
+        let bomResponse = null
+        
+        // First try searching by product name
+        bomResponse = await apiService.getBillOfMaterials({
+          search: selectedGood.productName,
+          limit: 10
+        })
+        
+        // If not found, try searching by product code
+        if (!bomResponse.success || !bomResponse.data || bomResponse.data.length === 0) {
+          bomResponse = await apiService.getBillOfMaterials({
+            search: selectedGood.productCode,
+            limit: 10
+          })
+        }
+        
+        // If still not found, try searching by bomCode if available
+        if ((!bomResponse.success || !bomResponse.data || bomResponse.data.length === 0) && selectedGood.bomCode) {
+          bomResponse = await apiService.getBillOfMaterials({
+            search: selectedGood.bomCode,
+            limit: 10
+          })
+        }
+        
+        if (bomResponse.success && bomResponse.data && bomResponse.data.length > 0) {
+          // Find exact match by product name
+          const exactMatch = bomResponse.data.find(bom => 
+            bom.productName.toLowerCase() === selectedGood.productName.toLowerCase()
+          )
+          setSelectedBOM(exactMatch || bomResponse.data[0])
+        } else {
+          setSelectedBOM(null)
+        }
+      } catch (err) {
+        console.error('Error fetching BOM:', err)
+        setSelectedBOM(null)
+      } finally {
+        setBomLoading(false)
+      }
+    }
+  }
+
   const handleSaveProduction = async () => {
     if (productionItems.length === 0) {
       alert('Please add at least one item to produce')
@@ -125,46 +225,53 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
       
       // Process each production item
       for (const item of productionItems) {
-        const productionData = {
-          outletId: outlet?.id,
-          outletCode: outlet?.outletCode,
-          outletName: outlet?.outletName,
-          productId: item.productCode,
-          productCode: item.productCode,
-          productName: item.productName,
-          category: item.category,
-          unitOfMeasure: item.unitOfMeasure,
-          unitPrice: item.unitPrice,
-          costPrice: item.costPrice,
-          currentStock: item.quantity,
-          reservedStock: 0,
-          availableStock: item.quantity,
-          minimumStock: Math.ceil(item.quantity * 0.2), // 20% of production as minimum
-          maximumStock: item.quantity * 2, // 2x production as maximum
-          reorderPoint: Math.ceil(item.quantity * 0.3), // 30% of production as reorder point
-          totalValue: item.quantity * item.unitPrice,
-          productionDate: new Date().toISOString(),
-          expiryDate: new Date(Date.now() + item.expiryDays * 24 * 60 * 60 * 1000).toISOString(),
-          batchNumber: `BATCH-${item.productCode}-${Date.now()}`,
-          storageLocation: 'Production Area',
-          storageTemperature: 'Room Temperature',
-          qualityStatus: 'Good',
-          qualityNotes: 'Freshly produced',
-          status: 'In Stock',
-          transferSource: 'Production',
-          lastUpdated: new Date().toISOString(),
-          notes: item.notes,
-          isActive: true
+        // Find the BOM for this item
+        const bomResponse = await apiService.getBillOfMaterials({
+          search: item.productName,
+          limit: 10
+        })
+        
+        if (!bomResponse.success || !bomResponse.data || bomResponse.data.length === 0) {
+          alert(`No recipe found for ${item.productName}. Cannot produce without recipe.`)
+          return
         }
 
-        // Here you would typically call an API to save the production
-        console.log('Producing item:', productionData)
+        // Find exact match
+        const bom = bomResponse.data.find(b => 
+          b.productName.toLowerCase() === item.productName.toLowerCase()
+        ) || bomResponse.data[0]
+
+        // Call production API
+        const productionResponse = await apiService.makeFinishedGood({
+          productCode: item.productCode,
+          productName: item.productName,
+          quantity: item.quantity,
+          bomCode: bom.bomCode,
+          notes: item.notes
+        })
+
+        if (!productionResponse.success) {
+          alert(`Failed to produce ${item.productName}: ${productionResponse.message}`)
+          return
+        }
+
+        console.log(`Successfully produced ${item.productName}:`, productionResponse.data)
       }
 
-      alert(`Production completed successfully!\n\nProduced ${productionItems.length} items:\n${productionItems.map(item => `- ${item.productName} (${item.quantity} ${item.unitOfMeasure})`).join('\n')}`)
+      // Show success message with details
+      let successMessage = `Production completed successfully!\n\nProduced ${productionItems.length} items:\n`
+      productionItems.forEach(item => {
+        successMessage += `- ${item.productName} (${item.quantity} ${item.unitOfMeasure})\n`
+      })
+      successMessage += `\nRaw materials have been deducted from Central Kitchen inventory.\nFinished goods have been added to Central Kitchen inventory.`
+      
+      alert(successMessage)
       
       // Clear production items after successful production
       setProductionItems([])
+      
+      // Reload data to reflect changes
+      await loadCentralKitchenData()
       
     } catch (err) {
       console.error('Error saving production:', err)
@@ -174,16 +281,6 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
     }
   }
 
-  const categories = [
-    'Beverages',
-    'Meals',
-    'Bakery',
-    'Snacks',
-    'Desserts',
-    'Salads',
-    'Soups',
-    'Sandwiches'
-  ]
 
   const unitOfMeasures = [
     'pcs',
@@ -279,37 +376,49 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
             <h3 className="text-lg font-medium text-gray-900 mb-4">Add Production Item</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Product Code *</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={newItem.productCode || ''}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, productCode: e.target.value }))}
-                  placeholder="e.g., FG001"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Product Name *</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={newItem.productName || ''}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, productName: e.target.value }))}
-                  placeholder="e.g., Espresso"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Finished Good *</label>
                 <select
                   className="input-field"
-                  value={newItem.category || ''}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, category: e.target.value }))}
+                  value={newItem.productCode || ''}
+                  onChange={(e) => handleFinishedGoodChange(e.target.value)}
                 >
-                  <option value="">Select Category</option>
-                  {categories.map(category => (
-                    <option key={category} value={category}>{category}</option>
+                  <option value="">Select Finished Good</option>
+                  {finishedGoods.map(good => (
+                    <option key={good._id} value={good.productCode}>
+                      {good.productName} ({good.productCode})
+                    </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Product Code</label>
+                <input
+                  type="text"
+                  className="input-field bg-gray-100"
+                  value={newItem.productCode || ''}
+                  readOnly
+                  placeholder="Auto-filled from selection"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
+                <input
+                  type="text"
+                  className="input-field bg-gray-100"
+                  value={newItem.productName || ''}
+                  readOnly
+                  placeholder="Auto-filled from selection"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <input
+                  type="text"
+                  className="input-field bg-gray-100"
+                  value={newItem.category || ''}
+                  readOnly
+                  placeholder="Auto-filled from selection"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Unit of Measure</label>
@@ -329,7 +438,7 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
                   type="number"
                   className="input-field"
                   value={newItem.quantity || 1}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, quantity: Number.parseInt(e.target.value) || 1 }))}
                   min="1"
                 />
               </div>
@@ -340,7 +449,7 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
                   step="0.01"
                   className="input-field"
                   value={newItem.costPrice || 0}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, costPrice: parseFloat(e.target.value) || 0 }))}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, costPrice: Number.parseFloat(e.target.value) || 0 }))}
                   min="0"
                 />
               </div>
@@ -351,7 +460,7 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
                   step="0.01"
                   className="input-field"
                   value={newItem.unitPrice || 0}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, unitPrice: parseFloat(e.target.value) || 0 }))}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, unitPrice: Number.parseFloat(e.target.value) || 0 }))}
                   min="0"
                 />
               </div>
@@ -361,7 +470,7 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
                   type="number"
                   className="input-field"
                   value={newItem.expiryDays || 1}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, expiryDays: parseInt(e.target.value) || 1 }))}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, expiryDays: Number.parseInt(e.target.value) || 1 }))}
                   min="1"
                 />
               </div>
@@ -376,6 +485,69 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
                 />
               </div>
             </div>
+
+            {/* BOM Ingredients Display */}
+            {bomLoading && (
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                  <span className="text-blue-600">Loading recipe ingredients...</span>
+                </div>
+              </div>
+            )}
+
+            {selectedBOM && !bomLoading && (
+              <div className="mt-4 p-4 bg-green-50 rounded-lg">
+                <h4 className="text-lg font-medium text-gray-900 mb-3">Required Raw Materials (Recipe Master)</h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material Code</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material Name</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity per Unit</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Cost</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {selectedBOM.items.map((item, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.materialCode}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.materialName}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.quantity}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.unitOfMeasure}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.unitCost.toFixed(2)} KWD</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.totalCost.toFixed(2)} KWD</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-gray-100">
+                      <tr>
+                        <td colSpan={5} className="px-3 py-2 text-right text-sm font-medium text-gray-900">Total Recipe Cost:</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{selectedBOM.totalCost.toFixed(2)} KWD</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                <div className="mt-2 text-sm text-gray-600">
+                  <p><strong>BOM Code:</strong> {selectedBOM.bomCode}</p>
+                  <p><strong>Description:</strong> {selectedBOM.productDescription}</p>
+                </div>
+              </div>
+            )}
+
+            {!selectedBOM && !bomLoading && newItem.productCode && (
+              <div className="mt-4 p-4 bg-yellow-50 rounded-lg">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-yellow-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-yellow-800">No recipe found for this finished good. Raw materials information not available.</span>
+                </div>
+              </div>
+            )}
             <div className="flex gap-3 mt-4">
               <button
                 onClick={handleAddItem}
@@ -425,7 +597,7 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
                           type="number"
                           className="input-field w-20"
                           value={item.quantity}
-                          onChange={(e) => handleUpdateItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                          onChange={(e) => handleUpdateItem(item.id, 'quantity', Number.parseInt(e.target.value) || 1)}
                           min="1"
                         />
                         <span className="ml-2 text-sm text-gray-500">{item.unitOfMeasure}</span>
@@ -436,7 +608,7 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
                           step="0.01"
                           className="input-field w-24"
                           value={item.costPrice}
-                          onChange={(e) => handleUpdateItem(item.id, 'costPrice', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => handleUpdateItem(item.id, 'costPrice', Number.parseFloat(e.target.value) || 0)}
                           min="0"
                         />
                       </td>
@@ -446,7 +618,7 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
                           step="0.01"
                           className="input-field w-24"
                           value={item.unitPrice}
-                          onChange={(e) => handleUpdateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => handleUpdateItem(item.id, 'unitPrice', Number.parseFloat(e.target.value) || 0)}
                           min="0"
                         />
                       </td>
@@ -455,7 +627,7 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
                           type="number"
                           className="input-field w-20"
                           value={item.expiryDays}
-                          onChange={(e) => handleUpdateItem(item.id, 'expiryDays', parseInt(e.target.value) || 1)}
+                          onChange={(e) => handleUpdateItem(item.id, 'expiryDays', Number.parseInt(e.target.value) || 1)}
                           min="1"
                         />
                       </td>

@@ -1610,6 +1610,38 @@ class ApiService {
     });
   }
 
+  // Make Finished Good - Deduct raw materials and add finished goods
+  async makeFinishedGood(data: {
+    productCode: string;
+    productName: string;
+    quantity: number;
+    bomCode: string;
+    notes?: string;
+  }) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: {
+        productionId: string;
+        rawMaterialsConsumed: Array<{
+          materialCode: string;
+          materialName: string;
+          quantityConsumed: number;
+          remainingStock: number;
+        }>;
+        finishedGoodProduced: {
+          productCode: string;
+          productName: string;
+          quantityProduced: number;
+          newStock: number;
+        };
+      };
+    }>('/central-kitchen/make-finished-good', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
   // Import Central Kitchen Raw Materials from Excel
   async importCentralKitchenExcel(file: File) {
     const formData = new FormData();
@@ -1646,6 +1678,38 @@ class ApiService {
       };
     }>('/central-kitchen/import-status', {
       method: 'GET'
+    });
+  }
+
+  // Make Finished Good - Deduct raw materials and add finished goods
+  async makeFinishedGood(data: {
+    productCode: string;
+    productName: string;
+    quantity: number;
+    bomCode: string;
+    notes?: string;
+  }) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: {
+        productionId: string;
+        rawMaterialsConsumed: Array<{
+          materialCode: string;
+          materialName: string;
+          quantityConsumed: number;
+          remainingStock: number;
+        }>;
+        finishedGoodProduced: {
+          productCode: string;
+          productName: string;
+          quantityProduced: number;
+          newStock: number;
+        };
+      };
+    }>('/central-kitchen/finished-products/make-finished-good', {
+      method: 'POST',
+      body: JSON.stringify(data)
     });
   }
 }
