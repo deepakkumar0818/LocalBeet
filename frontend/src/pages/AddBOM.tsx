@@ -140,9 +140,9 @@ const AddBOM: React.FC = () => {
   const [submitting, setSubmitting] = useState(false)
 
   const statusOptions = ['Draft', 'Active', 'Obsolete']
-  const unitOptions = ['grams', 'kg', 'ml'] as const
+  const [unitOptions, setUnitOptions] = useState<string[]>([])
 
-  // Load Central Kitchen raw materials for dropdown (full inventory)
+  // Load Central Kitchen raw materials for dropdown (fresh, full list)
   useEffect(() => {
     (async () => {
       try {
@@ -159,15 +159,14 @@ const AddBOM: React.FC = () => {
           page += 1
           if (page > 20) break // safety cap
         }
-        const allowed = ['grams','kg','ml','g','l','liter','milliliter']
-        const filtered = all.filter(m => allowed.includes((m.unitOfMeasure || '').toLowerCase()))
-          .map(m => ({
-            ...m,
-            unitOfMeasure: (m.unitOfMeasure || '').toLowerCase() === 'g' ? 'grams' :
-                           (m.unitOfMeasure || '').toLowerCase() === 'l' || (m.unitOfMeasure || '').toLowerCase() === 'liter' ? 'ml' :
-                           (m.unitOfMeasure || '').toLowerCase() === 'milliliter' ? 'ml' : (m.unitOfMeasure || '')
-          }))
-        setMaterials(filtered)
+        setMaterials(all)
+        // Derive unique units for dropdown
+        const units = Array.from(new Set(
+          all
+            .map(m => (m.unitOfMeasure || '').toString().trim())
+            .filter(u => u && u.length > 0)
+        ))
+        setUnitOptions(units)
       } catch (err) {
         console.error('Failed to load central kitchen raw materials', err)
       }
@@ -216,7 +215,7 @@ const AddBOM: React.FC = () => {
     })()
   }, [])
 
-  type AllowedUnit = 'grams' | 'kg' | 'ml'
+  type AllowedUnit = string
 
   const findMaterial = (codeOrId: string) => {
     return materials.find(
@@ -229,29 +228,22 @@ const AddBOM: React.FC = () => {
     targetUnit: AllowedUnit
   ): number => {
     if (!material) return 0
-    const sourceUnit = (material.unitOfMeasure || '').toLowerCase()
+    const sourceUnit = (material.unitOfMeasure || '').toString().trim().toLowerCase()
+    const target = (targetUnit || '').toString().trim().toLowerCase()
     const price = Number(material.unitPrice || 0)
-
     if (price <= 0) return 0
 
-    // Normalize price per requested unit
-    if (sourceUnit === 'kg') {
-      if (targetUnit === 'kg') return price
-      if (targetUnit === 'grams') return price / 1000
-      if (targetUnit === 'ml') return 0 // incompatible
-    }
-    if (sourceUnit === 'grams') {
-      if (targetUnit === 'grams') return price
-      if (targetUnit === 'kg') return price * 1000
-      if (targetUnit === 'ml') return 0
-    }
-    if (sourceUnit === 'ml') {
-      if (targetUnit === 'ml') return price
-      // No cross mass-volume conversion without density
-      return 0
-    }
-    // Fallback: if same text
-    if (sourceUnit === targetUnit) return price
+    // If units match exactly, use material price
+    if (sourceUnit && sourceUnit === target) return price
+
+    // Basic mass conversions
+    if (sourceUnit === 'kg' && target === 'grams') return price / 1000
+    if (sourceUnit === 'grams' && target === 'kg') return price * 1000
+
+    // Basic volume identity
+    if (sourceUnit === 'ml' && target === 'ml') return price
+
+    // Otherwise, no conversion available
     return 0
   }
 
@@ -391,7 +383,7 @@ const AddBOM: React.FC = () => {
       materialCode: '',
       materialName: '',
       quantity: 0,
-      unitOfMeasure: 'grams',
+      unitOfMeasure: unitOptions[0] || '',
       unitCost: 0,
       totalCost: 0
     }
@@ -571,6 +563,13 @@ const AddBOM: React.FC = () => {
                         updateBOMItem(index, 'materialCode', value)
                         updateBOMItem(index, 'materialName', mat?.materialName || '')
                         updateBOMItem(index, 'materialId', mat?.id || '')
+                        if (mat) {
+                          // Auto-fill unit to material's unit and price
+                          updateBOMItem(index, 'unitOfMeasure', (mat.unitOfMeasure || '').toString())
+                          const unit = (mat.unitOfMeasure || '').toString()
+                          const price = computeUnitCost(mat, unit)
+                          updateBOMItem(index, 'unitCost', price)
+                        }
                       }}
                       placeholder="Select material"
                       options={materials.map((m) => ({
