@@ -394,6 +394,80 @@ class ApiService {
     }>(endpoint);
   }
 
+  // Import Kuwait City Raw Materials from Excel
+  async importKuwaitCityRawMaterialsExcel(file: File) {
+    const formData = new FormData();
+    formData.append('excelFile', file);
+
+    return this.request<{
+      success: boolean;
+      message: string;
+      results?: any;
+      data?: any;
+    }>('/kuwait-city/raw-materials/import-excel', {
+      method: 'POST',
+      body: formData
+    });
+  }
+
+  // Import Kuwait City Finished Products from JSON array
+  async importKuwaitCityFinishedProducts(products: any[]) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: { successCount: number; errorCount: number; errors: string[] };
+    }>('/kuwait-city/finished-products/import', {
+      method: 'POST',
+      body: JSON.stringify({ products })
+    });
+  }
+
+  // Import 360 Mall Raw Materials from Excel
+  async importMall360RawMaterialsExcel(file: File) {
+    const formData = new FormData();
+    formData.append('excelFile', file);
+
+    return this.request<{ success: boolean; message: string; data?: any }>(
+      '/360-mall/raw-materials/import-excel',
+      { method: 'POST', body: formData }
+    );
+  }
+
+  // Import 360 Mall Finished Products via JSON
+  async importMall360FinishedProducts(products: any[]) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: { successCount: number; errorCount: number; errors: string[] };
+    }>('/360-mall/finished-products/import', {
+      method: 'POST',
+      body: JSON.stringify({ products })
+    });
+  }
+
+  // Import Vibes Complex Raw Materials from Excel
+  async importVibeComplexRawMaterialsExcel(file: File) {
+    const formData = new FormData();
+    formData.append('excelFile', file);
+
+    return this.request<{ success: boolean; message: string; data?: any }>(
+      '/vibe-complex/raw-materials/import-excel',
+      { method: 'POST', body: formData }
+    );
+  }
+
+  // Import Vibes Complex Finished Products via JSON
+  async importVibeComplexFinishedProducts(products: any[]) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: { successCount: number; errorCount: number; errors: string[] };
+    }>('/vibe-complex/finished-products/import', {
+      method: 'POST',
+      body: JSON.stringify({ products })
+    });
+  }
+
   // Export Kuwait City Raw Materials to Excel
   async exportKuwaitCityRawMaterials(params?: {
     search?: string;
@@ -920,6 +994,29 @@ class ApiService {
         pages: number;
       };
     }>(endpoint);
+  }
+
+  // Import Taiba Hospital Raw Materials from Excel
+  async importTaibaKitchenRawMaterialsExcel(file: File) {
+    const formData = new FormData();
+    formData.append('excelFile', file);
+
+    return this.request<{ success: boolean; message: string; data?: any }>(
+      '/taiba-kitchen/raw-materials/import-excel',
+      { method: 'POST', body: formData }
+    );
+  }
+
+  // Import Taiba Hospital Finished Products via JSON array
+  async importTaibaKitchenFinishedProducts(products: any[]) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: { successCount: number; errorCount: number; errors: string[] };
+    }>('/taiba-kitchen/finished-products/import', {
+      method: 'POST',
+      body: JSON.stringify({ products })
+    });
   }
 
   async getTaibaKitchenFinishedProducts(params?: {

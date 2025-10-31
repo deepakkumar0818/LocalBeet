@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Package, Truck, RefreshCw, ShoppingCart, Coffee, Plus, Receipt, CreditCard, AlertTriangle, Download } from 'lucide-react'
+import { Package, Truck, RefreshCw, ShoppingCart, Coffee, Plus, Receipt, CreditCard, AlertTriangle, Download, Upload } from 'lucide-react'
 import { apiService } from '../services/api'
 import NotificationDropdown from '../components/NotificationDropdown'
 import { useNotifications } from '../hooks/useNotifications'
@@ -89,6 +89,7 @@ const MarinaWalkCafe: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [exportLoading, setExportLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [importLoading, setImportLoading] = useState(false)
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Vibes Complex')
 
   // Debug notifications when they change
@@ -383,140 +384,76 @@ const MarinaWalkCafe: React.FC = () => {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
-
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      alert('Please select a CSV file')
-      return
-    }
-
     try {
-      // setImporting(true)
-      const text = await file.text()
-      const lines = text.split('\n').filter(line => line.trim())
-      
-      if (lines.length < 2) {
-        alert('CSV file must contain at least a header row and one data row')
-        return
-      }
-
-      const dataRows = lines.slice(1)
-
-      let successCount = 0
-      let errorCount = 0
-
-      for (const row of dataRows) {
-        try {
-          const values = row.split(',').map(v => v.replace(/"/g, '').trim())
-          const type = values[0]
-          
-          if (type === 'Raw Material') {
-            const materialData = {
-              materialCode: values[1],
-              materialName: values[2],
-              category: values[3],
-              unitOfMeasure: values[4],
-              unitPrice: parseFloat(values[5]) || 0,
-              currentStock: parseInt(values[6]) || 0,
-              minimumStock: parseInt(values[8]) || 0,
-              maximumStock: parseInt(values[9]) || 0,
-              supplier: values[12] || '',
-              notes: values[14] || ''
-            }
-            
-            // Add to local state
-            const newItem: OutletInventoryItem = {
-              id: `rm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              outletId: outlet?._id || outlet?.id || '',
-              outletCode: outlet?.outletCode || '',
-              outletName: outlet?.outletName || '',
-              materialId: materialData.materialCode,
-              materialCode: materialData.materialCode,
-              materialName: materialData.materialName,
-              category: materialData.category,
-              unitOfMeasure: materialData.unitOfMeasure,
-              unitPrice: materialData.unitPrice,
-              currentStock: materialData.currentStock,
-              reservedStock: 0,
-              availableStock: materialData.currentStock,
-              minimumStock: materialData.minimumStock,
-              maximumStock: materialData.maximumStock,
-              reorderPoint: Math.ceil(materialData.minimumStock * 1.5),
-              totalValue: materialData.currentStock * materialData.unitPrice,
-              location: 'Main Storage',
-              batchNumber: `BATCH-${Date.now()}`,
-              supplier: materialData.supplier,
-              lastUpdated: new Date().toISOString(),
-              status: 'In Stock',
-              notes: materialData.notes,
-              isActive: true
-            }
-            
-            setInventoryItems(prev => [...prev, newItem])
-            successCount++
-          } else if (type === 'Finished Good') {
-            const productData = {
-              productCode: values[1],
-              productName: values[2],
-              category: values[3],
-              unitOfMeasure: values[4],
-              unitPrice: parseFloat(values[5]) || 0,
-              currentStock: parseInt(values[6]) || 0,
-              minimumStock: parseInt(values[8]) || 0,
-              maximumStock: parseInt(values[9]) || 0,
-              supplier: values[12] || '',
-              notes: values[14] || ''
-            }
-            
-            // Add to local state
-            const newItem: FinishedGoodInventoryItem = {
-              id: `fg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              outletId: outlet?._id || outlet?.id || '',
-              outletCode: outlet?.outletCode || '',
-              outletName: outlet?.outletName || '',
-              productId: productData.productCode,
-              productCode: productData.productCode,
-              productName: productData.productName,
-              category: productData.category,
-              unitOfMeasure: productData.unitOfMeasure,
-              unitPrice: productData.unitPrice,
-              costPrice: productData.unitPrice * 0.7, // Assume 30% margin
-              currentStock: productData.currentStock,
-              reservedStock: 0,
-              availableStock: productData.currentStock,
-              minimumStock: productData.minimumStock,
-              maximumStock: productData.maximumStock,
-              reorderPoint: Math.ceil(productData.minimumStock * 1.5),
-              totalValue: productData.currentStock * productData.unitPrice,
-              productionDate: new Date().toISOString().split('T')[0],
-              expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-              batchNumber: `BATCH-${Date.now()}`,
-              storageLocation: 'Cold Storage',
-              storageTemperature: '4°C',
-              qualityStatus: 'Good',
-              qualityNotes: 'Imported from CSV',
-              status: 'In Stock',
-              transferSource: 'Import',
-              lastUpdated: new Date().toISOString(),
-              notes: productData.notes,
-              isActive: true
-            }
-            
-            setFinishedGoodInventoryItems(prev => [...prev, newItem])
-            successCount++
-          }
-        } catch (err) {
-          errorCount++
+      setImportLoading(true)
+      const lower = file.name.toLowerCase()
+      const section = getCurrentSection()
+      if (section === 'raw-materials') {
+        if (!(lower.endsWith('.xlsx') || lower.endsWith('.xls'))) {
+          alert('Please select an Excel file (.xlsx/.xls) for Raw Materials import')
+          return
         }
+        const res = await apiService.importVibeComplexRawMaterialsExcel(file)
+        alert(res.message || 'Raw materials import completed')
+        await loadInventory()
+      } else if (section === 'finished-goods') {
+        let products: any[] = []
+        if (lower.endsWith('.json')) {
+          const text = await file.text()
+          const parsed = JSON.parse(text)
+          products = Array.isArray(parsed) ? parsed : parsed.products || []
+        } else if (lower.endsWith('.csv')) {
+          const text = await file.text()
+          const lines = text.split('\n').filter(line => line.trim())
+          const dataRows = lines.slice(1)
+          products = dataRows.map(row => {
+            const values = row.split(',').map(v => v.replace(/\"/g, '').trim())
+            return {
+              productCode: values[0] || values[1],
+              productName: values[1] || values[2],
+              subCategory: values[2] || 'MAIN COURSES',
+              category: values[2] || 'MAIN COURSES',
+              unitOfMeasure: values[3] || 'piece',
+              unitPrice: parseFloat(values[4]) || 0,
+              currentStock: parseFloat(values[5]) || 0
+            }
+          }).filter(p => p.productCode && p.productName)
+        } else if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) {
+          const data = await file.arrayBuffer()
+          const XLSXmod = await import('xlsx')
+          const workbook = XLSXmod.read(data, { type: 'array' })
+          const sheet = workbook.Sheets[workbook.SheetNames[0]]
+          const rows: any[] = XLSXmod.utils.sheet_to_json(sheet, { defval: '' })
+          products = rows.map((r) => {
+            const norm = (s: string) => s.toString().trim().toLowerCase()
+            const get = (keys: string[]) => {
+              const header = Object.keys(r).find(h => keys.includes(norm(h))) as string
+              return header ? r[header] : undefined
+            }
+            const subCat = (get(['subcategory name','subcategory','sub category','sub category name']) || 'MAIN COURSES').toString().trim()
+            return {
+              productCode: (get(['product code','sku','code']) || '').toString().trim(),
+              productName: (get(['product name','item name','name']) || '').toString().trim(),
+              subCategory: subCat,
+              category: subCat,
+              unitOfMeasure: (get(['unit of measure','unit','uom']) || 'piece').toString().trim(),
+              unitPrice: Number.parseFloat(String(get(['unit price','price']))) || 0,
+              currentStock: Number.parseFloat(String(get(['current stock','current quantity','quantity','qty']))) || 0
+            }
+          }).filter(p => p.productCode && p.productName)
+        } else {
+          alert('Please select CSV/JSON/Excel for Finished Products import')
+          return
+        }
+        const res = await apiService.importVibeComplexFinishedProducts(products)
+        alert(res.message || `Finished products import completed. Success: ${res.data?.successCount || 0}`)
+        await loadInventory()
       }
-
-      alert(`Import completed!\n\nSuccessfully imported: ${successCount} items\nErrors: ${errorCount}`)
     } catch (err) {
       alert('Error importing file: ' + (err instanceof Error ? err.message : 'Unknown error'))
     } finally {
-      // setImporting(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
+      setImportLoading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -577,15 +514,26 @@ const MarinaWalkCafe: React.FC = () => {
               <Package className="h-6 w-6 text-blue-600" />
               <h2 className="text-xl font-semibold text-gray-900">Raw Materials Inventory</h2>
             </div>
-            <button
-              onClick={handleExportRawMaterials}
-              disabled={exportLoading}
-              className="btn-primary flex items-center"
-              title="Export raw materials to Excel"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {exportLoading ? 'Exporting...' : 'Export'}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importLoading}
+                className="btn-secondary flex items-center"
+                title="Import raw materials from Excel"
+              >
+                {importLoading ? <span className="h-4 w-4 mr-2 inline-block border-2 border-gray-300 border-t-transparent rounded-full animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                {importLoading ? 'Importing...' : 'Import'}
+              </button>
+              <button
+                onClick={handleExportRawMaterials}
+                disabled={exportLoading || importLoading}
+                className="btn-primary flex items-center"
+                title="Export raw materials to Excel"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {exportLoading ? 'Exporting...' : 'Export'}
+              </button>
+            </div>
           </div>
         </div>
         {/* Search & Filters */}
@@ -676,15 +624,26 @@ const MarinaWalkCafe: React.FC = () => {
               <Package className="h-6 w-6 text-green-600" />
               <h2 className="text-xl font-semibold text-gray-900">Finished Goods Inventory</h2>
             </div>
-            <button
-              onClick={handleExportFinishedGoods}
-              disabled={exportLoading}
-              className="btn-primary flex items-center"
-              title="Export finished goods to Excel"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {exportLoading ? 'Exporting...' : 'Export'}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importLoading}
+                className="btn-secondary flex items-center"
+                title="Import finished products from CSV/JSON/Excel"
+              >
+                {importLoading ? <span className="h-4 w-4 mr-2 inline-block border-2 border-gray-300 border-t-transparent rounded-full animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                {importLoading ? 'Importing...' : 'Import'}
+              </button>
+              <button
+                onClick={handleExportFinishedGoods}
+                disabled={exportLoading || importLoading}
+                className="btn-primary flex items-center"
+                title="Export finished goods to Excel"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {exportLoading ? 'Exporting...' : 'Export'}
+              </button>
+            </div>
           </div>
         </div>
         {/* Search & Filters */}
@@ -1017,9 +976,10 @@ const MarinaWalkCafe: React.FC = () => {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".csv,.xlsx,.xls"
+        accept={currentSection === 'raw-materials' ? '.xlsx,.xls' : '.csv,.json,.xlsx,.xls'}
         onChange={handleFileUpload}
         className="hidden"
+        disabled={importLoading}
       />
     </div>
   )

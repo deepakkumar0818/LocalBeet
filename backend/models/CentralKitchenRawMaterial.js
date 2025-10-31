@@ -40,7 +40,11 @@ const CentralKitchenRawMaterialSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    enum: ['kg', 'ltr', 'g', 'ml', 'piece', 'box', 'pack'],
+    // Updated to match the provided unit list for Central Kitchen
+    enum: [
+      'box', 'cm', 'dz', 'ft', 'g', 'in', 'kg', 'km', 'lb', 'mg', 'ml', 'm',
+      'pcs', 'pcs 6', 'pcs 12', 'No.s', 'ltr', 'kg 2', 'kg 5', 'kg 10', 'Pr'
+    ],
     default: 'kg'
   },
   

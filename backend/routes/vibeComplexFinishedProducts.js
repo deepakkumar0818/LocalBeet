@@ -30,6 +30,95 @@ router.use(async (req, res, next) => {
   next();
 });
 
+// POST /api/vibe-complex/finished-products/import - Import finished products via JSON array
+router.post('/import', async (req, res) => {
+  try {
+    const { products } = req.body;
+    if (!products || !Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ success: false, message: 'No products provided for import' });
+    }
+
+    let successCount = 0;
+    let errorCount = 0;
+    const errors = [];
+
+    const normalizeStatus = (rawStatus, currentStock, reorderPoint) => {
+      const s = (rawStatus || '').toString().trim().toLowerCase();
+      if (s === 'in stock' || s === 'in-stock' || s === 'available' || s === 'active') return 'In Stock';
+      if (s === 'low stock' || s === 'low-stock') return 'Low Stock';
+      if (s === 'out of stock' || s === 'out-of-stock' || s === 'oos') return 'Out of Stock';
+      if (s === 'discontinued' || s === 'inactive') return 'Discontinued';
+      const qty = Number.parseFloat(currentStock) || 0;
+      const rp = Number.parseFloat(reorderPoint) || 0;
+      if (qty <= 0) return 'Out of Stock';
+      if (qty <= rp) return 'Low Stock';
+      return 'In Stock';
+    };
+
+    for (let i = 0; i < products.length; i++) {
+      try {
+        const productData = products[i];
+        if (!productData.productCode || !productData.productName) {
+          errors.push(`Row ${i + 1}: Product code and name are required`);
+          errorCount++;
+          continue;
+        }
+
+        const existing = await VibeComplexFinishedProduct.findOne({ productCode: productData.productCode });
+        if (existing) {
+          const updateData = {
+            productName: productData.productName || existing.productName,
+            salesDescription: productData.salesDescription || productData.productName || existing.salesDescription,
+            category: productData.category || productData.subCategory || existing.category || 'Finished Goods',
+            subCategory: productData.subCategory || productData.category || existing.subCategory,
+            unitOfMeasure: productData.unitOfMeasure || existing.unitOfMeasure,
+            unitPrice: Number.parseFloat(productData.unitPrice) || existing.unitPrice || 0,
+            costPrice: Number.parseFloat(productData.costPrice) || existing.costPrice || 0,
+            currentStock: Number.parseFloat(productData.currentStock) || existing.currentStock || 0,
+            minimumStock: Number.parseFloat(productData.minimumStock) || existing.minimumStock || 0,
+            maximumStock: Number.parseFloat(productData.maximumStock) || existing.maximumStock || 0,
+            reorderPoint: Number.parseFloat(productData.reorderPoint) || existing.reorderPoint || 0,
+            status: normalizeStatus(productData.status || existing.status, productData.currentStock ?? existing.currentStock, productData.reorderPoint ?? existing.reorderPoint),
+            notes: productData.notes || existing.notes,
+            updatedBy: 'System Import'
+          };
+          await VibeComplexFinishedProduct.findByIdAndUpdate(existing._id, updateData, { new: true, runValidators: true });
+          successCount++;
+        } else {
+          const newProduct = {
+            productCode: productData.productCode,
+            productName: productData.productName,
+            salesDescription: productData.salesDescription || productData.productName,
+            category: productData.category || productData.subCategory || 'Finished Goods',
+            subCategory: productData.subCategory || productData.category || 'MAIN COURSES',
+            unitOfMeasure: productData.unitOfMeasure || 'piece',
+            unitPrice: Number.parseFloat(productData.unitPrice) || 0,
+            costPrice: Number.parseFloat(productData.costPrice) || 0,
+            currentStock: Number.parseFloat(productData.currentStock) || 0,
+            minimumStock: Number.parseFloat(productData.minimumStock) || 5,
+            maximumStock: Number.parseFloat(productData.maximumStock) || 100,
+            reorderPoint: Number.parseFloat(productData.reorderPoint) || 10,
+            status: normalizeStatus(productData.status, productData.currentStock, productData.reorderPoint),
+            notes: productData.notes || '',
+            createdBy: 'System Import',
+            updatedBy: 'System Import'
+          };
+          await VibeComplexFinishedProduct.create(newProduct);
+          successCount++;
+        }
+      } catch (e) {
+        errors.push(`Row ${i + 1}: ${e.message}`);
+        errorCount++;
+      }
+    }
+
+    res.json({ success: true, message: `Import completed. Success: ${successCount}, Errors: ${errorCount}`, data: { successCount, errorCount, errors: errors.slice(0, 10) } });
+  } catch (error) {
+    console.error('Error importing Vibe Complex finished products:', error);
+    res.status(500).json({ success: false, message: 'Error importing finished products', error: error.message });
+  }
+});
+
 // GET all finished products
 router.get('/', async (req, res) => {
   try {
