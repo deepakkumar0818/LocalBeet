@@ -287,6 +287,29 @@ router.put('/:id/approve', ensureConnections, async (req, res) => {
     transferOrder.transferStartedAt = new Date();
     await transferOrder.save();
 
+    // After local approval and inventory updates, push to Zoho
+    try {
+      const { pushTransferOrderToZoho } = require('./transferOrders');
+      if (typeof pushTransferOrderToZoho === 'function') {
+        console.log(`🔄 Pushing approved transfer order ${transferOrder.transferNumber} to Zoho Inventory...`);
+        const zohoPushResult = await pushTransferOrderToZoho(transferOrder);
+        if (zohoPushResult && zohoPushResult.zohoTransferOrderId) {
+          await TransferOrder.findByIdAndUpdate(transferOrder._id, {
+            $set: {
+              zohoTransferOrderId: zohoPushResult.zohoTransferOrderId,
+              zohoTransferOrderNumber: zohoPushResult.zohoTransferOrderNumber
+            }
+          });
+        }
+        console.log('✅ Approved transfer order pushed to Zoho successfully');
+      } else {
+        console.warn('⚠️  Zoho push function not available');
+      }
+    } catch (zohoError) {
+      console.error('⚠️  Failed to push approved transfer order to Zoho:', zohoError.message);
+      // Continue even if Zoho push fails
+    }
+
     // Create notification for the requesting outlet (fromOutlet) that their request was approved
     try {
       console.log(`📢 Creating approval notification for ${fromOutletName}...`);

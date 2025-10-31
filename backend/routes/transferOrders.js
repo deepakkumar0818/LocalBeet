@@ -566,27 +566,8 @@ router.post('/', async (req, res) => {
 
     const transferOrder = await TransferOrder.create(transferOrderData);
 
-    // Push transfer order to Zoho Inventory
+    // Defer Zoho push until explicit approval/rejection by Central Kitchen
     let zohoPushResult = null;
-    try {
-      console.log(`🔄 Pushing transfer order ${transferOrder.transferNumber} to Zoho Inventory...`);
-      zohoPushResult = await pushTransferOrderToZoho(transferOrder);
-      console.log('✅ Transfer order pushed to Zoho successfully');
-      
-      // Optionally update the transfer order with Zoho details
-      if (zohoPushResult && zohoPushResult.zohoTransferOrderId) {
-        await TransferOrder.findByIdAndUpdate(transferOrder._id, {
-          $set: {
-            zohoTransferOrderId: zohoPushResult.zohoTransferOrderId,
-            zohoTransferOrderNumber: zohoPushResult.zohoTransferOrderNumber
-          }
-        });
-      }
-    } catch (zohoError) {
-      console.error('⚠️  Failed to push transfer order to Zoho:', zohoError.message);
-      // Don't fail the transfer order creation if Zoho push fails
-      // The order is still created locally
-    }
 
     // Send notification to Central Kitchen
     try {
@@ -624,7 +605,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Transfer Order created successfully' + (zohoPushResult ? ' and pushed to Zoho' : ''),
+      message: 'Transfer Order created successfully',
       data: transferOrder,
       zohoPush: zohoPushResult
     });
@@ -773,3 +754,12 @@ router.get('/stats/summary', async (req, res) => {
 });
 
 module.exports = router;
+
+// Expose Zoho push helper for use in approval flow
+try {
+  if (typeof pushTransferOrderToZoho === 'function') {
+    module.exports.pushTransferOrderToZoho = pushTransferOrderToZoho;
+  }
+} catch (e) {
+  // no-op
+}

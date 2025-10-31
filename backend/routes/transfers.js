@@ -470,7 +470,9 @@ router.post('/create', async (req, res) => {
         notes: item.notes || ''
       })),
       totalAmount: calculatedTotalValue,
-      status: errors.length > 0 ? 'Failed' : 'Pending',
+      status: errors.length > 0
+        ? 'Failed'
+        : (isFromCentralKitchen ? 'Approved' : 'Pending'),
       requestedBy: 'System User',
       transferResults: transferResults.map(result => ({
         itemCode: result.itemCode,
