@@ -263,7 +263,8 @@ const CentralKitchenCreateTransfer: React.FC = () => {
           if (selectedItem) {
             updatedForm.data.itemName = selectedItem.materialName || selectedItem.productName || ''
             updatedForm.data.category = selectedItem.category || selectedItem.subCategory || ''
-            updatedForm.data.unitOfMeasure = selectedItem.unitOfMeasure || 'pcs'
+            // Map database unit format to dropdown format
+            updatedForm.data.unitOfMeasure = mapUnitToDropdownFormat(selectedItem.unitOfMeasure || 'pcs')
             updatedForm.data.unitPrice = selectedItem.unitPrice || 0
           }
         }
@@ -387,15 +388,42 @@ const CentralKitchenCreateTransfer: React.FC = () => {
 
 
   const unitOfMeasures = [
-    'pcs',
-    'kg',
-    'L',
-    'g',
-    'ml',
-    'box',
-    'pack',
-    'serving'
+    'km (Kilometers)', 'lb (Pounds)', 'mg (Milli Grams)', 'ml (Milli Litre)',
+    'm (Meter)', 'pcs (Pieces)', 'pcs 6 (Pieces 6)', 'pcs 12 (Pieces 12)',
+    'No.s (Number)', 'ltr (Liter)', 'kg 2 (Kilograms2)', 'kg 5 (Kilograms 5)',
+    'kg 10 (Kilograms 10)', 'Pr (Portion)', 'kg (Kilograms)'
   ]
+
+  // Map database unit format to dropdown format
+  const mapUnitToDropdownFormat = (dbUnit: string): string => {
+    if (!dbUnit) return 'pcs (Pieces)'
+    
+    const unitMap: Record<string, string> = {
+      'km': 'km (Kilometers)',
+      'lb': 'lb (Pounds)',
+      'mg': 'mg (Milli Grams)',
+      'ml': 'ml (Milli Litre)',
+      'm': 'm (Meter)',
+      'pcs': 'pcs (Pieces)',
+      'pcs 6': 'pcs 6 (Pieces 6)',
+      'pcs 12': 'pcs 12 (Pieces 12)',
+      'No.s': 'No.s (Number)',
+      'ltr': 'ltr (Liter)',
+      'kg 2': 'kg 2 (Kilograms2)',
+      'kg 5': 'kg 5 (Kilograms 5)',
+      'kg 10': 'kg 10 (Kilograms 10)',
+      'Pr': 'Pr (Portion)',
+      'kg': 'kg (Kilograms)'
+    }
+    
+    // Check if it's already in the dropdown format
+    if (unitOfMeasures.includes(dbUnit)) {
+      return dbUnit
+    }
+    
+    // Map from database format to dropdown format
+    return unitMap[dbUnit.trim()] || 'pcs (Pieces)'
+  }
 
   const destinationOutlets = [
     'Kuwait City',
@@ -633,7 +661,7 @@ const CentralKitchenCreateTransfer: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Unit of Measure</label>
                 <select
                   className="input-field"
-                  value={form.data.unitOfMeasure || 'pcs'}
+                  value={form.data.unitOfMeasure || 'pcs (Pieces)'}
                   onChange={(e) => handleUpdateForm(form.id, 'unitOfMeasure', e.target.value)}
                 >
                   {unitOfMeasures.map(unit => (

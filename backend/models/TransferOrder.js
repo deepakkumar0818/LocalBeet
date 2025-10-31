@@ -156,6 +156,17 @@ const TransferOrderSchema = new mongoose.Schema({
     }
   }],
   
+  // Zoho Integration
+  zohoTransferOrderId: {
+    type: String,
+    trim: true
+  },
+  
+  zohoTransferOrderNumber: {
+    type: String,
+    trim: true
+  },
+  
   // System Information
   isActive: {
     type: Boolean,
