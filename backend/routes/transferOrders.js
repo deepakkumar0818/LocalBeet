@@ -1,7 +1,11 @@
 const express = require('express');
 const router = express.Router();
+const https = require('https');
 const connectDB = require('../config/database');
 const TransferOrder = require('../models/TransferOrder');
+const LocationList = require('../models/LocationList');
+const ItemList = require('../models/ItemList');
+const { getZohoAccessToken } = require('../scripts/getZohoAccessToken');
 
 // Helper functions to get outlet details
 const getOutletCode = (outletName) => {
@@ -36,6 +40,264 @@ const getOutletLocation = (outletName) => {
   };
   return outletLocations[outletName] || 'Kuwait';
 };
+
+// Map internal outlet names to Zoho location names
+const OUTLET_TO_ZOHO_LOCATION = {
+  'Central Kitchen': ['TLB central kitchen', 'TLB Central Kitchen', 'TLB CENTRAL KITCHEN'],
+  'Main Central Kitchen': ['TLB central kitchen', 'TLB Central Kitchen', 'TLB CENTRAL KITCHEN'], // Handle "Main Central Kitchen" variant
+  'Kuwait City': ['TLB City', 'TLB city', 'TLB CITY'],
+  '360 Mall': ['TLB 360 RNA', 'TLB 360 rna', 'TLB 360 Rna', '360 Mall', '360 mall'],
+  'Vibe Complex': ['TLB vibes', 'TLB Vibes', 'TLB VIBES'],
+  'Vibes Complex': ['TLB vibes', 'TLB Vibes', 'TLB VIBES'], // Handle "Vibes Complex" variant (with 's')
+  'Taiba Hospital': ['clinic', 'Clinic', 'CLINIC', 'Taiba Hospital', 'taiba hospital', 'TAIBA HOSPITAL']
+};
+
+/**
+ * Get Zoho location ID for an internal outlet name
+ */
+async function getZohoLocationId(outletName) {
+  try {
+    console.log(`   🔍 Looking up Zoho location for: "${outletName}"`);
+    
+    // First try exact match
+    let possibleZohoNames = OUTLET_TO_ZOHO_LOCATION[outletName];
+    
+    // If not found, try case-insensitive match
+    if (!possibleZohoNames) {
+      const normalizedName = outletName.toLowerCase().trim();
+      for (const [key, value] of Object.entries(OUTLET_TO_ZOHO_LOCATION)) {
+        if (key.toLowerCase() === normalizedName || normalizedName.includes(key.toLowerCase()) || key.toLowerCase().includes(normalizedName)) {
+          possibleZohoNames = value;
+          console.log(`   ✅ Found mapping: "${outletName}" → "${key}"`);
+          break;
+        }
+      }
+    }
+    
+    // Fallback to outlet name itself
+    if (!possibleZohoNames) {
+      possibleZohoNames = [outletName];
+      console.log(`   ⚠️  No mapping found, using outlet name directly`);
+    }
+    
+    console.log(`   📋 Trying ${possibleZohoNames.length} possible Zoho location names...`);
+    
+    for (const zohoName of possibleZohoNames) {
+      const location = await LocationList.findOne({
+        locationName: { $regex: new RegExp(zohoName, 'i') }
+      });
+      
+      if (location && location.zohoLocationId) {
+        console.log(`   ✅ Found location: "${location.locationName}" (ID: ${location.zohoLocationId})`);
+        return location.zohoLocationId;
+      }
+    }
+    
+    // Final fallback: try direct match with outlet name
+    const location = await LocationList.findOne({
+      locationName: { $regex: new RegExp(outletName, 'i') }
+    });
+    
+    if (location && location.zohoLocationId) {
+      console.log(`   ✅ Found location by direct match: "${location.locationName}" (ID: ${location.zohoLocationId})`);
+      return location.zohoLocationId;
+    }
+    
+    console.log(`   ❌ No location found for: "${outletName}"`);
+    return null;
+  } catch (error) {
+    console.error('❌ Error getting Zoho location ID:', error);
+    return null;
+  }
+}
+
+/**
+ * Get Zoho item ID for an item code (SKU)
+ */
+async function getZohoItemId(itemCode) {
+  try {
+    const item = await ItemList.findOne({ sku: itemCode });
+    return item && item.zohoItemId ? item.zohoItemId : null;
+  } catch (error) {
+    console.error('Error getting Zoho item ID:', error);
+    return null;
+  }
+}
+
+/**
+ * Push transfer order to Zoho Inventory
+ */
+async function pushTransferOrderToZoho(transferOrder) {
+  try {
+    console.log('🔍 Starting Zoho push for transfer order:', transferOrder.transferNumber);
+    console.log('   From Outlet:', transferOrder.fromOutlet);
+    console.log('   To Outlet:', transferOrder.toOutlet);
+    console.log('   Items Count:', transferOrder.items?.length || 0);
+    
+    // Get Zoho access token
+    console.log('🔑 Getting Zoho access token...');
+    const tokenData = await getZohoAccessToken();
+    const accessToken = tokenData.access_token;
+    const organizationId = process.env.ZOHO_ORG_ID || '888785593';
+    console.log('✅ Access token obtained');
+    
+    // Helper function to check if an outlet is Central Kitchen
+    const isCentralKitchen = (outletName) => {
+      if (!outletName) return false;
+      const normalized = outletName.toLowerCase().trim();
+      return normalized.includes('central kitchen') || normalized === 'central kitchen' || normalized === 'main central kitchen';
+    };
+
+    // Determine Zoho locations
+    // Rule: Central Kitchen must ALWAYS be the source (from_location_id) in Zoho
+    // If toOutlet is Central Kitchen and fromOutlet is not, we need to swap them for Zoho
+    const needsZohoSwap = isCentralKitchen(transferOrder.toOutlet) && !isCentralKitchen(transferOrder.fromOutlet);
+    
+    const zohoSourceOutlet = needsZohoSwap ? transferOrder.toOutlet : transferOrder.fromOutlet;
+    const zohoDestinationOutlet = needsZohoSwap ? transferOrder.fromOutlet : transferOrder.toOutlet;
+    
+    console.log('📍 Getting Zoho location IDs...');
+    console.log(`   Original: ${transferOrder.fromOutlet} → ${transferOrder.toOutlet}`);
+    if (needsZohoSwap) {
+      console.log(`   🔄 Swapping for Zoho (Central Kitchen must be source): ${zohoSourceOutlet} → ${zohoDestinationOutlet}`);
+    }
+    
+    const fromLocationId = await getZohoLocationId(zohoSourceOutlet);
+    const toLocationId = await getZohoLocationId(zohoDestinationOutlet);
+    console.log('   From Location ID (Zoho Source):', fromLocationId);
+    console.log('   To Location ID (Zoho Destination):', toLocationId);
+    
+    if (!fromLocationId || !toLocationId) {
+      const errorMsg = `Missing Zoho location IDs: from=${fromLocationId || 'NOT FOUND'}, to=${toLocationId || 'NOT FOUND'}`;
+      console.error('❌', errorMsg);
+      console.error('   Please ensure LocationList is synced from Zoho');
+      throw new Error(errorMsg);
+    }
+    
+    // Map line items to Zoho format
+    console.log('📦 Mapping line items to Zoho format...');
+    const lineItems = [];
+    for (const item of transferOrder.items) {
+      console.log(`   Processing item: ${item.itemCode} (${item.itemName})`);
+      const zohoItemId = await getZohoItemId(item.itemCode);
+      console.log(`   Zoho Item ID: ${zohoItemId || 'NOT FOUND'}`);
+      
+      if (!zohoItemId) {
+        console.warn(`⚠️  Skipping item ${item.itemCode}: Zoho item ID not found in ItemList`);
+        console.warn(`   Please sync ItemList from Zoho or verify SKU: ${item.itemCode}`);
+        continue;
+      }
+      
+      // Extract unit from unitOfMeasure (e.g., "kg (Kilograms)" -> "kg")
+      const unit = item.unitOfMeasure ? item.unitOfMeasure.split(' ')[0] : 'pcs';
+      
+      // Keep zohoItemId as string to avoid precision loss with large numbers
+      // Zoho API accepts item_id as string or number, but string is safer for large IDs
+      const itemId = zohoItemId.toString();
+      
+      lineItems.push({
+        item_id: itemId,
+        name: item.itemName || item.itemCode,
+        description: item.notes || `${item.category || ''} ${item.subCategory || ''}`.trim() || '',
+        quantity_transfer: item.quantity,
+        unit: unit
+      });
+      console.log(`   ✅ Added item ${item.itemCode} to line items`);
+    }
+    
+    console.log(`📊 Total line items: ${lineItems.length} out of ${transferOrder.items.length}`);
+    
+    if (lineItems.length === 0) {
+      const errorMsg = 'No valid line items found with Zoho item IDs. Please sync ItemList from Zoho.';
+      console.error('❌', errorMsg);
+      throw new Error(errorMsg);
+    }
+    
+    // Format date as YYYY-MM-DD
+    const transferDate = new Date(transferOrder.transferDate);
+    const formattedDate = transferDate.toISOString().split('T')[0];
+    
+    // Prepare Zoho transfer order payload
+    // Note: Omitting transfer_order_number to let Zoho auto-generate it
+    // If you want to use a custom number, add ignore_auto_number_generation=true to the query string
+    const zohoPayload = {
+      // transfer_order_number: transferOrder.transferNumber, // Omitted - let Zoho generate
+      date: formattedDate,
+      from_location_id: fromLocationId,
+      to_location_id: toLocationId,
+      line_items: lineItems,
+      is_intransit_order: false
+    };
+    
+    console.log('📤 Sending transfer order to Zoho API...');
+    console.log('   Payload:', JSON.stringify(zohoPayload, null, 2));
+    console.log('   Note: transfer_order_number omitted - Zoho will auto-generate');
+    
+    // Make API call to Zoho
+    return new Promise((resolve, reject) => {
+      const postData = JSON.stringify(zohoPayload);
+      
+      const options = {
+        hostname: 'www.zohoapis.com',
+        port: 443,
+        path: `/inventory/v1/transferorders?organization_id=${organizationId}&ignore_auto_number_generation=false`,
+        method: 'POST',
+        headers: {
+          'Authorization': `Zoho-oauthtoken ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      };
+      
+      const req = https.request(options, (res) => {
+        let data = '';
+        
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        res.on('end', () => {
+          try {
+            const response = JSON.parse(data);
+            
+            console.log(`📥 Zoho API Response Status: ${res.statusCode}`);
+            console.log('📥 Zoho API Response:', JSON.stringify(response, null, 2));
+            
+            if ((res.statusCode === 200 || res.statusCode === 201) && response.code === 0) {
+              console.log('✅ Transfer order pushed to Zoho successfully:', response.transfer_order.transfer_order_id);
+              resolve({
+                success: true,
+                zohoTransferOrderId: response.transfer_order.transfer_order_id,
+                zohoTransferOrderNumber: response.transfer_order.transfer_order_number,
+                message: response.message
+              });
+            } else {
+              console.error('❌ Zoho API error:', response);
+              const errorMsg = response.message || response.error || 'Failed to create transfer order in Zoho';
+              console.error('   Error details:', JSON.stringify(response, null, 2));
+              reject(new Error(errorMsg));
+            }
+          } catch (error) {
+            console.error('❌ Error parsing Zoho response:', error);
+            console.error('Raw response:', data);
+            reject(error);
+          }
+        });
+      });
+      
+      req.on('error', (error) => {
+        console.error('❌ Request error:', error);
+        reject(error);
+      });
+      
+      req.write(postData);
+      req.end();
+    });
+  } catch (error) {
+    console.error('❌ Error pushing transfer order to Zoho:', error);
+    throw error;
+  }
+}
 
 // GET all transfer orders with pagination, search, and filtering
 router.get('/', async (req, res) => {
@@ -90,41 +352,59 @@ router.get('/', async (req, res) => {
 
     const result = await TransferOrder.paginate(query, options);
 
+    // Helper function to check if an outlet is Central Kitchen
+    const isCentralKitchen = (outletName) => {
+      if (!outletName) return false;
+      const normalized = outletName.toLowerCase().trim();
+      return normalized.includes('central kitchen') || normalized === 'central kitchen' || normalized === 'main central kitchen';
+    };
+
     // Transform data for frontend table
-    const transformedData = result.docs.map(order => ({
-      _id: order._id,
-      transferNumber: order.transferNumber,
-      fromOutlet: {
-        name: order.fromOutlet,
-        code: getOutletCode(order.fromOutlet),
-        type: getOutletType(order.fromOutlet),
-        location: getOutletLocation(order.fromOutlet)
-      },
-      toOutlet: {
-        name: order.toOutlet,
-        code: getOutletCode(order.toOutlet),
-        type: getOutletType(order.toOutlet),
-        location: getOutletLocation(order.toOutlet)
-      },
-      fromTo: `${order.fromOutlet} → ${order.toOutlet}`,
-      transferDate: order.transferDate.toISOString().split('T')[0],
-      status: order.status,
-      requestedBy: order.requestedBy,
-      totalAmount: order.totalAmount,
-      itemsCount: order.items.length,
-      priority: order.priority,
-      items: order.items, // Include the full items array for the modal
-      notes: order.notes,
-      approvedBy: order.approvedBy,
-      transferStartedAt: order.transferStartedAt,
-      transferCompletedAt: order.transferCompletedAt,
-      transferResults: order.transferResults,
-      isActive: order.isActive,
-      createdBy: order.createdBy,
-      updatedBy: order.updatedBy,
-      createdAt: order.createdAt,
-      updatedAt: order.updatedAt
-    }));
+    const transformedData = result.docs.map(order => {
+      // Check if this is an outlet-to-central-kitchen request (needs display swap)
+      const toIsCentralKitchen = isCentralKitchen(order.toOutlet);
+      const fromIsCentralKitchen = isCentralKitchen(order.fromOutlet);
+      const needsSwap = toIsCentralKitchen && !fromIsCentralKitchen;
+
+      // Determine display values (swapped if needed)
+      const displayFromOutlet = needsSwap ? order.toOutlet : order.fromOutlet;
+      const displayToOutlet = needsSwap ? order.fromOutlet : order.toOutlet;
+
+      return {
+        _id: order._id,
+        transferNumber: order.transferNumber,
+        fromOutlet: {
+          name: displayFromOutlet,
+          code: getOutletCode(displayFromOutlet),
+          type: getOutletType(displayFromOutlet),
+          location: getOutletLocation(displayFromOutlet)
+        },
+        toOutlet: {
+          name: displayToOutlet,
+          code: getOutletCode(displayToOutlet),
+          type: getOutletType(displayToOutlet),
+          location: getOutletLocation(displayToOutlet)
+        },
+        fromTo: `${displayFromOutlet} → ${displayToOutlet}`,
+        transferDate: order.transferDate.toISOString().split('T')[0],
+        status: order.status,
+        requestedBy: order.requestedBy,
+        totalAmount: order.totalAmount,
+        itemsCount: order.items.length,
+        priority: order.priority,
+        items: order.items, // Include the full items array for the modal
+        notes: order.notes,
+        approvedBy: order.approvedBy,
+        transferStartedAt: order.transferStartedAt,
+        transferCompletedAt: order.transferCompletedAt,
+        transferResults: order.transferResults,
+        isActive: order.isActive,
+        createdBy: order.createdBy,
+        updatedBy: order.updatedBy,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt
+      };
+    });
 
     res.json({
       success: true,
@@ -166,23 +446,39 @@ router.get('/:id', async (req, res) => {
       });
     }
 
+    // Helper function to check if an outlet is Central Kitchen
+    const isCentralKitchen = (outletName) => {
+      if (!outletName) return false;
+      const normalized = outletName.toLowerCase().trim();
+      return normalized.includes('central kitchen') || normalized === 'central kitchen' || normalized === 'main central kitchen';
+    };
+
+    // Check if this is an outlet-to-central-kitchen request (needs display swap)
+    const toIsCentralKitchen = isCentralKitchen(transferOrder.toOutlet);
+    const fromIsCentralKitchen = isCentralKitchen(transferOrder.fromOutlet);
+    const needsSwap = toIsCentralKitchen && !fromIsCentralKitchen;
+
+    // Determine display values (swapped if needed)
+    const displayFromOutlet = needsSwap ? transferOrder.toOutlet : transferOrder.fromOutlet;
+    const displayToOutlet = needsSwap ? transferOrder.fromOutlet : transferOrder.toOutlet;
+
     // Transform data to match the list endpoint structure
     const transformedData = {
       _id: transferOrder._id,
       transferNumber: transferOrder.transferNumber,
       fromOutlet: {
-        name: transferOrder.fromOutlet,
-        code: getOutletCode(transferOrder.fromOutlet),
-        type: getOutletType(transferOrder.fromOutlet),
-        location: getOutletLocation(transferOrder.fromOutlet)
+        name: displayFromOutlet,
+        code: getOutletCode(displayFromOutlet),
+        type: getOutletType(displayFromOutlet),
+        location: getOutletLocation(displayFromOutlet)
       },
       toOutlet: {
-        name: transferOrder.toOutlet,
-        code: getOutletCode(transferOrder.toOutlet),
-        type: getOutletType(transferOrder.toOutlet),
-        location: getOutletLocation(transferOrder.toOutlet)
+        name: displayToOutlet,
+        code: getOutletCode(displayToOutlet),
+        type: getOutletType(displayToOutlet),
+        location: getOutletLocation(displayToOutlet)
       },
-      fromTo: `${transferOrder.fromOutlet} → ${transferOrder.toOutlet}`,
+      fromTo: `${displayFromOutlet} → ${displayToOutlet}`,
       transferDate: transferOrder.transferDate.toISOString().split('T')[0],
       status: transferOrder.status,
       requestedBy: transferOrder.requestedBy,
@@ -270,6 +566,28 @@ router.post('/', async (req, res) => {
 
     const transferOrder = await TransferOrder.create(transferOrderData);
 
+    // Push transfer order to Zoho Inventory
+    let zohoPushResult = null;
+    try {
+      console.log(`🔄 Pushing transfer order ${transferOrder.transferNumber} to Zoho Inventory...`);
+      zohoPushResult = await pushTransferOrderToZoho(transferOrder);
+      console.log('✅ Transfer order pushed to Zoho successfully');
+      
+      // Optionally update the transfer order with Zoho details
+      if (zohoPushResult && zohoPushResult.zohoTransferOrderId) {
+        await TransferOrder.findByIdAndUpdate(transferOrder._id, {
+          $set: {
+            zohoTransferOrderId: zohoPushResult.zohoTransferOrderId,
+            zohoTransferOrderNumber: zohoPushResult.zohoTransferOrderNumber
+          }
+        });
+      }
+    } catch (zohoError) {
+      console.error('⚠️  Failed to push transfer order to Zoho:', zohoError.message);
+      // Don't fail the transfer order creation if Zoho push fails
+      // The order is still created locally
+    }
+
     // Send notification to Central Kitchen
     try {
       // Create more detailed notification message
@@ -306,8 +624,9 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Transfer Order created successfully',
-      data: transferOrder
+      message: 'Transfer Order created successfully' + (zohoPushResult ? ' and pushed to Zoho' : ''),
+      data: transferOrder,
+      zohoPush: zohoPushResult
     });
   } catch (error) {
     console.error('Error creating transfer order:', error);
