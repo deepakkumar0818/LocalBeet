@@ -12,6 +12,12 @@ interface SearchableDropdownProps {
   placeholder?: string
   disabled?: boolean
 }
+const fixedUnitOptions = [
+  'km (Kilometers)', 'lb (Pounds)', 'mg (Milli Grams)', 'ml (Milli Litre)',
+  'm (Meter)', 'pcs (Pieces)', 'pcs 6 (Pieces 6)', 'pcs 12 (Pieces 12)',
+  'No.s (Number)', 'ltr (Liter)', 'kg 2 (Kilograms2)', 'kg 5 (Kilograms 5)',
+  'kg 10 (Kilograms 10)', 'Pr (Portion)', 'kg (Kilograms)'
+];
 
 const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   value,
@@ -140,7 +146,6 @@ const AddBOM: React.FC = () => {
   const [submitting, setSubmitting] = useState(false)
 
   const statusOptions = ['Draft', 'Active', 'Obsolete']
-  const [unitOptions, setUnitOptions] = useState<string[]>([])
 
   // Load Central Kitchen raw materials for dropdown (fresh, full list)
   useEffect(() => {
@@ -166,7 +171,6 @@ const AddBOM: React.FC = () => {
             .map(m => (m.unitOfMeasure || '').toString().trim())
             .filter(u => u && u.length > 0)
         ))
-        setUnitOptions(units)
       } catch (err) {
         console.error('Failed to load central kitchen raw materials', err)
       }
@@ -383,7 +387,7 @@ const AddBOM: React.FC = () => {
       materialCode: '',
       materialName: '',
       quantity: 0,
-      unitOfMeasure: unitOptions[0] || '',
+      unitOfMeasure: fixedUnitOptions[0] || '',
       unitCost: 0,
       totalCost: 0
     }
@@ -604,9 +608,9 @@ const AddBOM: React.FC = () => {
                       value={item.unitOfMeasure}
                       onChange={(e) => updateBOMItem(index, 'unitOfMeasure', e.target.value)}
                     >
-                      {unitOptions.map(u => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
+                     {fixedUnitOptions.map(u => (
+  <option key={u} value={u}>{u}</option>
+))}
                     </select>
                   </div>
                   <div>

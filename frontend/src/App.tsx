@@ -41,6 +41,8 @@ import SalesOrders from './pages/SalesOrders'
 import AddSalesOrder from './pages/AddSalesOrder'
 import POSCreateOrder from './pages/POSCreateOrder'
 import Settings from './pages/Settings'
+import ItemsList from './pages/ItemsList'
+import LocationsList from './pages/LocationsList'
 import KuwaitCityRequestRawMaterials from './pages/KuwaitCityRequestRawMaterials'
 import KuwaitCityRequestFinishedGoods from './pages/KuwaitCityRequestFinishedGoods'
 import Mall360RequestRawMaterials from './pages/Mall360RequestRawMaterials'
@@ -90,6 +92,8 @@ function App() {
         <Route path="/purchase-orders" element={<PurchaseOrders />} />
         <Route path="/purchase-orders/add" element={<AddPurchaseOrder />} />
         <Route path="/purchase-orders/edit/:id" element={<EditPurchaseOrder />} />
+        <Route path="/items-list" element={<ItemsList />} />
+        <Route path="/locations-list" element={<LocationsList />} />
         <Route path="/good-receipt-notes" element={<GoodReceiptNotes />} />
         <Route path="/good-receipt-notes/add" element={<AddGRN />} />
         <Route path="/good-receipt-notes/edit/:id" element={<EditGRN />} />

@@ -19,10 +19,10 @@ class ApiService {
     // Don't set Content-Type for FormData, let the browser set it with boundary
     const isFormData = options.body instanceof FormData;
     const token = localStorage.getItem('auth_token');
-    const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
-    const headers = isFormData 
-      ? { ...authHeader, ...options.headers } 
-      : { 'Content-Type': 'application/json', ...authHeader, ...options.headers };
+    const headers: Record<string, string> = {};
+    if (!isFormData) headers['Content-Type'] = 'application/json';
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (options.headers) Object.assign(headers, options.headers as any);
     
     const config: RequestInit = {
       headers,
@@ -228,6 +228,40 @@ class ApiService {
         pages: number;
       };
     }>(endpoint);
+  }
+
+  // Items List API
+  async getItemsList(params?: { page?: number; limit?: number; search?: string }) {
+    const qp = new URLSearchParams();
+    if (params?.page) qp.append('page', String(params.page));
+    if (params?.limit) qp.append('limit', String(params.limit));
+    if (params?.search) qp.append('search', params.search);
+    const qs = qp.toString();
+    return this.request<{ success: boolean; data: any[]; pagination?: any }>(`/items-list${qs ? `?${qs}` : ''}`);
+  }
+
+  async syncItemsListFromZoho() {
+    return this.request<{ success: boolean; message: string; summary: { total: number; created: number; updated: number; skipped: number } }>(
+      '/items-list/sync',
+      { method: 'POST' }
+    );
+  }
+
+  // Locations List API
+  async getLocationsList(params?: { page?: number; limit?: number; search?: string }) {
+    const qp = new URLSearchParams();
+    if (params?.page) qp.append('page', String(params.page));
+    if (params?.limit) qp.append('limit', String(params.limit));
+    if (params?.search) qp.append('search', params.search);
+    const qs = qp.toString();
+    return this.request<{ success: boolean; data: any[]; pagination?: any }>(`/locations-list${qs ? `?${qs}` : ''}`);
+  }
+
+  async syncLocationsFromZoho() {
+    return this.request<{ success: boolean; message: string; summary: { total: number; created: number; updated: number } }>(
+      '/locations-list/sync',
+      { method: 'POST' }
+    );
   }
 
   async createCentralKitchenRawMaterial(data: {
@@ -1709,37 +1743,7 @@ class ApiService {
     });
   }
 
-  // Make Finished Good - Deduct raw materials and add finished goods
-  async makeFinishedGood(data: {
-    productCode: string;
-    productName: string;
-    quantity: number;
-    bomCode: string;
-    notes?: string;
-  }) {
-    return this.request<{
-      success: boolean;
-      message: string;
-      data: {
-        productionId: string;
-        rawMaterialsConsumed: Array<{
-          materialCode: string;
-          materialName: string;
-          quantityConsumed: number;
-          remainingStock: number;
-        }>;
-        finishedGoodProduced: {
-          productCode: string;
-          productName: string;
-          quantityProduced: number;
-          newStock: number;
-        };
-      };
-    }>('/central-kitchen/make-finished-good', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  }
+  
 
   // Import Central Kitchen Raw Materials from Excel
   async importCentralKitchenExcel(file: File) {

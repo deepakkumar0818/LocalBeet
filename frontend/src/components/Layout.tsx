@@ -19,8 +19,9 @@ import {
   ChevronDown,
   ChevronRight,
   Utensils,
-  Database
+  
 } from 'lucide-react'
+// Removed unused imports
 
 interface LayoutProps {
   children: React.ReactNode
@@ -37,6 +38,8 @@ interface NavigationItem {
 const baseNavigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Recipe Master', href: '/bill-of-materials', icon: FileText },
+  { name: 'Items List', href: '/items-list', icon: Package },
+  { name: 'All Locations', href: '/locations-list', icon: Store },
   // { name: 'Job Orders', href: '/job-orders', icon: ClipboardList },
   // { name: 'Ingredient Forecast', href: '/raw-material-forecast', icon: TrendingUp },
   // { name: 'Good Receipt Notes', href: '/good-receipt-notes', icon: Receipt },
