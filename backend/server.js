@@ -81,6 +81,8 @@ app.use('/api/transfers', require('./routes/transfers'));
 app.use('/api/transfer-orders', require('./routes/transferOrders'));
 app.use('/api/transfer-order-inventory', require('./routes/transferOrderInventory'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/items-list', require('./routes/itemsList'));
+app.use('/api/locations-list', require('./routes/locationsList'));
 
 // Health check
 app.get('/api/health', (req, res) => {
