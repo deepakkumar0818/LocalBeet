@@ -7,7 +7,16 @@ const Mall360FinishedProductSchema = new mongoose.Schema({
   salesDescription: { type: String, trim: true },
   category: { type: String, required: true, trim: true }, // e.g., COLD DRINKS, GATHERING
   subCategory: { type: String, trim: true },
-  unitOfMeasure: { type: String, required: true, trim: true }, // e.g., piece, serving
+  unitOfMeasure: {
+    type: String,
+    required: true,
+    trim: true,
+    enum: [
+      'box', 'cm', 'dz', 'ft', 'g', 'in', 'kg', 'km', 'lb', 'mg', 'ml', 'm',
+      'pcs', 'pcs 6', 'pcs 12', 'No.s', 'ltr', 'kg 2', 'kg 5', 'kg 10', 'Pr'
+    ],
+    default: 'pcs'
+  }, // e.g., piece, serving
   unitPrice: { type: Number, required: true, min: 0 },
   costPrice: { type: Number, default: 0, min: 0 },
   currentStock: { type: Number, default: 0, min: 0 },

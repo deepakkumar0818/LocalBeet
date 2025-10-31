@@ -80,8 +80,12 @@ const CentralKitchenFinishedProductSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    enum: ['piece', 'kg', 'ltr', 'ml', 'g', 'box', 'pack', 'serving'],
-    default: 'piece'
+    // Updated to match the provided unit list for Central Kitchen
+    enum: [
+      'box', 'cm', 'dz', 'ft', 'g', 'in', 'kg', 'km', 'lb', 'mg', 'ml', 'm',
+      'pcs', 'pcs 6', 'pcs 12', 'No.s', 'ltr', 'kg 2', 'kg 5', 'kg 10', 'Pr'
+    ],
+    default: 'pcs'
   },
   
   // From your sample data: Status (Active)

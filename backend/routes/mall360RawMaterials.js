@@ -3,6 +3,7 @@ const router = express.Router();
 const connectMall360DB = require('../config/mall360DB');
 const { getMall360Models, initializeMall360Models } = require('../models/mall360Models');
 const XLSX = require('xlsx');
+const multer = require('multer');
 
 let Mall360RawMaterial;
 
@@ -28,6 +29,127 @@ router.use(async (req, res, next) => {
     }
   }
   next();
+});
+
+// Configure multer for Excel upload (memory storage)
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    if (
+      file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      file.mimetype === 'application/vnd.ms-excel' ||
+      file.originalname.endsWith('.xlsx') ||
+      file.originalname.endsWith('.xls')
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only Excel files (.xlsx, .xls) are allowed'));
+    }
+  },
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+// POST /api/mall360/raw-materials/import-excel - Import raw materials from Excel
+router.post('/import-excel', upload.single('excelFile'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No Excel file uploaded' });
+    }
+
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    if (jsonData.length < 2) {
+      return res.status(400).json({ success: false, message: 'Excel must have header and data rows' });
+    }
+
+    const headers = jsonData[0];
+    const rows = jsonData.slice(1);
+
+    const headerMap = {
+      'SKU': 'materialCode',
+      'Material Code': 'materialCode',
+      'Item Name': 'materialName',
+      'Material Name': 'materialName',
+      'Parent Category': 'category',
+      'Category': 'category',
+      'SubCategory Name': 'subCategory',
+      'Sub Category': 'subCategory',
+      'Unit': 'unitOfMeasure',
+      'Unit Name': 'unitOfMeasure',
+      'Unit of Measure': 'unitOfMeasure',
+      'Default Purchase Unit Name': 'unitOfMeasure',
+      'Unit Price': 'unitPrice',
+      'Price': 'unitPrice',
+      'Quantity': 'currentStock',
+      'Current Stock': 'currentStock',
+      'Current Quantity': 'currentStock',
+      'Qty': 'currentStock',
+      'Qty On Hand': 'currentStock',
+      'Quantity On Hand': 'currentStock',
+      'On Hand Qty': 'currentStock',
+      'Available Quantity': 'currentStock',
+      'Available Qty': 'currentStock'
+    };
+
+    const columnIndices = {};
+    headers.forEach((h, i) => {
+      const key = h?.toString().trim();
+      if (key && headerMap[key]) columnIndices[headerMap[key]] = i;
+    });
+
+    const results = { totalProcessed: 0, created: 0, updated: 0, skipped: 0, errors: 0, errorDetails: [] };
+
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r];
+      try {
+        const materialCode = row[columnIndices.materialCode]?.toString().trim();
+        const materialName = row[columnIndices.materialName]?.toString().trim();
+        if (!materialCode || !materialName) { results.skipped++; continue; }
+
+        const payload = {
+          materialCode,
+          materialName,
+          category: row[columnIndices.category]?.toString().trim() || 'Raw Materials',
+          subCategory: row[columnIndices.subCategory]?.toString().trim() || 'General',
+          unitOfMeasure: row[columnIndices.unitOfMeasure]?.toString().trim() || 'kg',
+          unitPrice: columnIndices.unitPrice !== undefined ? parseFloat(row[columnIndices.unitPrice]) || 0 : 0,
+          currentStock: columnIndices.currentStock !== undefined ? parseFloat(row[columnIndices.currentStock]) || 0 : 0,
+          createdBy: 'System Import',
+          updatedBy: 'System Import',
+          isActive: true
+        };
+
+        const existing = await Mall360RawMaterial.findOne({ materialCode });
+        if (existing) {
+          await Mall360RawMaterial.findByIdAndUpdate(existing._id, {
+            materialName: payload.materialName,
+            category: payload.category,
+            subCategory: payload.subCategory,
+            unitOfMeasure: payload.unitOfMeasure,
+            unitPrice: payload.unitPrice,
+            currentStock: payload.currentStock,
+            updatedBy: 'System Import'
+          }, { new: true, runValidators: true });
+          results.updated++;
+        } else {
+          await Mall360RawMaterial.create(payload);
+          results.created++;
+        }
+        results.totalProcessed++;
+      } catch (e) {
+        results.errors++;
+        results.errorDetails.push(`Row ${r + 2}: ${e.message}`);
+      }
+    }
+
+    res.json({ success: true, message: 'Import completed', data: results });
+  } catch (error) {
+    console.error('Error importing 360 Mall raw materials:', error);
+    res.status(500).json({ success: false, message: 'Error importing raw materials', error: error.message });
+  }
 });
 
 // GET all raw materials
