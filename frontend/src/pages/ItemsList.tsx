@@ -27,8 +27,11 @@ const ItemsList: React.FC = () => {
       setLoading(true)
       const res = await apiService.getItemsList({ page, limit, search })
       if (res.success) {
-        setItems(res.data as ItemRow[])
-        setTotal((res as any)?.pagination?.total || 0)
+        const payload: any = res.data || {}
+        const rows = payload.data || []
+        const pagination = payload.pagination || {}
+        setItems(rows as ItemRow[])
+        setTotal(Number(pagination.total || 0))
       }
     } finally {
       setLoading(false)
@@ -42,7 +45,8 @@ const ItemsList: React.FC = () => {
       setSyncing(true)
       const res = await apiService.syncItemsListFromZoho()
       await load()
-      alert(`Synced. Total: ${res.summary.total}, Created: ${res.summary.created}, Updated: ${res.summary.updated}, Skipped: ${res.summary.skipped}`)
+      const summary = (res.data as any)?.summary || (res as any)?.summary || {}
+      alert(`Synced. Total: ${summary.total ?? 0}, Created: ${summary.created ?? 0}, Updated: ${summary.updated ?? 0}, Skipped: ${summary.skipped ?? 0}`)
     } catch (e: any) {
       alert(`Sync failed: ${e?.message || 'Unknown error'}`)
     } finally {

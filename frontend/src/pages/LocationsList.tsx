@@ -13,7 +13,10 @@ const LocationsList: React.FC = () => {
     setLoading(true)
     try {
       const res = await apiService.getLocationsList({ limit: 200 })
-      if (res.success) setRows(res.data as LocationRow[])
+      if (res.success) {
+        const payload: any = res.data || {}
+        setRows((payload.data as LocationRow[]) || [])
+      }
     } finally {
       setLoading(false)
     }

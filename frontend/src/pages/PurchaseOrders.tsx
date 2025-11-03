@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Search, Filter, Download, RefreshCw, Package, MapPin, User, DollarSign, Hash, Calendar, AlertCircle } from 'lucide-react'
 import { apiService } from '../services/api'
 
@@ -28,7 +27,7 @@ interface PurchaseOrder {
 }
 
 const PurchaseOrders: React.FC = () => {
-  const navigate = useNavigate()
+  // const navigate = useNavigate()
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -65,7 +64,8 @@ const PurchaseOrders: React.FC = () => {
 
       if (response.success) {
         console.log('Loaded Purchase Orders:', response.data)
-        setPurchaseOrders(response.data)
+        const list = (response.data as any)?.data || []
+        setPurchaseOrders(list as PurchaseOrder[])
       } else {
         setError('Failed to load purchase orders')
       }
@@ -89,7 +89,12 @@ const PurchaseOrders: React.FC = () => {
       const response = await apiService.syncZohoBillsToPurchaseOrders()
       
       if (response.success) {
-        const { totalBills, addedOrders, updatedOrders, errorCount, processingResult } = response.data
+        const summary: any = response.data as any
+        const totalBills = summary?.totalBills ?? 0
+        const addedOrders = summary?.addedOrders ?? 0
+        const updatedOrders = summary?.updatedOrders ?? 0
+        const errorCount = summary?.errorCount ?? 0
+        const processingResult = summary?.processingResult
         let message = `✅ Sync Completed Successfully!\n\n` +
           `📦 Total Bills: ${totalBills}\n` +
           `➕ Added: ${addedOrders}\n` +
@@ -119,17 +124,7 @@ const PurchaseOrders: React.FC = () => {
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Completed': return 'bg-green-100 text-green-800 border-green-200'
-      case 'Confirmed': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'Sent': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'Partial': return 'bg-orange-100 text-orange-800 border-orange-200'
-      case 'Draft': return 'bg-gray-100 text-gray-800 border-gray-200'
-      case 'Cancelled': return 'bg-red-100 text-red-800 border-red-200'
-      default: return 'bg-gray-100 text-gray-800 border-gray-200'
-    }
-  }
+  // Status color helper retained if needed for future label chips
 
   const getSyncStatusColor = (syncStatus: string) => {
     switch (syncStatus) {

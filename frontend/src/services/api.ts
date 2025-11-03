@@ -4,6 +4,8 @@ interface ApiResponse<T> {
   data: T;
   message?: string;
   error?: string;
+  pagination?: any;
+  [key: string]: any;
 }
 
 class ApiService {
@@ -95,16 +97,7 @@ class ApiService {
     const queryString = queryParams.toString();
     const endpoint = `/raw-materials${queryString ? `?${queryString}` : ''}`;
     
-    return this.request<{
-      success: boolean;
-      data: any[];
-      pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
-      };
-    }>(endpoint);
+    return this.request<any[]>(endpoint);
   }
 
   async createRawMaterial(data: any) {
@@ -185,16 +178,7 @@ class ApiService {
     const queryString = queryParams.toString();
     const endpoint = `/central-kitchen/raw-materials${queryString ? `?${queryString}` : ''}`;
     
-    return this.request<{
-      success: boolean;
-      data: any[];
-      pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
-      };
-    }>(endpoint);
+    return this.request<any[]>(endpoint);
   }
 
   async getCentralKitchenFinishedProducts(params?: {
@@ -1163,11 +1147,11 @@ class ApiService {
   }
 
   // Additional common methods that might be missing
-  async getOutlets() {
+  async getOutlets(_params?: any) {
     return this.request<{
       success: boolean;
       data: any[];
-    }>('/outlets');
+    }>(`/outlets`);
   }
 
   async getFinishedGoods(params?: {
@@ -1814,6 +1798,95 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(data)
     });
+  }
+
+  async getJobOrders(params?: { page?: number; limit?: number; search?: string; status?: string; sortBy?: string; sortOrder?: string; }) {
+    const qp = new URLSearchParams();
+    if (params?.page) qp.append('page', String(params.page));
+    if (params?.limit) qp.append('limit', String(params.limit));
+    if (params?.search) qp.append('search', params.search);
+    if (params?.status) qp.append('status', params.status);
+    if (params?.sortBy) qp.append('sortBy', params.sortBy);
+    if (params?.sortOrder) qp.append('sortOrder', params.sortOrder);
+    const qs = qp.toString();
+    return this.request<{ success: boolean; data: any[]; pagination?: any }>(`/job-orders${qs ? `?${qs}` : ''}`);
+  }
+
+  async getJobOrder(id: string) {
+    return this.request<{ success: boolean; data: any }>(`/job-orders/${id}`);
+  }
+
+  async createJobOrder(data: any) {
+    return this.request<{ success: boolean; message: string; data: any }>(`/job-orders`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateJobOrder(id: string, data: any) {
+    return this.request<{ success: boolean; message: string; data: any }>(`/job-orders/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteJobOrder(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/job-orders/${id}`, { method: 'DELETE' });
+  }
+
+  async createOutlet(data: any) {
+    return this.request<{ success: boolean; message: string; data: any }>(`/outlets`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async getOutlet(id: string) {
+    return this.request<{ success: boolean; data: any }>(`/outlets/${id}`);
+  }
+
+  async updateOutlet(id: string, data: any) {
+    return this.request<{ success: boolean; message: string; data: any }>(`/outlets/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteOutlet(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/outlets/${id}`, { method: 'DELETE' });
+  }
+
+  async getRawMaterial(id: string) {
+    return this.request<{ success: boolean; data: any }>(`/raw-materials/${id}`);
+  }
+
+  async getRawMaterialForecasts(params?: { page?: number; limit?: number; search?: string; status?: string; sortBy?: string; sortOrder?: string; }) {
+    const qp = new URLSearchParams();
+    if (params?.page) qp.append('page', String(params.page));
+    if (params?.limit) qp.append('limit', String(params.limit));
+    if (params?.search) qp.append('search', params.search);
+    if (params?.status) qp.append('status', params.status);
+    if (params?.sortBy) qp.append('sortBy', params.sortBy);
+    if (params?.sortOrder) qp.append('sortOrder', params.sortOrder);
+    const qs = qp.toString();
+    return this.request<{ success: boolean; data: any[]; pagination?: any }>(`/raw-material-forecasts${qs ? `?${qs}` : ''}`);
+  }
+
+  async createRawMaterialForecast(data: any) {
+    return this.request<{ success: boolean; message: string; data: any }>(`/raw-material-forecasts`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async deleteRawMaterialForecast(id: string) {
+    return this.request<{ success: boolean; message: string }>(`/raw-material-forecasts/${id}`, { method: 'DELETE' });
+  }
+
+  async createCentralKitchenInventoryItem(data: any) {
+    return this.request<{ success: boolean; message: string; data: any }>(`/central-kitchen/raw-materials`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateCentralKitchenRawMaterial(id: string, data: any) {
+    return this.request<{ success: boolean; message: string; data: any }>(`/central-kitchen/raw-materials/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  // Aliases for outlet finished goods, use generic finished goods endpoints if specialized ones are absent
+  async getOutletFinishedGoods(params?: { page?: number; limit?: number; search?: string; subCategory?: string; status?: string; sortBy?: string; sortOrder?: string; }) {
+    return this.getFinishedGoods(params);
+  }
+
+  async updateTaibaKitchenRawMaterial(id: string, data: any) {
+    return this.request<{ success: boolean; message: string; data: any }>(`/taiba-kitchen/raw-materials/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async updateTaibaKitchenFinishedProduct(id: string, data: any) {
+    return this.request<{ success: boolean; message: string; data: any }>(`/taiba-kitchen/finished-products/${id}`, { method: 'PUT', body: JSON.stringify(data) });
   }
 }
 
