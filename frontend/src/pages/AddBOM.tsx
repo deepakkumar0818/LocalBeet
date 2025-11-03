@@ -227,28 +227,134 @@ const AddBOM: React.FC = () => {
     )
   }
 
+  // Function to match material unit to fixed unit options
+  const matchUnitToFixedOptions = (materialUnit: string): string => {
+    if (!materialUnit) return fixedUnitOptions[0] || ''
+    
+    const unitLower = materialUnit.toLowerCase().trim()
+    
+    // First try exact match
+    const exactMatch = fixedUnitOptions.find(opt => 
+      opt.toLowerCase().trim() === unitLower
+    )
+    if (exactMatch) return exactMatch
+    
+    // Try matching by extracting base unit, prioritizing simple units (without numbers)
+    // Extract base unit from material (e.g., "kg" from "kg")
+    const materialBaseUnit = unitLower
+    
+    // First, find all options where base unit matches
+    const matchingOptions = fixedUnitOptions.filter(opt => {
+      const optionBaseUnit = opt.split(' ')[0].toLowerCase().trim()
+      return optionBaseUnit === materialBaseUnit
+    })
+    
+    if (matchingOptions.length > 0) {
+      // Prioritize options without numbers in the base unit part
+      // Check if base unit is exactly the material unit (not "kg 2", "kg 5", etc.)
+      const exactBaseMatch = matchingOptions.find(opt => {
+        const parts = opt.split(' ')
+        const baseUnitPart = parts[0].toLowerCase().trim()
+        // Check if base unit part matches exactly AND second part doesn't start with a number
+        // Example: "kg (Kilograms)" - parts[1] is "(Kilograms)" - good
+        // Example: "kg 2 (Kilograms2)" - parts[1] is "2" - not good
+        if (baseUnitPart === materialBaseUnit && parts.length > 1) {
+          const secondPart = parts[1].toLowerCase().trim()
+          // If second part starts with a number, skip it (e.g., "2", "5", "10")
+          if (/^\d/.test(secondPart)) {
+            return false
+          }
+        }
+        return baseUnitPart === materialBaseUnit
+      })
+      
+      if (exactBaseMatch) {
+        return exactBaseMatch
+      }
+      
+      // If no exact match without numbers, return the first matching option
+      return matchingOptions[0]
+    }
+    
+    // Try partial match as last resort
+    const partialMatch = fixedUnitOptions.find(opt => 
+      opt.toLowerCase().includes(unitLower) || unitLower.includes(opt.split(' ')[0].toLowerCase())
+    )
+    if (partialMatch) return partialMatch
+    
+    // If no match found, return the first option as default
+    return fixedUnitOptions[0] || materialUnit
+  }
+
   const computeUnitCost = (
     material: RawMaterial | undefined,
     targetUnit: AllowedUnit
   ): number => {
     if (!material) return 0
-    const sourceUnit = (material.unitOfMeasure || '').toString().trim().toLowerCase()
-    const target = (targetUnit || '').toString().trim().toLowerCase()
+    
     const price = Number(material.unitPrice || 0)
     if (price <= 0) return 0
-
-    // If units match exactly, use material price
-    if (sourceUnit && sourceUnit === target) return price
-
+    
+    // Extract base unit from material (e.g., "kg" from "kg")
+    const sourceUnit = (material.unitOfMeasure || '').toString().trim().toLowerCase()
+    
+    // Extract base unit from target (e.g., "kg" from "kg (Kilograms)" or "ltr" from "ltr (Liter)")
+    const targetUnitStr = (targetUnit || '').toString().trim().toLowerCase()
+    // Extract base unit by taking the first word before space or parenthesis
+    const targetBaseUnit = targetUnitStr.split(' ')[0].split('(')[0].trim()
+    
+    // Compare base units (e.g., "kg" === "kg")
+    if (sourceUnit === targetBaseUnit) {
+      return price
+    }
+    
+    // Try exact match with full target unit (for backwards compatibility)
+    if (sourceUnit === targetUnitStr) {
+      return price
+    }
+    
+    // Handle unit variations (e.g., "kilogram" vs "kg", "piece" vs "pcs")
+    const unitVariations: Record<string, string[]> = {
+      'kg': ['kilogram', 'kilograms', 'kg'],
+      'pcs': ['piece', 'pieces', 'pcs'],
+      'g': ['gram', 'grams', 'g'],
+      'ltr': ['liter', 'litre', 'liters', 'litres', 'ltr', 'l'],
+      'ml': ['milliliter', 'millilitre', 'milliliters', 'millilitres', 'ml'],
+      'm': ['meter', 'metre', 'meters', 'metres', 'm'],
+      'cm': ['centimeter', 'centimetre', 'centimeters', 'centimetres', 'cm'],
+      'in': ['inch', 'inches', 'in'],
+      'ft': ['foot', 'feet', 'ft'],
+      'box': ['box', 'boxes'],
+      'dz': ['dozen', 'dz'],
+      'pr': ['portion', 'portions', 'pr']
+    }
+    
+    // Check if source and target belong to the same unit family
+    for (const [baseUnit, variations] of Object.entries(unitVariations)) {
+      const sourceInFamily = variations.some(v => v.toLowerCase() === sourceUnit)
+      const targetInFamily = variations.some(v => v.toLowerCase() === targetBaseUnit)
+      
+      if (sourceInFamily && targetInFamily) {
+        // Same unit family, use material price directly
+        return price
+      }
+    }
+    
     // Basic mass conversions
-    if (sourceUnit === 'kg' && target === 'grams') return price / 1000
-    if (sourceUnit === 'grams' && target === 'kg') return price * 1000
-
-    // Basic volume identity
-    if (sourceUnit === 'ml' && target === 'ml') return price
-
-    // Otherwise, no conversion available
-    return 0
+    if (sourceUnit === 'kg' && targetBaseUnit === 'g') return price / 1000
+    if (sourceUnit === 'g' && targetBaseUnit === 'kg') return price * 1000
+    if (sourceUnit === 'kg' && targetBaseUnit === 'grams') return price / 1000
+    if (sourceUnit === 'grams' && targetBaseUnit === 'kg') return price * 1000
+    
+    // Basic volume conversions
+    if (sourceUnit === 'ltr' && targetBaseUnit === 'ml') return price / 1000
+    if (sourceUnit === 'ml' && targetBaseUnit === 'ltr') return price * 1000
+    if (sourceUnit === 'liter' && targetBaseUnit === 'ml') return price / 1000
+    if (sourceUnit === 'ml' && targetBaseUnit === 'liter') return price * 1000
+    
+    // If no conversion available, but material has a price, use it anyway
+    // This handles cases where unit formats differ slightly but represent the same unit
+    return price
   }
 
   const validateForm = () => {
@@ -400,12 +506,32 @@ const AddBOM: React.FC = () => {
       items: prev.items.map((item, i) => {
         if (i === index) {
           const updatedItem = { ...item, [field]: value }
+          
           // Recompute costs when quantity, unit, or material changes
-          const material = findMaterial(updatedItem.materialCode || updatedItem.materialId)
-          const unit = (updatedItem.unitOfMeasure || 'grams') as AllowedUnit
-          const unitCost = computeUnitCost(material, unit)
+          // Find material using materialCode (preferred) or materialId
+          const materialCodeToFind = updatedItem.materialCode || updatedItem.materialId || ''
+          const material = findMaterial(materialCodeToFind)
+          
+          // Get the unit from updated item
+          const unit = (updatedItem.unitOfMeasure || '') as AllowedUnit
+          
+          // Calculate unit cost if we have both material and unit
+          let unitCost = 0
+          if (material && unit) {
+            unitCost = computeUnitCost(material, unit)
+            // Debug logging (can be removed in production)
+            if (unitCost === 0 && material.unitPrice && material.unitPrice > 0) {
+              console.log('Unit cost calculation debug:', {
+                materialCode: material.materialCode,
+                materialUnit: material.unitOfMeasure,
+                selectedUnit: unit,
+                materialPrice: material.unitPrice
+              })
+            }
+          }
+          
           updatedItem.unitCost = unitCost
-          updatedItem.totalCost = (updatedItem.quantity || 0) * unitCost
+          updatedItem.totalCost = Math.round(((updatedItem.quantity || 0) * unitCost) * 100) / 100
           return updatedItem
         }
         return item
@@ -564,15 +690,23 @@ const AddBOM: React.FC = () => {
                       value={item.materialCode}
                       onChange={(value) => {
                         const mat = findMaterial(value)
-                        updateBOMItem(index, 'materialCode', value)
-                        updateBOMItem(index, 'materialName', mat?.materialName || '')
-                        updateBOMItem(index, 'materialId', mat?.id || '')
                         if (mat) {
-                          // Auto-fill unit to material's unit and price
-                          updateBOMItem(index, 'unitOfMeasure', (mat.unitOfMeasure || '').toString())
-                          const unit = (mat.unitOfMeasure || '').toString()
-                          const price = computeUnitCost(mat, unit)
-                          updateBOMItem(index, 'unitCost', price)
+                          // Auto-fill unit to material's unit - match to fixed options format
+                          const materialUnit = (mat.unitOfMeasure || '').toString()
+                          const matchedUnit = matchUnitToFixedOptions(materialUnit)
+                          
+                          // Update material code, name, id, and unit together
+                          // This will trigger updateBOMItem which will calculate unitCost automatically
+                          updateBOMItem(index, 'materialCode', value)
+                          updateBOMItem(index, 'materialName', mat.materialName || '')
+                          updateBOMItem(index, 'materialId', mat.id || '')
+                          updateBOMItem(index, 'unitOfMeasure', matchedUnit)
+                          // unitCost will be calculated automatically in updateBOMItem function
+                        } else {
+                          // Clear fields if material not found
+                          updateBOMItem(index, 'materialCode', value)
+                          updateBOMItem(index, 'materialName', '')
+                          updateBOMItem(index, 'materialId', '')
                         }
                       }}
                       placeholder="Select material"
