@@ -64,7 +64,8 @@ const PurchaseOrders: React.FC = () => {
 
       if (response.success) {
         console.log('Loaded Purchase Orders:', response.data)
-        const list = (response.data as any)?.data || []
+        // API returns the array directly in response.data
+        const list = (response.data as any[]) || []
         setPurchaseOrders(list as PurchaseOrder[])
       } else {
         setError('Failed to load purchase orders')
