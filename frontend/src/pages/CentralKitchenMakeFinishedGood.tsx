@@ -514,12 +514,16 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {selectedBOM.items.map((item, index) => (
                         <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.materialCode}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.materialName}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.quantity}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.unitOfMeasure}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.unitCost.toFixed(2)} KWD</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.totalCost.toFixed(2)} KWD</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.materialCode || '-'}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.materialName || '-'}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.quantity || 0}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.unitOfMeasure || '-'}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                            {(item.unitCost || 0) > 0 ? (item.unitCost || 0).toFixed(2) + ' KWD' : '0.00 KWD'}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                            {(item.totalCost || 0) > 0 ? (item.totalCost || 0).toFixed(2) + ' KWD' : '0.00 KWD'}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -701,20 +705,6 @@ const CentralKitchenMakeFinishedGood: React.FC = () => {
           </div>
         )}
 
-        {productionItems.length === 0 && (
-          <div className="text-center py-8">
-            <Utensils className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Production Items</h3>
-            <p className="text-gray-600 mb-4">Add items to start a production batch</p>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="btn-primary flex items-center mx-auto"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add First Item
-            </button>
-          </div>
-        )}
       </div>
     </div>
   )
