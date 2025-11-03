@@ -79,6 +79,8 @@ const TransferOrderModal: React.FC<TransferOrderModalProps> = ({
     }
   }
 
+  const isPending = transferOrder.status === 'Pending'
+
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -127,6 +129,16 @@ const TransferOrderModal: React.FC<TransferOrderModalProps> = ({
         {/* Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-200px)]">
           <div className="p-6 space-y-6">
+            {/* Status Banner */}
+            <div className={`p-3 rounded-md border ${
+              isPending
+                ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                : transferOrder.status === 'Approved'
+                ? 'bg-green-50 border-green-200 text-green-800'
+                : 'bg-red-50 border-red-200 text-red-800'
+            }`}>
+              Status: {transferOrder.status}
+            </div>
             {/* Order Summary */}
             <div className="grid grid-cols-1 gap-6">
               {/* From Outlet */}
@@ -284,9 +296,9 @@ const TransferOrderModal: React.FC<TransferOrderModalProps> = ({
                 onReject(transferOrderId)
               }}
               className="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors disabled:opacity-50"
-              disabled={loading}
+              disabled={loading || !isPending}
             >
-              {loading ? 'Processing...' : 'Reject Order'}
+              {isPending ? (loading ? 'Processing...' : 'Reject Order') : 'Rejected'}
             </button>
             <button
               onClick={() => {
@@ -298,9 +310,9 @@ const TransferOrderModal: React.FC<TransferOrderModalProps> = ({
                 onAccept(transferOrderId)
               }}
               className="px-4 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors disabled:opacity-50"
-              disabled={loading}
+              disabled={loading || !isPending}
             >
-              {loading ? 'Processing...' : 'Accept Order'}
+              {isPending ? (loading ? 'Processing...' : 'Accept Order') : 'Approved'}
             </button>
           </div>
         </div>

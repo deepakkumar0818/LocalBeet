@@ -287,9 +287,12 @@ class ApiService {
     
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: (() => {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        return headers;
+      })(),
     });
 
     if (!response.ok) {
@@ -325,9 +328,12 @@ class ApiService {
     
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: (() => {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        return headers;
+      })(),
     });
 
     if (!response.ok) {
@@ -502,9 +508,12 @@ class ApiService {
     
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: (() => {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        return headers;
+      })(),
     });
 
     if (!response.ok) {
@@ -540,9 +549,12 @@ class ApiService {
     
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: (() => {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        return headers;
+      })(),
     });
 
     if (!response.ok) {
@@ -576,9 +588,12 @@ class ApiService {
     
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: (() => {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        return headers;
+      })(),
     });
 
     if (!response.ok) {
@@ -614,9 +629,12 @@ class ApiService {
     
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: (() => {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        return headers;
+      })(),
     });
 
     if (!response.ok) {
