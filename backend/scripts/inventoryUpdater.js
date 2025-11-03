@@ -71,41 +71,111 @@ async function updateBillProcessingStatus(billId, status, verbose = true) {
  * @returns {Promise<Object>} - Update statistics
  */
 async function updateInventoryForModule(moduleName, lineItems, billId, verbose = true) {
-  // Special handling for Central Kitchen to distinguish Raw Materials vs Finished Goods
+  // All modules now handle Raw Materials and Finished Goods based on account_name
   if (moduleName === 'central-kitchen') {
     return await updateCentralKitchenInventory(lineItems, billId, verbose);
   }
 
+  // Handle outlets with Raw Materials and Finished Goods distinction
+  return await updateOutletInventory(moduleName, lineItems, billId, verbose);
+}
+
+/**
+ * Update outlet inventory with Raw Materials and Finished Goods distinction
+ * @param {string} moduleName - The module name (e.g., 'kuwait-city', 'vibe-complex', etc.)
+ * @param {Array} lineItems - Array of line items from the bill
+ * @param {string} billId - The bill ID for reference
+ * @param {boolean} verbose - Whether to log detailed information
+ * @returns {Promise<Object>} - Update statistics
+ */
+async function updateOutletInventory(moduleName, lineItems, billId, verbose = true) {
   const stats = {
     module: moduleName,
     totalItems: lineItems.length,
-    updatedItems: 0,
-    createdItems: 0,
+    rawMaterialsUpdated: 0,
+    rawMaterialsCreated: 0,
+    finishedGoodsUpdated: 0,
+    finishedGoodsCreated: 0,
+    skippedItems: 0,
     errors: 0,
     errorDetails: []
   };
 
   try {
-    // Get the appropriate model for this module
-    const Model = await getModelForModule(moduleName);
-    
-    if (!Model) {
-      throw new Error(`No model found for module: ${moduleName}`);
+    // Get the appropriate database connection
+    let connection;
+    switch (moduleName) {
+      case 'mall-360':
+        connection = await connectMall360DB();
+        break;
+      case 'vibe-complex':
+        connection = await connectVibeComplexDB();
+        break;
+      case 'kuwait-city':
+        connection = await connectKuwaitCityDB();
+        break;
+      case 'taiba-kitchen':
+        connection = await connectTaibaKitchenDB();
+        break;
+      default:
+        throw new Error(`Unknown module: ${moduleName}`);
     }
 
+    // Get both models for the outlet
+    const RawMaterialModel = getRawMaterialModelForModule(moduleName, connection);
+    const FinishedGoodModel = getFinishedGoodModelForModule(moduleName, connection);
+
     if (verbose) {
-      console.log(`📦 Updating inventory for module: ${moduleName}`);
+      console.log(`📦 Updating ${moduleName} inventory (Raw Materials + Finished Goods)`);
     }
 
     // Process each line item
     for (const item of lineItems) {
       try {
-        const updateResult = await updateInventoryItem(Model, item, billId, verbose);
+        const accountName = item.account_name || '';
         
-        if (updateResult.created) {
-          stats.createdItems++;
+        if (verbose) {
+          console.log(`   🔍 Processing ${item.sku} (${item.name}) - Account: ${accountName}`);
+        }
+
+        let updateResult;
+        
+        // Only process items with specific account names
+        if (accountName === 'Inventory Raw') {
+          // Add to Raw Materials
+          updateResult = await updateInventoryItem(RawMaterialModel, item, billId, verbose);
+          
+          if (updateResult.created) {
+            stats.rawMaterialsCreated++;
+          } else {
+            stats.rawMaterialsUpdated++;
+          }
+          
+          if (verbose) {
+            console.log(`   📦 Added to Raw Materials`);
+          }
+          
+        } else if (accountName === 'Inventory Asset') {
+          // Add to Finished Goods (uses productCode field)
+          updateResult = await updateFinishedGoodItem(FinishedGoodModel, item, billId, verbose);
+          
+          if (updateResult.created) {
+            stats.finishedGoodsCreated++;
+          } else {
+            stats.finishedGoodsUpdated++;
+          }
+          
+          if (verbose) {
+            console.log(`   🏭 Added to Finished Goods`);
+          }
+          
         } else {
-          stats.updatedItems++;
+          // Skip items with other account types
+          stats.skippedItems++;
+          if (verbose) {
+            console.log(`   ⏭️  Skipping item with account type "${accountName}" - not Inventory Raw or Inventory Asset`);
+          }
+          continue; // Skip this item entirely
         }
         
       } catch (itemError) {
@@ -114,6 +184,7 @@ async function updateInventoryForModule(moduleName, lineItems, billId, verbose =
           itemId: item.item_id,
           sku: item.sku,
           name: item.name,
+          accountName: item.account_name,
           error: itemError.message
         });
         
@@ -124,17 +195,80 @@ async function updateInventoryForModule(moduleName, lineItems, billId, verbose =
     }
 
     if (verbose) {
-      console.log(`✅ Module ${moduleName} completed: ${stats.updatedItems} updated, ${stats.createdItems} created, ${stats.errors} errors`);
+      console.log(`✅ ${moduleName} completed:`);
+      console.log(`   📦 Raw Materials: ${stats.rawMaterialsUpdated} updated, ${stats.rawMaterialsCreated} created`);
+      console.log(`   🏭 Finished Goods: ${stats.finishedGoodsUpdated} updated, ${stats.finishedGoodsCreated} created`);
+      console.log(`   ⏭️  Skipped: ${stats.skippedItems} items (non-inventory accounts)`);
+      console.log(`   ❌ Errors: ${stats.errors}`);
     }
 
-    return stats;
+    // Convert stats to match the expected format (for backward compatibility)
+    return {
+      module: stats.module,
+      totalItems: stats.totalItems,
+      updatedItems: stats.rawMaterialsUpdated + stats.finishedGoodsUpdated,
+      createdItems: stats.rawMaterialsCreated + stats.finishedGoodsCreated,
+      errors: stats.errors,
+      errorDetails: stats.errorDetails,
+      rawMaterialsUpdated: stats.rawMaterialsUpdated,
+      rawMaterialsCreated: stats.rawMaterialsCreated,
+      finishedGoodsUpdated: stats.finishedGoodsUpdated,
+      finishedGoodsCreated: stats.finishedGoodsCreated,
+      skippedItems: stats.skippedItems
+    };
 
   } catch (error) {
     if (verbose) {
-      console.error(`❌ Error updating module ${moduleName}:`, error.message);
+      console.error(`❌ Error updating ${moduleName} inventory:`, error.message);
     }
     throw error;
   }
+}
+
+/**
+ * Get Raw Material model for a module
+ * @param {string} moduleName - The module name
+ * @param {Object} connection - The Mongoose connection
+ * @returns {Object} - The Raw Material model
+ */
+function getRawMaterialModelForModule(moduleName, connection) {
+  const modelMapping = {
+    'central-kitchen': require('../models/CentralKitchenRawMaterial'),
+    'kuwait-city': require('../models/KuwaitCityRawMaterial'),
+    'vibe-complex': require('../models/VibeComplexRawMaterial'),
+    'mall-360': require('../models/Mall360RawMaterial'),
+    'taiba-kitchen': require('../models/TaibaKitchenRawMaterial')
+  };
+
+  const modelFunction = modelMapping[moduleName];
+  if (!modelFunction) {
+    throw new Error(`No Raw Material model found for module: ${moduleName}`);
+  }
+
+  return modelFunction(connection);
+}
+
+/**
+ * Get Finished Goods model for a module
+ * @param {string} moduleName - The module name
+ * @param {Object} connection - The Mongoose connection
+ * @returns {Object} - The Finished Goods model
+ */
+function getFinishedGoodModelForModule(moduleName, connection) {
+  const modelMapping = {
+    'central-kitchen': require('../models/CentralKitchenFinishedProduct'),
+    'kuwait-city': require('../models/KuwaitCityFinishedProduct'),
+    'vibe-complex': require('../models/VibeComplexFinishedProduct'),
+    'mall-360': require('../models/Mall360FinishedProduct'),
+    'taiba-kitchen': require('../models/TaibaKitchenFinishedProduct')
+  };
+
+  const modelFunction = modelMapping[moduleName];
+  if (!modelFunction) {
+    throw new Error(`No Finished Goods model found for module: ${moduleName}`);
+  }
+
+  return modelFunction(connection);
 }
 
 /**
@@ -242,7 +376,20 @@ async function updateCentralKitchenInventory(lineItems, billId, verbose = true) 
       console.log(`   ❌ Errors: ${stats.errors}`);
     }
 
-    return stats;
+    // Convert stats to match the expected format (for backward compatibility)
+    return {
+      module: stats.module,
+      totalItems: stats.totalItems,
+      updatedItems: stats.rawMaterialsUpdated + stats.finishedGoodsUpdated,
+      createdItems: stats.rawMaterialsCreated + stats.finishedGoodsCreated,
+      errors: stats.errors,
+      errorDetails: stats.errorDetails,
+      rawMaterialsUpdated: stats.rawMaterialsUpdated,
+      rawMaterialsCreated: stats.rawMaterialsCreated,
+      finishedGoodsUpdated: stats.finishedGoodsUpdated,
+      finishedGoodsCreated: stats.finishedGoodsCreated,
+      skippedItems: stats.skippedItems
+    };
 
   } catch (error) {
     if (verbose) {

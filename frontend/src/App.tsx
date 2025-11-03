@@ -93,7 +93,9 @@ function App() {
         <Route path="/purchase-orders/add" element={<AddPurchaseOrder />} />
         <Route path="/purchase-orders/edit/:id" element={<EditPurchaseOrder />} />
         <Route path="/items-list" element={<ItemsList />} />
+        
         <Route path="/locations-list" element={<LocationsList />} />
+        
         <Route path="/good-receipt-notes" element={<GoodReceiptNotes />} />
         <Route path="/good-receipt-notes/add" element={<AddGRN />} />
         <Route path="/good-receipt-notes/edit/:id" element={<EditGRN />} />
