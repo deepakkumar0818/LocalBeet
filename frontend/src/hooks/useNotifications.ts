@@ -33,7 +33,8 @@ export const useNotifications = (outletName?: string) => {
       console.log(`🔔 useNotifications: API response:`, response)
       
       if (response.success) {
-        const apiNotifications: Notification[] = response.data.map((notif: any) => {
+        const list: any[] = (response.data as any[]) || []
+        const apiNotifications: Notification[] = list.map((notif: any) => {
           return {
             id: notif.id,
             title: notif.title,
