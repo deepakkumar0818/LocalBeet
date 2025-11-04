@@ -312,7 +312,7 @@ const Mall360RequestFinishedGoods: React.FC = () => {
             type: 'transfer_request',
             targetOutlet: 'Central Kitchen',
             sourceOutlet: '360 Mall',
-            transferOrderId: response.data._id || response.data.id,
+            transferOrderId: response.data._id || response.data.id || response.data.transferId || null,
             itemType: itemType,
             priority: formData.priority === 'Urgent' ? 'high' : 'normal'
           }
@@ -356,7 +356,7 @@ const Mall360RequestFinishedGoods: React.FC = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <button
-            onClick={() => navigate('/mall-food-court/finished-goods')}
+            onClick={() => navigate('/360-mall/finished-goods')}
             className="flex items-center text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="h-5 w-5 mr-2" />
@@ -608,7 +608,7 @@ const Mall360RequestFinishedGoods: React.FC = () => {
           <div className="flex justify-end space-x-4 pt-6 border-t">
             <button
               type="button"
-              onClick={() => navigate('/mall-food-court/finished-goods')}
+              onClick={() => navigate('/360-mall/finished-goods')}
               className="btn-secondary flex items-center"
             >
               <X className="h-4 w-4 mr-2" />

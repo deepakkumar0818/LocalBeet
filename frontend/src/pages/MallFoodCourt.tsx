@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Package, Truck, RefreshCw, ShoppingBag, ShoppingCart, Search, Download, Upload } from 'lucide-react'
 import { apiService } from '../services/api'
+import TransferOrderModal, { TransferOrder } from '../components/TransferOrderModal'
 import NotificationDropdown from '../components/NotificationDropdown'
 import { useNotifications } from '../hooks/useNotifications'
 
@@ -91,6 +92,9 @@ const MallFoodCourt: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importLoading, setImportLoading] = useState(false)
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('360 Mall')
+  const [showTransferOrderModal, setShowTransferOrderModal] = useState(false)
+  const [selectedTransferOrder, setSelectedTransferOrder] = useState<TransferOrder | null>(null)
+  const [transferOrderLoading, setTransferOrderLoading] = useState(false)
 
   // Filter notifications based on current section
   const getFilteredNotifications = () => {
@@ -209,6 +213,90 @@ const MallFoodCourt: React.FC = () => {
       console.error('Error loading outlet data:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Open transfer order from notification
+  const handleViewTransferOrder = async (transferOrderId: string) => {
+    try {
+      setTransferOrderLoading(true)
+      const response = await apiService.getTransferOrderById(transferOrderId)
+      if (response.success) {
+        setSelectedTransferOrder(response.data)
+        setShowTransferOrderModal(true)
+      } else {
+        throw new Error(response.message || 'Failed to load transfer order')
+      }
+    } catch (error) {
+      console.error('Error loading transfer order:', error)
+      alert('Failed to load transfer order details')
+    } finally {
+      setTransferOrderLoading(false)
+    }
+  }
+
+  // Approve transfer order (supports edited quantities)
+  const handleAcceptTransferOrder = async (transferOrderId: string, editedItems?: any[], notes?: string) => {
+    try {
+      setTransferOrderLoading(true)
+      const response = await apiService.getTransferOrderById(transferOrderId)
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch transfer order')
+      }
+      const transferOrder = response.data
+
+      const approvalData: any = {
+        approvedBy: '360 Mall Manager',
+        notes: notes || 'Transfer order approved by 360 Mall'
+      }
+      if (editedItems && editedItems.length > 0) {
+        approvalData.editedItems = editedItems
+      }
+
+      const approvalResponse = await apiService.approveTransferOrder(transferOrderId, approvalData)
+      if (approvalResponse.success) {
+        const hasMod = editedItems && editedItems.some((item, idx) => item.quantity !== transferOrder.items[idx]?.quantity)
+        alert(`Transfer order accepted successfully!${hasMod ? ' (Quantities modified)' : ''}`)
+        setShowTransferOrderModal(false)
+        setSelectedTransferOrder(null)
+        await loadInventory()
+        refreshNotifications()
+      } else {
+        throw new Error(`Failed to approve transfer order: ${approvalResponse.message}`)
+      }
+    } catch (error) {
+      console.error('Error accepting transfer order:', error)
+      alert(`Failed to accept transfer order: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setTransferOrderLoading(false)
+    }
+  }
+
+  // Reject transfer order
+  const handleRejectTransferOrder = async (transferOrderId: string) => {
+    try {
+      setTransferOrderLoading(true)
+      const response = await apiService.getTransferOrderById(transferOrderId)
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch transfer order')
+      }
+      const rejectionResponse = await apiService.rejectTransferOrder(transferOrderId, {
+        approvedBy: '360 Mall Manager',
+        notes: 'Transfer order rejected by 360 Mall'
+      })
+      if (rejectionResponse.success) {
+        alert('Transfer order rejected successfully!')
+        setShowTransferOrderModal(false)
+        setSelectedTransferOrder(null)
+        refreshNotifications()
+      } else {
+        throw new Error(`Failed to reject transfer order: ${rejectionResponse.message}`)
+      }
+    } catch (error) {
+      console.error('Error rejecting transfer order:', error)
+      alert(`Failed to reject transfer order: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setTransferOrderLoading(false)
     }
   }
 
@@ -878,6 +966,7 @@ const MallFoodCourt: React.FC = () => {
             onMarkAllAsRead={markAllAsRead}
             onClearAll={clearAll}
             onRefresh={refreshNotifications}
+            onViewTransferOrder={handleViewTransferOrder}
           />
         </div>
       </div>
@@ -893,6 +982,19 @@ const MallFoodCourt: React.FC = () => {
         onChange={handleFileUpload}
         className="hidden"
         disabled={importLoading}
+      />
+
+      {/* Transfer Order Modal */}
+      <TransferOrderModal
+        isOpen={showTransferOrderModal}
+        onClose={() => {
+          setShowTransferOrderModal(false)
+          setSelectedTransferOrder(null)
+        }}
+        transferOrder={selectedTransferOrder}
+        onAccept={handleAcceptTransferOrder}
+        onReject={handleRejectTransferOrder}
+        loading={transferOrderLoading}
       />
     </div>
   )
