@@ -406,46 +406,93 @@ router.post('/create', async (req, res) => {
     const transferResults = [];
     const errors = [];
 
-    // Process each item in the transfer
-    for (const item of items) {
-      try {
-        const { itemType, itemCode, quantity, unitPrice, notes: itemNotes } = item;
+    // IMPORTANT: When Central Kitchen creates a transfer to an outlet, 
+    // DO NOT update inventory immediately - wait for outlet approval
+    // Only update inventory immediately when outlet creates a transfer to Central Kitchen
+    const shouldUpdateInventoryImmediately = !isFromCentralKitchen; // Only for outlet → Central Kitchen
+    
+    if (shouldUpdateInventoryImmediately) {
+      // Process each item in the transfer (only for outlet → Central Kitchen)
+      for (const item of items) {
+        try {
+          const { itemType, itemCode, quantity, unitPrice, notes: itemNotes } = item;
 
-        if (itemType === 'Raw Material') {
-          // Handle Raw Material transfer
-          await handleRawMaterialTransfer(
-            sourceModels,
-            destinationModels,
+          if (itemType === 'Raw Material') {
+            // Handle Raw Material transfer
+            await handleRawMaterialTransfer(
+              sourceModels,
+              destinationModels,
+              itemCode,
+              quantity,
+              itemNotes,
+              isFromCentralKitchen
+            );
+          } else if (itemType === 'Finished Goods') {
+            // Handle Finished Goods transfer
+            await handleFinishedGoodsTransfer(
+              sourceModels,
+              destinationModels,
+              itemCode,
+              quantity,
+              itemNotes,
+              isFromCentralKitchen
+            );
+          }
+
+          transferResults.push({
             itemCode,
+            itemType,
             quantity,
-            itemNotes,
-            isFromCentralKitchen
-          );
-        } else if (itemType === 'Finished Goods') {
-          // Handle Finished Goods transfer
-          await handleFinishedGoodsTransfer(
-            sourceModels,
-            destinationModels,
-            itemCode,
-            quantity,
-            itemNotes,
-            isFromCentralKitchen
-          );
+            status: 'success'
+          });
+
+        } catch (itemError) {
+          console.error(`Error transferring item ${item.itemCode}:`, itemError);
+          errors.push({
+            itemCode: item.itemCode,
+            error: itemError.message
+          });
         }
+      }
+    } else {
+      // For Central Kitchen → Outlet transfers, just validate items exist (don't transfer yet)
+      console.log('📋 Central Kitchen → Outlet transfer: Validating items only (inventory update deferred until approval)');
+      for (const item of items) {
+        try {
+          const { itemType, itemCode, quantity } = item;
+          
+          // Validate item exists in source
+          if (itemType === 'Raw Material') {
+            const sourceItem = await sourceModels.CentralKitchenRawMaterial.findOne({ materialCode: itemCode });
+            if (!sourceItem) {
+              throw new Error(`Raw Material ${itemCode} not found in Central Kitchen`);
+            }
+            if (sourceItem.currentStock < quantity) {
+              throw new Error(`Insufficient stock. Available: ${sourceItem.currentStock}, Required: ${quantity}`);
+            }
+          } else if (itemType === 'Finished Goods') {
+            const sourceItem = await sourceModels.CentralKitchenFinishedProduct.findOne({ productCode: itemCode });
+            if (!sourceItem) {
+              throw new Error(`Finished Good ${itemCode} not found in Central Kitchen`);
+            }
+            if (sourceItem.currentStock < quantity) {
+              throw new Error(`Insufficient stock. Available: ${sourceItem.currentStock}, Required: ${quantity}`);
+            }
+          }
 
-        transferResults.push({
-          itemCode,
-          itemType,
-          quantity,
-          status: 'success'
-        });
-
-      } catch (itemError) {
-        console.error(`Error transferring item ${item.itemCode}:`, itemError);
-        errors.push({
-          itemCode: item.itemCode,
-          error: itemError.message
-        });
+          transferResults.push({
+            itemCode,
+            itemType,
+            quantity,
+            status: 'pending_validation'
+          });
+        } catch (itemError) {
+          console.error(`Error validating item ${item.itemCode}:`, itemError);
+          errors.push({
+            itemCode: item.itemCode,
+            error: itemError.message
+          });
+        }
       }
     }
 
@@ -472,7 +519,7 @@ router.post('/create', async (req, res) => {
       totalAmount: calculatedTotalValue,
       status: errors.length > 0
         ? 'Failed'
-        : (isFromCentralKitchen ? 'Approved' : 'Pending'),
+        : (isFromCentralKitchen ? 'Pending' : 'Pending'), // Always Pending for Central Kitchen → Outlet, requires outlet approval
       requestedBy: 'System User',
       transferResults: transferResults.map(result => ({
         itemCode: result.itemCode,
@@ -498,39 +545,44 @@ router.post('/create', async (req, res) => {
       console.log('   Total Amount:', transferOrder.totalAmount);
       console.log('   Database ID:', transferOrder._id);
       
-      // Push transfer order to Zoho Inventory
+      // Push transfer order to Zoho Inventory ONLY if immediately approved (outlet → Central Kitchen)
+      // For Central Kitchen → Outlet, defer Zoho push until outlet approval
       let zohoPushResult = null;
-      try {
-        console.log('\n🔄 ========== STARTING ZOHO PUSH ==========');
-        console.log('📋 Transfer Order Details:');
-        console.log('   Transfer Number:', transferOrder.transferNumber);
-        console.log('   From Outlet:', transferOrder.fromOutlet);
-        console.log('   To Outlet:', transferOrder.toOutlet);
-        console.log('   Items:', transferOrder.items.map(i => `${i.itemCode} (${i.itemName})`).join(', '));
-        
-        zohoPushResult = await pushTransferOrderToZoho(transferOrder);
-        console.log('✅ Transfer order pushed to Zoho successfully');
-        
-        // Update the transfer order with Zoho details
-        if (zohoPushResult && zohoPushResult.zohoTransferOrderId) {
-          await TransferOrder.findByIdAndUpdate(transferOrder._id, {
-            $set: {
-              zohoTransferOrderId: zohoPushResult.zohoTransferOrderId,
-              zohoTransferOrderNumber: zohoPushResult.zohoTransferOrderNumber
-            }
-          });
-          console.log('✅ Transfer order updated with Zoho details');
+      if (shouldUpdateInventoryImmediately && transferOrder.status === 'Approved') {
+        try {
+          console.log('\n🔄 ========== STARTING ZOHO PUSH ==========');
+          console.log('📋 Transfer Order Details:');
+          console.log('   Transfer Number:', transferOrder.transferNumber);
+          console.log('   From Outlet:', transferOrder.fromOutlet);
+          console.log('   To Outlet:', transferOrder.toOutlet);
+          console.log('   Items:', transferOrder.items.map(i => `${i.itemCode} (${i.itemName})`).join(', '));
+          
+          zohoPushResult = await pushTransferOrderToZoho(transferOrder);
+          console.log('✅ Transfer order pushed to Zoho successfully');
+          
+          // Update the transfer order with Zoho details
+          if (zohoPushResult && zohoPushResult.zohoTransferOrderId) {
+            await TransferOrder.findByIdAndUpdate(transferOrder._id, {
+              $set: {
+                zohoTransferOrderId: zohoPushResult.zohoTransferOrderId,
+                zohoTransferOrderNumber: zohoPushResult.zohoTransferOrderNumber
+              }
+            });
+            console.log('✅ Transfer order updated with Zoho details');
+          }
+          console.log('========== ZOHO PUSH COMPLETED ==========\n');
+        } catch (zohoError) {
+          console.error('\n❌ ========== ZOHO PUSH FAILED ==========');
+          console.error('⚠️  Failed to push transfer order to Zoho');
+          console.error('   Error Message:', zohoError.message);
+          console.error('   Error Stack:', zohoError.stack);
+          console.error('   Transfer Order ID:', transferOrder?._id);
+          console.error('   Transfer Number:', transferOrder?.transferNumber);
+          console.error('========== END ZOHO PUSH ERROR ==========\n');
+          // Don't fail the transfer creation if Zoho push fails
         }
-        console.log('========== ZOHO PUSH COMPLETED ==========\n');
-      } catch (zohoError) {
-        console.error('\n❌ ========== ZOHO PUSH FAILED ==========');
-        console.error('⚠️  Failed to push transfer order to Zoho');
-        console.error('   Error Message:', zohoError.message);
-        console.error('   Error Stack:', zohoError.stack);
-        console.error('   Transfer Order ID:', transferOrder?._id);
-        console.error('   Transfer Number:', transferOrder?.transferNumber);
-        console.error('========== END ZOHO PUSH ERROR ==========\n');
-        // Don't fail the transfer creation if Zoho push fails
+      } else {
+        console.log('⏸️  Zoho push deferred - transfer requires outlet approval');
       }
     } catch (orderError) {
       console.error('❌ Error creating transfer order:', orderError);
@@ -546,22 +598,52 @@ router.post('/create', async (req, res) => {
       
       // Create notification data
       const itemDetails = items.map(item => `${item.itemName || item.itemCode} (${item.quantity} ${item.unitOfMeasure || 'pcs'})`).join(', ');
-      const notificationData = {
-        title: `Items Received from ${fromOutlet}`,
-        message: `Transfer completed: ${itemDetails} have been added to your inventory from ${fromOutlet}. Total value: KWD ${calculatedTotalValue.toFixed(3)}`,
-        type: 'transfer_completed',
-        targetOutlet: toOutlet,
-        sourceOutlet: fromOutlet,
-        transferOrderId: transferOrder?._id?.toString(),
-        itemType: items[0]?.itemType || 'Mixed',
-        priority: 'normal'
-      };
+      
+      // Determine itemType: check if all items are the same type, otherwise 'Mixed'
+      const itemTypes = items.map(item => item.itemType).filter(Boolean)
+      const uniqueItemTypes = [...new Set(itemTypes)]
+      let determinedItemType = 'Mixed'
+      if (uniqueItemTypes.length === 1) {
+        determinedItemType = uniqueItemTypes[0] // 'Raw Material' or 'Finished Goods'
+      } else if (uniqueItemTypes.length > 1) {
+        determinedItemType = 'Mixed' // Both types present
+      } else if (items.length > 0 && items[0]?.itemType) {
+        determinedItemType = items[0].itemType // Fallback to first item's type
+      }
+      
+      let notificationData;
+      if (isFromCentralKitchen) {
+        // Central Kitchen → Outlet: Request notification (pending approval)
+        notificationData = {
+          title: `Transfer Request from ${fromOutlet}`,
+          message: `Transfer order #${transferOrder?.transferNumber || 'Pending'} from ${fromOutlet} requesting: ${itemDetails}. Total value: KWD ${calculatedTotalValue.toFixed(3)}. Please review and approve.`,
+          type: 'transfer_request',
+          targetOutlet: toOutlet,
+          sourceOutlet: fromOutlet,
+          transferOrderId: transferOrder?._id?.toString(),
+          itemType: determinedItemType,
+          priority: priority === 'Urgent' ? 'high' : 'normal'
+        };
+      } else {
+        // Outlet → Central Kitchen: Completed notification (already approved)
+        // Use the same determinedItemType from above
+        notificationData = {
+          title: `Items Received from ${fromOutlet}`,
+          message: `Transfer completed: ${itemDetails} have been added to your inventory from ${fromOutlet}. Total value: KWD ${calculatedTotalValue.toFixed(3)}`,
+          type: 'transfer_completed',
+          targetOutlet: toOutlet,
+          sourceOutlet: fromOutlet,
+          transferOrderId: transferOrder?._id?.toString(),
+          itemType: determinedItemType,
+          priority: 'normal'
+        };
+      }
       
       // Use the persistent notification service
       const notificationService = require('../services/persistentNotificationService');
       const notification = await notificationService.createNotification(notificationData);
       
-      console.log(`✅ Notification created for ${toOutlet}: Items received from ${fromOutlet}`);
+      console.log(`✅ Notification created for ${toOutlet}: ${isFromCentralKitchen ? 'Transfer request pending approval' : 'Items received'}`);
       
     } catch (notificationError) {
       console.error('⚠️  Failed to create notification:', notificationError);

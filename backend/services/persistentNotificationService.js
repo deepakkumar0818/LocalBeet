@@ -77,10 +77,22 @@ async function getNotifications(outletName, type = null, limit = 50) {
   try {
     console.log(`🔔 Getting notifications for outlet: "${outletName}"`);
     
-    const query = { targetOutlet: outletName };
+    // Use case-insensitive regex for targetOutlet matching
+    // This handles variations like "Kuwait City", "kuwait city", "KUWAIT CITY", etc.
+    const query = { 
+      targetOutlet: { $regex: new RegExp(`^${outletName}$`, 'i') }
+    };
     if (type) {
       query.type = type;
     }
+    
+    // Also try to find all notifications to debug
+    const allNotifications = await Notification.find({}).limit(5).lean();
+    console.log(`🔔 Sample notifications in DB (first 5):`, allNotifications.map(n => ({
+      targetOutlet: n.targetOutlet,
+      title: n.title,
+      type: n.type
+    })));
     
     const notifications = await Notification.find(query)
       .sort({ timestamp: -1 }) // Newest first
@@ -196,13 +208,65 @@ async function clearAllNotifications(outletName) {
   }
 }
 
+/**
+ * Mark notifications as read by transferOrderId (for transfer request notifications)
+ * This is called when a transfer order is accepted or rejected
+ * @param {string} transferOrderId - The transfer order ID
+ * @returns {number} - Number of notifications marked as read
+ */
+async function markNotificationsByTransferOrderIdAsRead(transferOrderId) {
+  try {
+    if (!transferOrderId) {
+      console.warn('⚠️  No transferOrderId provided, skipping notification marking');
+      return 0;
+    }
+    
+    const result = await Notification.updateMany(
+      { transferOrderId: transferOrderId.toString(), read: false },
+      { read: true }
+    );
+    
+    console.log(`✅ Marked ${result.modifiedCount} notifications as read for transfer order ${transferOrderId}`);
+    return result.modifiedCount;
+  } catch (error) {
+    console.error('❌ Error marking notifications by transferOrderId as read:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete notifications by transferOrderId (removes from notification list completely)
+ * @param {string} transferOrderId - The transfer order ID
+ * @returns {number} - Number of notifications deleted
+ */
+async function deleteNotificationsByTransferOrderId(transferOrderId) {
+  try {
+    if (!transferOrderId) {
+      console.warn('⚠️  No transferOrderId provided, skipping notification deletion');
+      return 0;
+    }
+    
+    const result = await Notification.deleteMany({
+      transferOrderId: transferOrderId.toString()
+    });
+    
+    console.log(`✅ Deleted ${result.deletedCount} notifications for transfer order ${transferOrderId}`);
+    return result.deletedCount;
+  } catch (error) {
+    console.error('❌ Error deleting notifications by transferOrderId:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   createNotification,
   getNotifications,
   getAllNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
-  clearAllNotifications
+  clearAllNotifications,
+  markNotificationsByTransferOrderIdAsRead,
+  deleteNotificationsByTransferOrderId
 };
 
 

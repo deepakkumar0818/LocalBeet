@@ -19,8 +19,10 @@ import {
   ChevronDown,
   ChevronRight,
   Utensils,
-  
+  Bell,
 } from 'lucide-react'
+import NotificationDropdown from './NotificationDropdown'
+import { useNotifications } from '../hooks/useNotifications'
 // Removed unused imports
 
 interface LayoutProps {
@@ -128,6 +130,144 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const isAdmin = Boolean(authUser?.isAdmin)
   const assignedOutlet: string = String(authUser?.assignedOutletCode || '')
+
+  // Determine outlet name for notifications based on current route
+  // This ensures that when viewing a specific outlet page, notifications are fetched for that outlet
+  const outletNameForNotifications = React.useMemo(() => {
+    const pathname = location.pathname
+    console.log('🔔 Layout: Determining outlet name for notifications', { isAdmin, assignedOutlet, pathname })
+    
+    // First, check the current route to determine which outlet page is being viewed
+    if (pathname.includes('/kuwait-city') || pathname.includes('/downtown-restaurant')) {
+      console.log('🔔 Layout: On Kuwait City page, using "Kuwait City"')
+      return 'Kuwait City'
+    }
+    if (pathname.includes('/mall-360') || pathname.includes('/mall-food-court')) {
+      console.log('🔔 Layout: On 360 Mall page, using "360 Mall"')
+      return '360 Mall'
+    }
+    if (pathname.includes('/vibes-complex') || pathname.includes('/marina-walk-cafe')) {
+      console.log('🔔 Layout: On Vibes Complex page, using "Vibes Complex"')
+      return 'Vibes Complex'
+    }
+    if (pathname.includes('/taiba-hospital') || pathname.includes('/drive-thru-express')) {
+      console.log('🔔 Layout: On Taiba Hospital page, using "Taiba Hospital"')
+      return 'Taiba Hospital'
+    }
+    if (pathname.includes('/central-kitchen') || pathname.includes('/central-kitchen-raw-materials') || pathname.includes('/central-kitchen-finished-goods') || pathname.includes('/create-transfer')) {
+      console.log('🔔 Layout: On Central Kitchen page, using "Central Kitchen"')
+      return 'Central Kitchen'
+    }
+    
+    // Fallback: If not on a specific outlet page, check user role
+    if (isAdmin) {
+      // Admin sees notifications for "Central Kitchen" by default
+      console.log('🔔 Layout: User is admin and not on specific outlet page, using "Central Kitchen"')
+      return 'Central Kitchen'
+    }
+    
+    // Map outlet codes to outlet names for non-admin users
+    if (assignedOutlet === 'KUWAIT_CITY') {
+      console.log('🔔 Layout: Assigned outlet is KUWAIT_CITY, using "Kuwait City"')
+      return 'Kuwait City'
+    }
+    if (assignedOutlet === 'MALL_360') {
+      console.log('🔔 Layout: Assigned outlet is MALL_360, using "360 Mall"')
+      return '360 Mall'
+    }
+    if (assignedOutlet === 'VIBE_COMPLEX') {
+      console.log('🔔 Layout: Assigned outlet is VIBE_COMPLEX, using "Vibes Complex"')
+      return 'Vibes Complex'
+    }
+    if (assignedOutlet === 'TAIBA_HOSPITAL') {
+      console.log('🔔 Layout: Assigned outlet is TAIBA_HOSPITAL, using "Taiba Hospital"')
+      return 'Taiba Hospital'
+    }
+    console.warn('🔔 Layout: Unknown assignedOutlet or route, returning undefined', { assignedOutlet, pathname })
+    return undefined
+  }, [isAdmin, assignedOutlet, location.pathname])
+
+  // Get notifications for the current outlet
+  const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications(outletNameForNotifications)
+
+  // Listen for refresh requests from pages
+  React.useEffect(() => {
+    const handleRefreshRequest = () => {
+      refreshNotifications()
+    }
+    window.addEventListener('refreshNotifications', handleRefreshRequest)
+    return () => {
+      window.removeEventListener('refreshNotifications', handleRefreshRequest)
+    }
+  }, [refreshNotifications])
+
+  // Determine current module (raw-materials or finished-goods) from route
+  const currentModule = React.useMemo(() => {
+    const pathname = location.pathname
+    if (pathname.includes('/raw-materials')) return 'Raw Material'
+    if (pathname.includes('/finished-goods')) return 'Finished Goods'
+    return null // Not on a specific module page
+  }, [location.pathname])
+
+  // Filter notifications to show only transfer-related notifications:
+  // - Transfer requests (for Central Kitchen to approve outlet requests, or for outlets to approve Central Kitchen transfers)
+  // - Accepted/Rejected notifications
+  // - Filter by itemType if on a specific module page (raw-materials or finished-goods)
+  // - Exclude notifications that are already read (for transfer requests that were accepted/rejected)
+  const filteredNotifications = React.useMemo(() => {
+    console.log('🔔 Layout: All notifications:', notifications)
+    console.log('🔔 Layout: Outlet for notifications:', outletNameForNotifications)
+    console.log('🔔 Layout: Current module:', currentModule)
+    
+    // Filter by notification type (more reliable than title matching)
+    // Show all transfer-related notifications (both read and unread)
+    let filtered = notifications.filter(notif => {
+      // Check if it's a transfer-related notification
+      const isTransferRelated = notif.isTransferOrder || 
+        notif.title?.includes('Transfer Request') ||
+        notif.title?.includes('Transfer') ||
+        notif.transferOrderId;
+      
+      return isTransferRelated;
+    })
+    
+    // If on a specific module page, filter by itemType
+    if (currentModule) {
+      filtered = filtered.filter(notif => {
+        // Show notification if:
+        // 1. itemType matches current module
+        // 2. itemType is 'Mixed' (show on both pages)
+        // 3. itemType is not set (fallback - show on both)
+        const itemType = notif.itemType
+        const shouldShow = !itemType || 
+          itemType === currentModule || 
+          itemType === 'Mixed'
+        
+        console.log('🔔 Layout: Filtering notification by itemType:', {
+          id: notif.id,
+          title: notif.title,
+          itemType: itemType,
+          currentModule: currentModule,
+          shouldShow: shouldShow
+        })
+        
+        return shouldShow
+      })
+    }
+    
+    console.log('🔔 Layout: Filtered notifications count:', filtered.length)
+    return filtered
+  }, [notifications, outletNameForNotifications, currentModule])
+
+  // Handler for viewing transfer orders from Layout notifications
+  // Store transfer order ID in localStorage so pages can pick it up
+  const handleViewTransferOrder = (transferOrderId: string) => {
+    console.log('Layout: View transfer order:', transferOrderId)
+    // Store in localStorage so pages can detect and open modal
+    localStorage.setItem('pendingTransferOrderView', transferOrderId)
+    // Dispatch custom event for pages to listen to
+    window.dispatchEvent(new CustomEvent('viewTransferOrder', { detail: { transferOrderId } }))
+  }
 
   const navigation: NavigationItem[] = React.useMemo(() => {
     if (isAdmin) return baseNavigation
@@ -539,8 +679,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex flex-1"></div>
             <div className="flex items-center gap-x-4 lg:gap-x-6">
               <div className="hidden lg:block lg:h-6 lg:w-px lg:bg-gray-200" />
+              <NotificationDropdown
+                notifications={filteredNotifications}
+                onMarkAsRead={markAsRead}
+                onMarkAllAsRead={markAllAsRead}
+                onClearAll={clearAll}
+                onViewTransferOrder={handleViewTransferOrder}
+                onRefresh={refreshNotifications}
+              />
               <div className="flex items-center gap-x-2">
-                <span className="text-sm text-gray-700">Welcome back, Admin</span>
+                <span className="text-sm text-gray-700">Welcome back, {authUser?.name || 'Admin'}</span>
               </div>
             </div>
           </div>
