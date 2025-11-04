@@ -679,14 +679,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex flex-1"></div>
             <div className="flex items-center gap-x-4 lg:gap-x-6">
               <div className="hidden lg:block lg:h-6 lg:w-px lg:bg-gray-200" />
-              <NotificationDropdown
-                notifications={filteredNotifications}
-                onMarkAsRead={markAsRead}
-                onMarkAllAsRead={markAllAsRead}
-                onClearAll={clearAll}
-                onViewTransferOrder={handleViewTransferOrder}
-                onRefresh={refreshNotifications}
-              />
               <div className="flex items-center gap-x-2">
                 <span className="text-sm text-gray-700">Welcome back, {authUser?.name || 'Admin'}</span>
               </div>
