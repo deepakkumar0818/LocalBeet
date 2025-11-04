@@ -543,10 +543,11 @@ const CentralKitchenFinishedGoods: React.FC = () => {
     }
   }
 
-  const handleAcceptTransferOrder = async (transferOrderId: string) => {
+  const handleAcceptTransferOrder = async (transferOrderId: string, editedItems?: any[], notes?: string) => {
     try {
       setTransferOrderLoading(true)
       console.log('Starting acceptance process for transfer order:', transferOrderId)
+      console.log('Edited items:', editedItems)
       
       // Get transfer order details to determine item type and create notification
       console.log('Fetching transfer order details...')
@@ -557,15 +558,24 @@ const CentralKitchenFinishedGoods: React.FC = () => {
       const transferOrder = response.data
       console.log('Transfer order details:', transferOrder)
       
+      // Prepare approval data
+      const approvalData: any = {
+        approvedBy: 'Central Kitchen Manager',
+        notes: notes || 'Transfer order approved by Central Kitchen'
+      }
+      
+      // Include edited items if provided
+      if (editedItems && editedItems.length > 0) {
+        approvalData.editedItems = editedItems
+        console.log('Including edited items in approval request:', editedItems)
+      }
+      
       // Approve transfer order (handles inventory updates and notifications automatically)
       console.log('Approving transfer order...')
       let approvalResponse
       
       try {
-        approvalResponse = await apiService.approveTransferOrder(transferOrderId, {
-          approvedBy: 'Central Kitchen Manager',
-          notes: 'Transfer order approved by Central Kitchen'
-        })
+        approvalResponse = await apiService.approveTransferOrder(transferOrderId, approvalData)
         console.log('Approval response:', approvalResponse)
       } catch (error) {
         console.error('Approval failed:', error)
@@ -574,7 +584,10 @@ const CentralKitchenFinishedGoods: React.FC = () => {
 
       if (approvalResponse.success) {
         // Backend automatically handles inventory updates and notifications
-        alert(`Transfer order accepted successfully!`)
+        const hasModifications = editedItems && editedItems.some((item, index) => 
+          item.quantity !== transferOrder.items[index]?.quantity
+        )
+        alert(`Transfer order accepted successfully!${hasModifications ? ' (Quantities modified)' : ''}`)
         setShowTransferOrderModal(false)
         setSelectedTransferOrder(null)
         

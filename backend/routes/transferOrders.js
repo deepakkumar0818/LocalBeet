@@ -195,14 +195,26 @@ async function pushTransferOrderToZoho(transferOrder) {
       // Zoho API accepts item_id as string or number, but string is safer for large IDs
       const itemId = zohoItemId.toString();
       
+      // Build description: item notes/category + transfer order notes (if any)
+      let description = item.notes || `${item.category || ''} ${item.subCategory || ''}`.trim() || '';
+      
+      // Add transfer order notes to description if they exist
+      if (transferOrder.notes && transferOrder.notes.trim()) {
+        if (description) {
+          description = `${description} | Transfer Notes: ${transferOrder.notes.trim()}`;
+        } else {
+          description = `Transfer Notes: ${transferOrder.notes.trim()}`;
+        }
+      }
+      
       lineItems.push({
         item_id: itemId,
         name: item.itemName || item.itemCode,
-        description: item.notes || `${item.category || ''} ${item.subCategory || ''}`.trim() || '',
-        quantity_transfer: item.quantity,
+        description: description,
+        quantity_transfer: item.quantity, // This will now use edited quantity if provided
         unit: unit
       });
-      console.log(`   ✅ Added item ${item.itemCode} to line items`);
+      console.log(`   ✅ Added item ${item.itemCode} to line items (quantity: ${item.quantity})`);
     }
     
     console.log(`📊 Total line items: ${lineItems.length} out of ${transferOrder.items.length}`);

@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Package, AlertTriangle, Store, Truck, RefreshCw, ShoppingCart, Receipt, CreditCard, Plus, Download, Upload } from 'lucide-react'
 import { apiService } from '../services/api'
-import NotificationDropdown from '../components/NotificationDropdown'
-import { useNotifications } from '../hooks/useNotifications'
+import TransferOrderModal, { TransferOrder } from '../components/TransferOrderModal'
 import * as XLSX from 'xlsx'
 
 interface OutletInventoryItem {
@@ -90,29 +89,9 @@ const DowntownRestaurant: React.FC = () => {
   const [exportLoading, setExportLoading] = useState(false)
   const [importLoading, setImportLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Kuwait City')
-  
-  // Filter notifications based on current section
-  const getFilteredNotifications = () => {
-    const currentSection = getCurrentSection()
-    
-    if (currentSection === 'raw-materials') {
-      // Show only Raw Material notifications
-      return notifications.filter(notification => 
-        notification.isTransferOrder && 
-        (notification.itemType === 'Raw Material' || notification.itemType === 'Mixed')
-      )
-    } else if (currentSection === 'finished-goods') {
-      // Show only Finished Goods notifications
-      return notifications.filter(notification => 
-        notification.isTransferOrder && 
-        (notification.itemType === 'Finished Goods' || notification.itemType === 'Mixed')
-      )
-    } else {
-      // Show all notifications for other sections
-      return notifications
-    }
-  }
+  const [showTransferOrderModal, setShowTransferOrderModal] = useState(false)
+  const [selectedTransferOrder, setSelectedTransferOrder] = useState<TransferOrder | null>(null)
+  const [transferOrderLoading, setTransferOrderLoading] = useState(false)
 
   // Determine current section based on URL
   const getCurrentSection = () => {
@@ -125,10 +104,52 @@ const DowntownRestaurant: React.FC = () => {
 
   const currentSection = getCurrentSection()
 
+  // Handler for viewing transfer orders (defined early so it can be used in useEffect)
+  const handleViewTransferOrder = React.useCallback(async (transferOrderId: string) => {
+    try {
+      console.log('🔍 Kuwait City: handleViewTransferOrder called with transferOrderId:', transferOrderId)
+      setTransferOrderLoading(true)
+      const response = await apiService.getTransferOrderById(transferOrderId)
+      if (response.success) {
+        setSelectedTransferOrder(response.data)
+        setShowTransferOrderModal(true)
+        console.log('✅ Kuwait City: Transfer order modal opened successfully')
+      } else {
+        throw new Error(response.message || 'Failed to load transfer order')
+      }
+    } catch (error) {
+      console.error('Error loading transfer order:', error)
+      alert('Failed to load transfer order details')
+    } finally {
+      setTransferOrderLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     loadOutletData()
     loadInventory()
-  }, [])
+    
+    // Listen for transfer order view requests from Layout notifications
+    const handleLayoutViewRequest = (event: CustomEvent) => {
+      const { transferOrderId } = event.detail
+      if (transferOrderId) {
+        handleViewTransferOrder(transferOrderId)
+      }
+    }
+    
+    window.addEventListener('viewTransferOrder', handleLayoutViewRequest as EventListener)
+    
+    // Also check localStorage on mount
+    const pendingView = localStorage.getItem('pendingTransferOrderView')
+    if (pendingView) {
+      localStorage.removeItem('pendingTransferOrderView')
+      handleViewTransferOrder(pendingView)
+    }
+    
+    return () => {
+      window.removeEventListener('viewTransferOrder', handleLayoutViewRequest as EventListener)
+    }
+  }, [handleViewTransferOrder])
 
   // Reload inventory when filters change
   useEffect(() => {
@@ -136,25 +157,6 @@ const DowntownRestaurant: React.FC = () => {
       loadInventory()
     }
   }, [loading, searchTerm, filterCategory, filterStatus, sortBy, sortOrder])
-
-  // Refresh inventory when notifications change (e.g., when transfer orders are accepted or completed)
-  useEffect(() => {
-    if (notifications.length > 0) {
-      // Check if there are any new transfer notifications
-      const hasNewTransferNotifications = notifications.some(notif => 
-        !notif.read && notif.type === 'success' && (
-          notif.title?.includes('Transfer Order Accepted') ||
-          notif.title?.includes('Items Received from Central Kitchen') ||
-          notif.title?.includes('Items Received from Ingredient Master')
-        )
-      )
-      
-      if (hasNewTransferNotifications) {
-        console.log('New transfer notification detected, refreshing inventory...')
-        loadInventory()
-      }
-    }
-  }, [notifications])
 
   const loadOutletData = async () => {
     try {
@@ -188,6 +190,109 @@ const DowntownRestaurant: React.FC = () => {
     setSortBy(currentSection === 'finished-goods' ? 'productName' : 'materialName')
     setSortOrder('asc')
     loadInventory()
+  }
+
+
+  const handleAcceptTransferOrder = async (transferOrderId: string, editedItems?: any[], notes?: string) => {
+    try {
+      setTransferOrderLoading(true)
+      console.log('Starting acceptance process for transfer order:', transferOrderId)
+      console.log('Edited items:', editedItems)
+      console.log('Transfer notes:', notes)
+      
+      // Get transfer order details
+      console.log('Fetching transfer order details...')
+      const response = await apiService.getTransferOrderById(transferOrderId)
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch transfer order')
+      }
+      const transferOrder = response.data
+      console.log('Transfer order details:', transferOrder)
+      
+      // Prepare approval data
+      const approvalData: any = {
+        approvedBy: 'Kuwait City Manager',
+        notes: notes || 'Transfer order approved by Kuwait City'
+      }
+      
+      // Include edited items if provided
+      if (editedItems && editedItems.length > 0) {
+        approvalData.editedItems = editedItems
+        console.log('Including edited items in approval request:', editedItems)
+      }
+      
+      // Approve transfer order (handles inventory updates and notifications automatically)
+      console.log('Approving transfer order...')
+      const approvalResponse = await apiService.approveTransferOrder(transferOrderId, approvalData)
+      console.log('Approval response:', approvalResponse)
+
+      if (approvalResponse.success) {
+        // Backend automatically handles inventory updates and notifications
+        const hasModifications = editedItems && editedItems.some((item, index) => 
+          item.quantity !== transferOrder.items[index]?.quantity
+        )
+        alert(`Transfer order accepted successfully!${hasModifications ? ' (Quantities modified)' : ''}`)
+        setShowTransferOrderModal(false)
+        setSelectedTransferOrder(null)
+        
+        // Refresh inventory
+        await loadInventory()
+        
+        // Refresh notifications in Layout (will happen automatically via Layout's useNotifications hook)
+        window.dispatchEvent(new CustomEvent('refreshNotifications'))
+      } else {
+        throw new Error(`Failed to approve transfer order: ${approvalResponse.message}`)
+      }
+      
+    } catch (error) {
+      console.error('Error accepting transfer order:', error)
+      console.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
+      alert(`Failed to accept transfer order: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setTransferOrderLoading(false)
+    }
+  }
+
+  const handleRejectTransferOrder = async (transferOrderId: string) => {
+    try {
+      setTransferOrderLoading(true)
+      console.log('Starting rejection process for transfer order:', transferOrderId)
+      
+      // Get transfer order details
+      console.log('Fetching transfer order details...')
+      const response = await apiService.getTransferOrderById(transferOrderId)
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch transfer order')
+      }
+      const transferOrder = response.data
+      console.log('Transfer order details:', transferOrder)
+      
+      // Reject transfer order
+      console.log('Rejecting transfer order...')
+      const rejectionResponse = await apiService.rejectTransferOrder(transferOrderId, {
+        approvedBy: 'Kuwait City Manager',
+        notes: 'Transfer order rejected by Kuwait City'
+      })
+      console.log('Rejection response:', rejectionResponse)
+
+      if (rejectionResponse.success) {
+        alert(`Transfer order rejected successfully!`)
+        setShowTransferOrderModal(false)
+        setSelectedTransferOrder(null)
+        
+        // Refresh notifications in Layout (will happen automatically via Layout's useNotifications hook)
+        window.dispatchEvent(new CustomEvent('refreshNotifications'))
+      } else {
+        throw new Error(`Failed to reject transfer order: ${rejectionResponse.message}`)
+      }
+      
+    } catch (error) {
+      console.error('Error rejecting transfer order:', error)
+      console.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
+      alert(`Failed to reject transfer order: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setTransferOrderLoading(false)
+    }
   }
 
   const loadInventory = async () => {
@@ -963,13 +1068,6 @@ const DowntownRestaurant: React.FC = () => {
               Request Finished Goods
             </button>
           )}
-        <NotificationDropdown
-          notifications={getFilteredNotifications()}
-          onMarkAsRead={markAsRead}
-          onMarkAllAsRead={markAllAsRead}
-          onClearAll={clearAll}
-          onRefresh={refreshNotifications}
-        />
             </div>
           </div>
 
@@ -985,6 +1083,19 @@ const DowntownRestaurant: React.FC = () => {
         onChange={handleFileUpload}
         className="hidden"
         disabled={importLoading}
+      />
+
+      {/* Transfer Order Modal */}
+      <TransferOrderModal
+        isOpen={showTransferOrderModal}
+        onClose={() => {
+          setShowTransferOrderModal(false)
+          setSelectedTransferOrder(null)
+        }}
+        transferOrder={selectedTransferOrder}
+        onAccept={handleAcceptTransferOrder}
+        onReject={handleRejectTransferOrder}
+        loading={transferOrderLoading}
       />
     </div>
   )

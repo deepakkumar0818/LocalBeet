@@ -123,153 +123,135 @@ router.put('/:id/approve', ensureConnections, async (req, res) => {
       ? transferOrder.toOutlet 
       : (transferOrder.toOutlet?.name || transferOrder.toOutlet);
     
+    // Determine transfer direction
+    const isFromCentralKitchen = fromOutletName.toLowerCase().includes('central kitchen');
+    const isToCentralKitchen = toOutletName.toLowerCase().includes('central kitchen');
+    
     console.log(`🏪 Processing transfer order:`);
-    console.log(`   From: ${fromOutletName} (requesting outlet)`);
-    console.log(`   To: ${toOutletName} (source outlet)`);
+    console.log(`   From: ${fromOutletName}`);
+    console.log(`   To: ${toOutletName}`);
+    console.log(`   Direction: ${isFromCentralKitchen ? 'Central Kitchen → Outlet' : 'Outlet → Central Kitchen'}`);
     
-    // Get the correct outlet models based on the requesting outlet (fromOutlet)
-    const requestingOutletModels = getOutletModels(fromOutletName, req);
+    // Determine which outlet is the requesting/destination outlet
+    let requestingOutletName, destinationOutletName;
+    let requestingOutletModels, destinationOutletModels;
     
+    if (isFromCentralKitchen) {
+      // Central Kitchen → Outlet: Outlet is approving
+      requestingOutletName = toOutletName; // Destination outlet (e.g., Kuwait City)
+      destinationOutletName = fromOutletName; // Source is Central Kitchen
+      requestingOutletModels = getOutletModels(requestingOutletName, req);
+      destinationOutletModels = req.centralKitchenModels;
+    } else {
+      // Outlet → Central Kitchen: Central Kitchen is approving
+      requestingOutletName = fromOutletName; // Requesting outlet (e.g., Kuwait City)
+      destinationOutletName = toOutletName; // Destination is Central Kitchen
+      requestingOutletModels = getOutletModels(requestingOutletName, req);
+      destinationOutletModels = req.centralKitchenModels;
+    }
+    
+    console.log(`🏪 Requesting outlet: ${requestingOutletName}`);
+    console.log(`🏪 Destination outlet: ${destinationOutletName}`);
     console.log(`🏪 Requesting outlet models available:`, Object.keys(requestingOutletModels));
+    
+    // Check if edited items were provided in the request body
+    const editedItems = req.body.editedItems || null;
+    
+    if (editedItems) {
+      console.log(`📝 Using edited quantities from request`);
+      console.log(`📝 Original items count: ${transferOrder.items.length}, Edited items count: ${editedItems.length}`);
+      console.log(`📝 Edited items details:`, JSON.stringify(editedItems.map(item => ({
+        itemCode: item.itemCode,
+        itemName: item.itemName,
+        quantity: item.quantity
+      })), null, 2));
+    } else {
+      console.log(`📝 No edited items provided, using original quantities`);
+    }
     
     // Update inventory for each item
     try {
-      for (const item of transferOrder.items) {
-        console.log(`📦 Processing item: ${item.itemCode} - ${item.itemName} (${item.quantity} ${item.unitOfMeasure})`);
+      // Use edited items if provided, otherwise use original items
+      const itemsToProcess = editedItems || transferOrder.items;
+      
+      for (let i = 0; i < itemsToProcess.length; i++) {
+        const item = itemsToProcess[i];
+        const originalItem = transferOrder.items[i];
+        
+        // IMPORTANT: Use edited quantity if editedItems is provided, otherwise use original
+        // For editedItems, the quantity is already the edited value
+        // For original items, use the original quantity
+        const quantity = editedItems ? item.quantity : originalItem.quantity;
+        
+        console.log(`📦 Processing item: ${item.itemCode} - ${item.itemName}`);
+        console.log(`   Original requested quantity: ${originalItem.quantity} ${originalItem.unitOfMeasure}`);
+        console.log(`   Using quantity for inventory: ${quantity} ${item.unitOfMeasure || originalItem.unitOfMeasure}`);
+        console.log(`   Source: ${editedItems ? 'EDITED' : 'ORIGINAL'}`);
+        
+        if (quantity === 0) {
+          console.log(`⏭️  Skipping item ${item.itemCode} - quantity is 0`);
+          continue;
+        }
         
         if (item.itemType === 'Raw Material') {
-        // Handle source outlet (from where items are being transferred)
-        if (toOutletName === 'Ingredient Master') {
-          // Subtract from Ingredient Master (main database)
-          const connectDB = require('../config/database');
-          const RawMaterial = require('../models/RawMaterial');
+          // Use the transfer functions from transfers.js for both directions
+          const transfersModule = require('./transfers');
           
-          const ingredientMasterItem = await RawMaterial.findOne({ materialCode: item.itemCode });
-          if (ingredientMasterItem) {
-            console.log(`Ingredient Master BEFORE: ${ingredientMasterItem.materialCode} - Stock: ${ingredientMasterItem.currentStock}`);
-            ingredientMasterItem.currentStock -= item.quantity;
-            await ingredientMasterItem.save();
-            console.log(`Ingredient Master AFTER: ${ingredientMasterItem.materialCode} - Stock: ${ingredientMasterItem.currentStock}`);
+          if (isFromCentralKitchen) {
+            // Central Kitchen → Outlet: Subtract from Central Kitchen, Add to Outlet
+            console.log(`🔄 Using transfer logic: Central Kitchen → ${requestingOutletName}`);
+            await transfersModule.handleRawMaterialTransfer(
+              destinationOutletModels, // Source: Central Kitchen
+              requestingOutletModels,   // Destination: Outlet
+              item.itemCode,
+              quantity, // Use edited quantity
+              item.notes || '',
+              true // isFromCentralKitchen = true
+            );
           } else {
-            console.log(`Ingredient Master item not found: ${item.itemCode}`);
+            // Outlet → Central Kitchen: Subtract from Outlet, Add to Central Kitchen
+            console.log(`🔄 Using transfer logic: ${requestingOutletName} → Central Kitchen`);
+            await transfersModule.handleRawMaterialTransfer(
+              requestingOutletModels,   // Source: Outlet
+              destinationOutletModels,  // Destination: Central Kitchen
+              item.itemCode,
+              quantity, // Use edited quantity
+              item.notes || '',
+              false // isFromCentralKitchen = false
+            );
           }
-        } else if (toOutletName === 'Central Kitchen' || toOutletName.includes('Central Kitchen')) {
-          // Subtract from Central Kitchen Raw Materials (the source)
-          const centralKitchenItem = await req.centralKitchenModels.CentralKitchenRawMaterial.findOne({ materialCode: item.itemCode });
-          if (centralKitchenItem) {
-            console.log(`✂️  Central Kitchen BEFORE: ${centralKitchenItem.materialCode} - Stock: ${centralKitchenItem.currentStock}`);
-            centralKitchenItem.currentStock -= item.quantity;
-            await centralKitchenItem.save();
-            console.log(`✂️  Central Kitchen AFTER: ${centralKitchenItem.materialCode} - Stock: ${centralKitchenItem.currentStock}`);
+        } else if (item.itemType === 'Finished Goods') {
+          // Use the proper transfer logic from transfers.js
+          console.log(`🔄 Using proper finished goods transfer logic for ${item.itemCode}`);
+          
+          if (isFromCentralKitchen) {
+            // Central Kitchen → Outlet: Subtract from Central Kitchen, Add to Outlet
+            console.log(`🔄 Using transfer logic: Central Kitchen → ${requestingOutletName}`);
+            const transfersModule = require('./transfers');
+            await transfersModule.handleFinishedGoodsTransfer(
+              destinationOutletModels, // Source: Central Kitchen
+              requestingOutletModels,   // Destination: Outlet
+              item.itemCode,
+              quantity, // Use edited quantity
+              item.notes || '',
+              true // isFromCentralKitchen = true
+            );
           } else {
-            console.log(`❌ Central Kitchen item not found: ${item.itemCode}`);
+            // Outlet → Central Kitchen: Subtract from Outlet, Add to Central Kitchen
+            console.log(`🔄 Using transfer logic: ${requestingOutletName} → Central Kitchen`);
+            const transfersModule = require('./transfers');
+            await transfersModule.handleFinishedGoodsTransfer(
+              requestingOutletModels,   // Source: Outlet
+              destinationOutletModels,  // Destination: Central Kitchen
+              item.itemCode,
+              quantity, // Use edited quantity
+              item.notes || '',
+              false // isFromCentralKitchen = false
+            );
           }
-        } else {
-          console.log(`⚠️  Unknown source outlet: ${toOutletName}`);
+          
+          console.log(`✅ Finished goods transfer completed for ${item.itemCode}`);
         }
-
-        // Add to requesting outlet (fromOutlet) Raw Materials
-        console.log(`➕ Adding ${item.quantity} ${item.unitOfMeasure} to ${fromOutletName}`);
-        let RawMaterialModel;
-        
-        if (fromOutletName === 'Central Kitchen' || fromOutletName.includes('Central Kitchen')) {
-          // Add to Central Kitchen Raw Materials
-          const centralKitchenItem = await req.centralKitchenModels.CentralKitchenRawMaterial.findOne({ materialCode: item.itemCode });
-          if (centralKitchenItem) {
-            console.log(`Central Kitchen BEFORE: ${centralKitchenItem.materialCode} - Stock: ${centralKitchenItem.currentStock}`);
-            centralKitchenItem.currentStock += item.quantity;
-            await centralKitchenItem.save();
-            console.log(`Central Kitchen AFTER: ${centralKitchenItem.materialCode} - Stock: ${centralKitchenItem.currentStock}`);
-          } else {
-            console.log(`Creating new Central Kitchen item: ${item.itemCode}`);
-            // Create new item in Central Kitchen if it doesn't exist
-            const newCentralKitchenItem = new req.centralKitchenModels.CentralKitchenRawMaterial({
-              materialCode: item.itemCode,
-              materialName: item.itemName,
-              parentCategory: 'Raw Materials',
-              subCategory: item.subCategory || item.category || 'General',
-              unitOfMeasure: item.unitOfMeasure,
-              currentStock: item.quantity,
-              unitPrice: item.unitPrice,
-              minimumStock: 10,
-              maximumStock: 1000,
-              reorderPoint: 20,
-              status: 'Active',
-              isActive: true,
-              createdBy: 'System',
-              updatedBy: 'System'
-            });
-            await newCentralKitchenItem.save();
-            console.log(`New Central Kitchen item created: ${newCentralKitchenItem.materialCode} - Stock: ${newCentralKitchenItem.currentStock}`);
-          }
-        } else {
-          // Add to requesting outlet (fromOutlet) Raw Materials
-          if (fromOutletName.toLowerCase().includes('kuwait')) {
-            RawMaterialModel = requestingOutletModels.KuwaitCityRawMaterial;
-          } else if (fromOutletName.toLowerCase().includes('360') || fromOutletName.toLowerCase().includes('mall')) {
-            RawMaterialModel = requestingOutletModels.Mall360RawMaterial;
-          } else if (fromOutletName.toLowerCase().includes('vibe') || fromOutletName.toLowerCase().includes('complex')) {
-            RawMaterialModel = requestingOutletModels.VibeComplexRawMaterial;
-          } else if (fromOutletName.toLowerCase().includes('taiba')) {
-            RawMaterialModel = requestingOutletModels.TaibaKitchenRawMaterial;
-          } else {
-            throw new Error(`Unknown raw material model for requesting outlet: ${fromOutletName}`);
-          }
-          
-          if (!RawMaterialModel) {
-            throw new Error(`Raw material model not found for requesting outlet: ${fromOutletName}`);
-          }
-          
-          let outletItem = await RawMaterialModel.findOne({ materialCode: item.itemCode });
-          if (outletItem) {
-            console.log(`➕ ${fromOutletName} BEFORE: ${outletItem.materialCode} - Stock: ${outletItem.currentStock}`);
-            outletItem.currentStock += item.quantity;
-            await outletItem.save();
-            console.log(`➕ ${fromOutletName} AFTER: ${outletItem.materialCode} - Stock: ${outletItem.currentStock}`);
-          } else {
-            console.log(`➕ Creating new ${fromOutletName} item: ${item.itemCode}`);
-            // Create new item in the outlet if it doesn't exist
-            outletItem = new RawMaterialModel({
-              materialCode: item.itemCode,
-              materialName: item.itemName,
-              category: item.category || 'General',
-              subCategory: item.subCategory || 'General',
-              unitOfMeasure: item.unitOfMeasure,
-              currentStock: item.quantity,
-              unitPrice: item.unitPrice,
-              minimumStock: 10,
-              maximumStock: 1000,
-              reorderPoint: 20,
-              status: 'Active',
-              isActive: true,
-              createdBy: 'System',
-              updatedBy: 'System'
-            });
-            await outletItem.save();
-            console.log(`➕ New ${fromOutletName} item created: ${outletItem.materialCode} - Stock: ${outletItem.currentStock}`);
-          }
-        }
-      } else if (item.itemType === 'Finished Goods') {
-        // Use the proper transfer logic from transfers.js
-        console.log(`🔄 Using proper finished goods transfer logic for ${item.itemCode}`);
-        
-        // Get source and destination models
-        const sourceModels = req.centralKitchenModels;
-        const destinationModels = requestingOutletModels;
-        
-        // Use the handleFinishedGoodsTransfer function
-        const transfersModule = require('./transfers');
-        await transfersModule.handleFinishedGoodsTransfer(
-          sourceModels,
-          destinationModels,
-          item.itemCode,
-          item.quantity,
-          item.notes || '',
-          true // isFromCentralKitchen = true
-        );
-        
-        console.log(`✅ Finished goods transfer completed for ${item.itemCode}`);
-      }
     }
     } catch (inventoryError) {
       console.error('❌ Error updating inventory:', inventoryError);
@@ -280,19 +262,52 @@ router.put('/:id/approve', ensureConnections, async (req, res) => {
       });
     }
 
-    // Update transfer order status
+    // Update transfer order status and notes
     console.log('✅ Updating transfer order status to Approved');
     transferOrder.status = 'Approved';
-    transferOrder.approvedBy = transferOrder.fromOutlet === 'Ingredient Master' ? 'Ingredient Master' : 'Central Kitchen Manager';
+    
+    // Update notes if provided in request
+    if (req.body.notes) {
+      transferOrder.notes = req.body.notes;
+      console.log('📝 Transfer order notes updated:', req.body.notes);
+    }
+    
+    // Determine who approved based on transfer direction
+    if (isFromCentralKitchen) {
+      // Central Kitchen → Outlet: Approved by outlet
+      transferOrder.approvedBy = `${requestingOutletName} Manager`;
+    } else {
+      // Outlet → Central Kitchen: Approved by Central Kitchen
+      transferOrder.approvedBy = transferOrder.fromOutlet === 'Ingredient Master' ? 'Ingredient Master' : 'Central Kitchen Manager';
+    }
     transferOrder.transferStartedAt = new Date();
     await transferOrder.save();
+
+    // Mark the original transfer request notification as read (disabled)
+    try {
+      const notificationService = require('../services/persistentNotificationService');
+      // Mark as read so it appears disabled but still visible
+      const markedCount = await notificationService.markNotificationsByTransferOrderIdAsRead(transferOrder._id.toString());
+      console.log(`✅ Marked ${markedCount} transfer request notification(s) as read for transfer order ${transferOrder.transferNumber}`);
+    } catch (notificationCleanupError) {
+      console.error('⚠️  Failed to mark transfer request notification as read:', notificationCleanupError);
+      // Don't fail the entire operation if notification cleanup fails
+    }
 
     // After local approval and inventory updates, push to Zoho
     try {
       const { pushTransferOrderToZoho } = require('./transferOrders');
       if (typeof pushTransferOrderToZoho === 'function') {
         console.log(`🔄 Pushing approved transfer order ${transferOrder.transferNumber} to Zoho Inventory...`);
-        const zohoPushResult = await pushTransferOrderToZoho(transferOrder);
+        
+        // Create a modified transfer order object with edited items if provided
+        const transferOrderForZoho = { ...transferOrder.toObject() };
+        if (editedItems && editedItems.length > 0) {
+          console.log('📝 Using edited quantities for Zoho push');
+          transferOrderForZoho.items = editedItems;
+        }
+        
+        const zohoPushResult = await pushTransferOrderToZoho(transferOrderForZoho);
         if (zohoPushResult && zohoPushResult.zohoTransferOrderId) {
           await TransferOrder.findByIdAndUpdate(transferOrder._id, {
             $set: {
@@ -310,30 +325,45 @@ router.put('/:id/approve', ensureConnections, async (req, res) => {
       // Continue even if Zoho push fails
     }
 
-    // Create notification for the requesting outlet (fromOutlet) that their request was approved
+    // Create notification based on transfer direction
     try {
-      console.log(`📢 Creating approval notification for ${fromOutletName}...`);
-      
-      // Determine the item type for the notification
       const itemType = transferOrder.items[0]?.itemType || 'Mixed';
       const itemDetails = transferOrder.items.map(item => `${item.itemName} (${item.quantity} ${item.unitOfMeasure || 'pcs'})`).join(', ');
       
-      const notificationData = {
-        title: 'Transfer Request Approved',
-        message: `Your transfer request #${transferOrder.transferNumber} has been approved by Central Kitchen. Items: ${itemDetails}`,
-        type: 'transfer_acceptance',
-        targetOutlet: fromOutletName, // Send back to the requesting outlet
-        sourceOutlet: 'Central Kitchen',
-        transferOrderId: transferOrder._id.toString(),
-        itemType: itemType,
-        priority: 'normal'
-      };
+      let notificationData;
+      if (isFromCentralKitchen) {
+        // Central Kitchen → Outlet: Notify Central Kitchen that outlet approved
+        console.log(`📢 Creating approval notification for Central Kitchen...`);
+        notificationData = {
+          title: 'Transfer Request Approved by Outlet',
+          message: `Transfer order #${transferOrder.transferNumber} has been approved by ${requestingOutletName}. Items: ${itemDetails}`,
+          type: 'transfer_acceptance',
+          targetOutlet: 'Central Kitchen',
+          sourceOutlet: requestingOutletName,
+          transferOrderId: transferOrder._id.toString(),
+          itemType: determinedItemType,
+          priority: 'normal'
+        };
+      } else {
+        // Outlet → Central Kitchen: Notify outlet that Central Kitchen approved
+        console.log(`📢 Creating approval notification for ${fromOutletName}...`);
+        notificationData = {
+          title: 'Transfer Request Approved',
+          message: `Your transfer request #${transferOrder.transferNumber} has been approved by Central Kitchen. Items: ${itemDetails}`,
+          type: 'transfer_acceptance',
+          targetOutlet: fromOutletName, // Send back to the requesting outlet
+          sourceOutlet: 'Central Kitchen',
+          transferOrderId: transferOrder._id.toString(),
+          itemType: determinedItemType,
+          priority: 'normal'
+        };
+      }
       
       // Use the persistent notification service
       const notificationService = require('../services/persistentNotificationService');
       const notification = await notificationService.createNotification(notificationData);
       
-      console.log(`✅ Approval notification created for ${fromOutletName}: Transfer approved`);
+      console.log(`✅ Approval notification created: Transfer approved`);
       
     } catch (notificationError) {
       console.error('⚠️  Failed to create approval notification:', notificationError);
@@ -376,36 +406,91 @@ router.put('/:id/reject', ensureConnections, async (req, res) => {
       });
     }
 
+    // Get the correct outlet names (handle both string and object formats)
+    const fromOutletName = typeof transferOrder.fromOutlet === 'string' 
+      ? transferOrder.fromOutlet 
+      : (transferOrder.fromOutlet?.name || transferOrder.fromOutlet);
+    const toOutletName = typeof transferOrder.toOutlet === 'string' 
+      ? transferOrder.toOutlet 
+      : (transferOrder.toOutlet?.name || transferOrder.toOutlet);
+    
+    // Determine transfer direction
+    const isFromCentralKitchen = fromOutletName.toLowerCase().includes('central kitchen');
+    const rejectionNotes = req.body.notes || (isFromCentralKitchen ? 'Transfer order rejected by outlet' : 'Transfer order rejected by Central Kitchen');
+    
     // Update transfer order status to rejected
     transferOrder.status = 'Rejected';
-    transferOrder.approvedBy = 'Central Kitchen Manager';
-    transferOrder.notes = 'Transfer order rejected by Central Kitchen';
+    if (isFromCentralKitchen) {
+      // Central Kitchen → Outlet: Rejected by outlet
+      transferOrder.approvedBy = `${toOutletName} Manager`;
+    } else {
+      // Outlet → Central Kitchen: Rejected by Central Kitchen
+      transferOrder.approvedBy = 'Central Kitchen Manager';
+    }
+    transferOrder.notes = rejectionNotes;
     await transferOrder.save();
 
-    // Create notification for the requesting outlet (fromOutlet) that their request was rejected
+    // Mark the original transfer request notification as read (disabled)
     try {
-      console.log(`📢 Creating rejection notification for ${transferOrder.fromOutlet}...`);
+      const notificationService = require('../services/persistentNotificationService');
+      // Mark as read so it appears disabled but still visible
+      const markedCount = await notificationService.markNotificationsByTransferOrderIdAsRead(transferOrder._id.toString());
+      console.log(`✅ Marked ${markedCount} transfer request notification(s) as read for transfer order ${transferOrder.transferNumber}`);
+    } catch (notificationCleanupError) {
+      console.error('⚠️  Failed to mark transfer request notification as read:', notificationCleanupError);
+      // Don't fail the entire operation if notification cleanup fails
+    }
+
+    // Create notification based on transfer direction
+    try {
+      // Determine itemType: check if all items are the same type, otherwise 'Mixed'
+      const itemTypes = transferOrder.items.map(item => item.itemType).filter(Boolean)
+      const uniqueItemTypes = [...new Set(itemTypes)]
+      let determinedItemType = 'Mixed'
+      if (uniqueItemTypes.length === 1) {
+        determinedItemType = uniqueItemTypes[0] // 'Raw Material' or 'Finished Goods'
+      } else if (uniqueItemTypes.length > 1) {
+        determinedItemType = 'Mixed' // Both types present
+      } else if (transferOrder.items.length > 0 && transferOrder.items[0]?.itemType) {
+        determinedItemType = transferOrder.items[0].itemType // Fallback to first item's type
+      }
       
-      // Determine the item type for the notification
-      const itemType = transferOrder.items[0]?.itemType || 'Mixed';
       const itemDetails = transferOrder.items.map(item => `${item.itemName} (${item.quantity} ${item.unitOfMeasure || 'pcs'})`).join(', ');
       
-      const notificationData = {
-        title: 'Transfer Request Rejected',
-        message: `Your transfer request #${transferOrder.transferNumber} has been rejected by Central Kitchen. Items: ${itemDetails}. Reason: ${transferOrder.notes}`,
-        type: 'transfer_rejection',
-        targetOutlet: transferOrder.fromOutlet, // Send back to the requesting outlet
-        sourceOutlet: 'Central Kitchen',
-        transferOrderId: transferOrder._id.toString(),
-        itemType: itemType,
-        priority: 'normal'
-      };
+      let notificationData;
+      if (isFromCentralKitchen) {
+        // Central Kitchen → Outlet: Notify Central Kitchen that outlet rejected
+        console.log(`📢 Creating rejection notification for Central Kitchen...`);
+        notificationData = {
+          title: 'Transfer Request Rejected by Outlet',
+          message: `Transfer order #${transferOrder.transferNumber} has been rejected by ${toOutletName}. Items: ${itemDetails}. Reason: ${rejectionNotes}`,
+          type: 'transfer_rejection',
+          targetOutlet: 'Central Kitchen',
+          sourceOutlet: toOutletName,
+          transferOrderId: transferOrder._id.toString(),
+          itemType: determinedItemType,
+          priority: 'normal'
+        };
+      } else {
+        // Outlet → Central Kitchen: Notify outlet that Central Kitchen rejected
+        console.log(`📢 Creating rejection notification for ${fromOutletName}...`);
+        notificationData = {
+          title: 'Transfer Request Rejected',
+          message: `Your transfer request #${transferOrder.transferNumber} has been rejected by Central Kitchen. Items: ${itemDetails}. Reason: ${rejectionNotes}`,
+          type: 'transfer_rejection',
+          targetOutlet: fromOutletName, // Send back to the requesting outlet
+          sourceOutlet: 'Central Kitchen',
+          transferOrderId: transferOrder._id.toString(),
+          itemType: determinedItemType,
+          priority: 'normal'
+        };
+      }
       
       // Use the persistent notification service
       const notificationService = require('../services/persistentNotificationService');
       const notification = await notificationService.createNotification(notificationData);
       
-      console.log(`✅ Rejection notification created for ${transferOrder.fromOutlet}: Transfer rejected`);
+      console.log(`✅ Rejection notification created: Transfer rejected`);
       
     } catch (notificationError) {
       console.error('⚠️  Failed to create rejection notification:', notificationError);

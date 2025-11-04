@@ -143,35 +143,48 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                 <p>No notifications</p>
               </div>
             ) : (
-              notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`p-4 border-b border-gray-100 hover:bg-gray-50 ${
-                    !notification.read ? 'bg-blue-50' : ''
-                  } ${
-                    notification.isTransferOrder && notification.transferOrderId && onViewTransferOrder
-                      ? 'cursor-pointer hover:bg-blue-100 transition-colors' : ''
-                  }`}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    console.log('🔍 NotificationDropdown: Notification clicked!')
-                    console.log('🔍 NotificationDropdown: notification =', notification)
-                    console.log('🔍 NotificationDropdown: isTransferOrder =', notification.isTransferOrder)
-                    console.log('🔍 NotificationDropdown: transferOrderId =', notification.transferOrderId)
-                    console.log('🔍 NotificationDropdown: onViewTransferOrder =', !!onViewTransferOrder)
-                    
-                    if (notification.isTransferOrder && notification.transferOrderId && onViewTransferOrder) {
-                      console.log('✅ NotificationDropdown: All conditions met, calling onViewTransferOrder')
-                      onViewTransferOrder(notification.transferOrderId)
-                    } else {
-                      console.log('❌ NotificationDropdown: Conditions not met for transfer order')
-                      console.log('❌ NotificationDropdown: isTransferOrder =', notification.isTransferOrder)
-                      console.log('❌ NotificationDropdown: transferOrderId =', notification.transferOrderId)
-                      console.log('❌ NotificationDropdown: onViewTransferOrder exists =', !!onViewTransferOrder)
-                    }
-                  }}
-                >
+              notifications.map((notification) => {
+                // Check if notification is disabled (read and is a transfer request)
+                const isDisabled = notification.read && notification.title?.includes('Transfer Request from');
+                
+                return (
+                  <div
+                    key={notification.id}
+                    className={`p-4 border-b border-gray-100 ${
+                      !notification.read ? 'bg-blue-50' : 'bg-gray-50'
+                    } ${
+                      isDisabled 
+                        ? 'opacity-70 cursor-pointer' 
+                        : (notification.isTransferOrder && notification.transferOrderId && onViewTransferOrder
+                            ? 'cursor-pointer hover:bg-blue-100 transition-colors' 
+                            : 'hover:bg-gray-50')
+                    }`}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      
+                      // Allow viewing disabled notifications (they're read-only)
+                      // Even if disabled, we can still view the transfer order details
+                      console.log('🔍 NotificationDropdown: Notification clicked!')
+                      console.log('🔍 NotificationDropdown: notification =', notification)
+                      console.log('🔍 NotificationDropdown: isDisabled =', isDisabled)
+                      console.log('🔍 NotificationDropdown: isTransferOrder =', notification.isTransferOrder)
+                      console.log('🔍 NotificationDropdown: transferOrderId =', notification.transferOrderId)
+                      console.log('🔍 NotificationDropdown: onViewTransferOrder =', !!onViewTransferOrder)
+                      
+                      if (notification.isTransferOrder && notification.transferOrderId && onViewTransferOrder) {
+                        console.log('✅ NotificationDropdown: All conditions met, calling onViewTransferOrder')
+                        // Close the dropdown when clicking on a notification
+                        setIsOpen(false)
+                        onViewTransferOrder(notification.transferOrderId)
+                      } else {
+                        console.log('❌ NotificationDropdown: Conditions not met for transfer order')
+                        console.log('❌ NotificationDropdown: isTransferOrder =', notification.isTransferOrder)
+                        console.log('❌ NotificationDropdown: transferOrderId =', notification.transferOrderId)
+                        console.log('❌ NotificationDropdown: onViewTransferOrder exists =', !!onViewTransferOrder)
+                      }
+                    }}
+                  >
                   <div className="flex items-start space-x-3">
                     <div className="flex-shrink-0 mt-0.5">
                       {getNotificationIcon(notification.type)}
@@ -197,8 +210,10 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                         </p>
                       )}
                       {notification.isTransferOrder && notification.transferOrderId && onViewTransferOrder && (
-                        <p className="text-xs text-blue-600 mt-1 font-medium">
-                          Click to view transfer details →
+                        <p className={`text-xs mt-1 font-medium ${
+                          isDisabled ? 'text-gray-400' : 'text-blue-600'
+                        }`}>
+                          {isDisabled ? '✓ Processed (view only)' : 'Click to view transfer details →'}
                         </p>
                       )}
                     </div>
@@ -209,13 +224,24 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                             e.stopPropagation()
                             console.log('NotificationDropdown: Clicking View button')
                             console.log('NotificationDropdown: notification.transferOrderId =', notification.transferOrderId)
+                            // Close the dropdown when clicking the view button
+                            setIsOpen(false)
                             onViewTransferOrder(notification.transferOrderId!)
                           }}
-                          className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
-                          title="View Transfer Order"
+                          className={`p-1 rounded transition-colors ${
+                            isDisabled 
+                              ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100' 
+                              : 'text-blue-600 hover:text-blue-800 hover:bg-blue-100'
+                          }`}
+                          title={isDisabled ? "View Transfer Order (Read-only)" : "View Transfer Order"}
                         >
                           <Eye className="h-4 w-4" />
                         </button>
+                      )}
+                      {isDisabled && (
+                        <span className="text-xs text-gray-400 px-2 py-1 bg-gray-100 rounded" title="This transfer order has been processed">
+                          ✓ Processed
+                        </span>
                       )}
                       <button
                         onClick={() => onMarkAsRead(notification.id)}
@@ -229,7 +255,8 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                     </div>
                   </div>
                 </div>
-              ))
+                )
+              })
             )}
           </div>
 
