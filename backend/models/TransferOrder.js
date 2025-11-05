@@ -99,7 +99,7 @@ const TransferOrderSchema = new mongoose.Schema({
   status: {
     type: String,
     required: true,
-    enum: ['Pending', 'Approved', 'Rejected', 'In Transit', 'Completed', 'Cancelled', 'Failed'],
+    enum: ['Pending', 'Approved', 'Approved by Central Kitchen', 'Rejected', 'In Transit', 'Completed', 'Cancelled', 'Failed'],
     default: 'Pending'
   },
   

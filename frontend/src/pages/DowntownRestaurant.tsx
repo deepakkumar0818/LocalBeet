@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { Package, AlertTriangle, Store, Truck, RefreshCw, ShoppingCart, Receipt, CreditCard, Plus, Download, Upload } from 'lucide-react'
 import { apiService } from '../services/api'
 import TransferOrderModal, { TransferOrder } from '../components/TransferOrderModal'
+import NotificationDropdown from '../components/NotificationDropdown'
+import { useNotifications } from '../hooks/useNotifications'
 import * as XLSX from 'xlsx'
 
 interface OutletInventoryItem {
@@ -92,6 +94,7 @@ const DowntownRestaurant: React.FC = () => {
   const [showTransferOrderModal, setShowTransferOrderModal] = useState(false)
   const [selectedTransferOrder, setSelectedTransferOrder] = useState<TransferOrder | null>(null)
   const [transferOrderLoading, setTransferOrderLoading] = useState(false)
+  const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Kuwait City')
 
   // Determine current section based on URL
   const getCurrentSection = () => {
@@ -103,6 +106,44 @@ const DowntownRestaurant: React.FC = () => {
   }
 
   const currentSection = getCurrentSection()
+
+  // Filter notifications based on current section
+  const getFilteredNotifications = () => {
+    const currentSection = getCurrentSection()
+    
+    console.log(`🔔 Kuwait City: Current section: ${currentSection}`)
+    console.log(`🔔 Kuwait City: All notifications:`, notifications)
+    
+    let filtered = []
+    if (currentSection === 'raw-materials') {
+      // Show only Raw Material notifications
+      filtered = notifications.filter(notification => 
+        notification.isTransferOrder && 
+        (notification.itemType === 'Raw Material' || notification.itemType === 'Mixed')
+      )
+    } else if (currentSection === 'finished-goods') {
+      // Show only Finished Goods notifications
+      filtered = notifications.filter(notification => 
+        notification.isTransferOrder && 
+        (notification.itemType === 'Finished Goods' || notification.itemType === 'Mixed')
+      )
+    } else {
+      // Show all notifications for other sections
+      filtered = notifications
+    }
+    
+    console.log(`🔔 Kuwait City: Filtered notifications for ${currentSection}:`, filtered)
+    return filtered
+  }
+
+  // Debug notifications when they change
+  useEffect(() => {
+    console.log(`🔔 Kuwait City: Notifications updated:`, notifications)
+    console.log(`🔔 Kuwait City: Number of notifications: ${notifications.length}`)
+    if (notifications.length > 0) {
+      console.log(`🔔 Kuwait City: First notification:`, notifications[0])
+    }
+  }, [notifications])
 
   // Handler for viewing transfer orders (defined early so it can be used in useEffect)
   const handleViewTransferOrder = React.useCallback(async (transferOrderId: string) => {
@@ -238,8 +279,8 @@ const DowntownRestaurant: React.FC = () => {
         // Refresh inventory
         await loadInventory()
         
-        // Refresh notifications in Layout (will happen automatically via Layout's useNotifications hook)
-        window.dispatchEvent(new CustomEvent('refreshNotifications'))
+        // Refresh notifications
+        refreshNotifications()
       } else {
         throw new Error(`Failed to approve transfer order: ${approvalResponse.message}`)
       }
@@ -280,8 +321,8 @@ const DowntownRestaurant: React.FC = () => {
         setShowTransferOrderModal(false)
         setSelectedTransferOrder(null)
         
-        // Refresh notifications in Layout (will happen automatically via Layout's useNotifications hook)
-        window.dispatchEvent(new CustomEvent('refreshNotifications'))
+        // Refresh notifications
+        refreshNotifications()
       } else {
         throw new Error(`Failed to reject transfer order: ${rejectionResponse.message}`)
       }
@@ -1028,7 +1069,7 @@ const DowntownRestaurant: React.FC = () => {
           <div className="p-3 bg-blue-100 rounded-lg">
             <Store className="h-8 w-8 text-blue-600" />
           </div>
-                        <div>
+          <div>
             <h1 className="text-2xl font-bold text-gray-900">Kuwait City</h1>
             <p className="text-gray-600">
               {currentSection === 'raw-materials' ? 'Raw Materials Inventory' :
@@ -1036,8 +1077,8 @@ const DowntownRestaurant: React.FC = () => {
                currentSection === 'sales-orders' ? 'Sales Orders' :
                'Premium dining restaurant'} - {outlet?.outletName}
             </p>
-                        </div>
-                        </div>
+          </div>
+        </div>
         <div className="flex gap-3">
           <button
             onClick={() => {
@@ -1068,8 +1109,16 @@ const DowntownRestaurant: React.FC = () => {
               Request Finished Goods
             </button>
           )}
-            </div>
-          </div>
+          <NotificationDropdown
+            notifications={getFilteredNotifications()}
+            onMarkAsRead={markAsRead}
+            onMarkAllAsRead={markAllAsRead}
+            onClearAll={clearAll}
+            onRefresh={refreshNotifications}
+            onViewTransferOrder={handleViewTransferOrder}
+          />
+        </div>
+      </div>
 
       {/* Section Content */}
       {renderSectionContent()}

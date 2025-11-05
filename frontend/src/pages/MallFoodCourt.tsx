@@ -136,9 +136,52 @@ const MallFoodCourt: React.FC = () => {
 
   const currentSection = getCurrentSection()
 
+  // Open transfer order from notification (defined early so it can be used in useEffect)
+  const handleViewTransferOrder = React.useCallback(async (transferOrderId: string) => {
+    try {
+      console.log('🔍 360 Mall: handleViewTransferOrder called with transferOrderId:', transferOrderId)
+      setTransferOrderLoading(true)
+      const response = await apiService.getTransferOrderById(transferOrderId)
+      if (response.success) {
+        setSelectedTransferOrder(response.data)
+        setShowTransferOrderModal(true)
+        console.log('✅ 360 Mall: Transfer order modal opened successfully')
+      } else {
+        throw new Error(response.message || 'Failed to load transfer order')
+      }
+    } catch (error) {
+      console.error('Error loading transfer order:', error)
+      alert('Failed to load transfer order details')
+    } finally {
+      setTransferOrderLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     loadOutletData()
-  }, [])
+    loadInventory()
+    
+    // Listen for transfer order view requests from Layout notifications
+    const handleLayoutViewRequest = (event: CustomEvent) => {
+      const { transferOrderId } = event.detail
+      if (transferOrderId) {
+        handleViewTransferOrder(transferOrderId)
+      }
+    }
+    
+    window.addEventListener('viewTransferOrder', handleLayoutViewRequest as EventListener)
+    
+    // Also check localStorage on mount
+    const pendingView = localStorage.getItem('pendingTransferOrderView')
+    if (pendingView) {
+      localStorage.removeItem('pendingTransferOrderView')
+      handleViewTransferOrder(pendingView)
+    }
+    
+    return () => {
+      window.removeEventListener('viewTransferOrder', handleLayoutViewRequest as EventListener)
+    }
+  }, [handleViewTransferOrder])
 
   // Debug notifications when they change
   useEffect(() => {
@@ -216,56 +259,60 @@ const MallFoodCourt: React.FC = () => {
     }
   }
 
-  // Open transfer order from notification
-  const handleViewTransferOrder = async (transferOrderId: string) => {
-    try {
-      setTransferOrderLoading(true)
-      const response = await apiService.getTransferOrderById(transferOrderId)
-      if (response.success) {
-        setSelectedTransferOrder(response.data)
-        setShowTransferOrderModal(true)
-      } else {
-        throw new Error(response.message || 'Failed to load transfer order')
-      }
-    } catch (error) {
-      console.error('Error loading transfer order:', error)
-      alert('Failed to load transfer order details')
-    } finally {
-      setTransferOrderLoading(false)
-    }
-  }
-
   // Approve transfer order (supports edited quantities)
   const handleAcceptTransferOrder = async (transferOrderId: string, editedItems?: any[], notes?: string) => {
     try {
       setTransferOrderLoading(true)
+      console.log('Starting acceptance process for transfer order:', transferOrderId)
+      console.log('Edited items:', editedItems)
+      console.log('Transfer notes:', notes)
+      
+      // Get transfer order details
+      console.log('Fetching transfer order details...')
       const response = await apiService.getTransferOrderById(transferOrderId)
       if (!response.success) {
         throw new Error(response.message || 'Failed to fetch transfer order')
       }
       const transferOrder = response.data
+      console.log('Transfer order details:', transferOrder)
 
+      // Prepare approval data
       const approvalData: any = {
         approvedBy: '360 Mall Manager',
         notes: notes || 'Transfer order approved by 360 Mall'
       }
+      
+      // Include edited items if provided
       if (editedItems && editedItems.length > 0) {
         approvalData.editedItems = editedItems
+        console.log('Including edited items in approval request:', editedItems)
       }
 
+      // Approve transfer order (handles inventory updates and notifications automatically)
+      console.log('Approving transfer order...')
       const approvalResponse = await apiService.approveTransferOrder(transferOrderId, approvalData)
+      console.log('Approval response:', approvalResponse)
+
       if (approvalResponse.success) {
-        const hasMod = editedItems && editedItems.some((item, idx) => item.quantity !== transferOrder.items[idx]?.quantity)
-        alert(`Transfer order accepted successfully!${hasMod ? ' (Quantities modified)' : ''}`)
+        // Backend automatically handles inventory updates and notifications
+        const hasModifications = editedItems && editedItems.some((item, index) => 
+          item.quantity !== transferOrder.items[index]?.quantity
+        )
+        alert(`Transfer order accepted successfully!${hasModifications ? ' (Quantities modified)' : ''}`)
         setShowTransferOrderModal(false)
         setSelectedTransferOrder(null)
+        
+        // Refresh inventory
         await loadInventory()
+        
+        // Refresh notifications
         refreshNotifications()
       } else {
         throw new Error(`Failed to approve transfer order: ${approvalResponse.message}`)
       }
     } catch (error) {
       console.error('Error accepting transfer order:', error)
+      console.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
       alert(`Failed to accept transfer order: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setTransferOrderLoading(false)

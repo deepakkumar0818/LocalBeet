@@ -742,26 +742,48 @@ async function handleRawMaterialTransfer(sourceModels, destinationModels, itemCo
   
   if (isFromCentralKitchen) {
     // Transfer FROM Central Kitchen TO outlet
-    SourceRawMaterial = centralKitchenModels.CentralKitchenRawMaterial;
-    // Determine the destination outlet name from the models
-    let destinationOutletName = 'kuwait city'; // default
-    if (destinationModels.KuwaitCityRawMaterial) destinationOutletName = 'kuwait city';
-    else if (destinationModels.Mall360RawMaterial) destinationOutletName = '360 mall';
-    else if (destinationModels.VibeComplexRawMaterial) destinationOutletName = 'vibe complex';
-    else if (destinationModels.TaibaKitchenRawMaterial) destinationOutletName = 'taiba hospital';
-    
-    DestinationRawMaterial = await getOutletModel(destinationOutletName);
+    // Use Central Kitchen models from sourceModels (passed from middleware) or fallback to module-level
+    if (sourceModels && sourceModels.CentralKitchenRawMaterial) {
+      SourceRawMaterial = sourceModels.CentralKitchenRawMaterial;
+    } else if (centralKitchenModels && centralKitchenModels.CentralKitchenRawMaterial) {
+      SourceRawMaterial = centralKitchenModels.CentralKitchenRawMaterial;
+    } else {
+      throw new Error('No valid Central Kitchen Raw Material model found. Ensure centralKitchenModels is initialized.');
+    }
+    // Use the models directly from the destinationModels object (already initialized via middleware)
+    if (destinationModels.KuwaitCityRawMaterial) {
+      DestinationRawMaterial = destinationModels.KuwaitCityRawMaterial;
+    } else if (destinationModels.Mall360RawMaterial) {
+      DestinationRawMaterial = destinationModels.Mall360RawMaterial;
+    } else if (destinationModels.VibeComplexRawMaterial) {
+      DestinationRawMaterial = destinationModels.VibeComplexRawMaterial;
+    } else if (destinationModels.TaibaKitchenRawMaterial) {
+      DestinationRawMaterial = destinationModels.TaibaKitchenRawMaterial;
+    } else {
+      throw new Error('No valid destination outlet Raw Material model found in destinationModels');
+    }
   } else {
     // Transfer FROM outlet TO Central Kitchen
-    // Determine the source outlet name from the models
-    let sourceOutletName = 'kuwait city'; // default
-    if (sourceModels.KuwaitCityRawMaterial) sourceOutletName = 'kuwait city';
-    else if (sourceModels.Mall360RawMaterial) sourceOutletName = '360 mall';
-    else if (sourceModels.VibeComplexRawMaterial) sourceOutletName = 'vibe complex';
-    else if (sourceModels.TaibaKitchenRawMaterial) sourceOutletName = 'taiba hospital';
-    
-    SourceRawMaterial = await getOutletModel(sourceOutletName);
-    DestinationRawMaterial = centralKitchenModels.CentralKitchenRawMaterial;
+    // Use the models directly from the sourceModels object (already initialized via middleware)
+    if (sourceModels.KuwaitCityRawMaterial) {
+      SourceRawMaterial = sourceModels.KuwaitCityRawMaterial;
+    } else if (sourceModels.Mall360RawMaterial) {
+      SourceRawMaterial = sourceModels.Mall360RawMaterial;
+    } else if (sourceModels.VibeComplexRawMaterial) {
+      SourceRawMaterial = sourceModels.VibeComplexRawMaterial;
+    } else if (sourceModels.TaibaKitchenRawMaterial) {
+      SourceRawMaterial = sourceModels.TaibaKitchenRawMaterial;
+    } else {
+      throw new Error('No valid source outlet Raw Material model found in sourceModels');
+    }
+    // Use Central Kitchen models from destinationModels (passed from middleware) or fallback to module-level
+    if (destinationModels && destinationModels.CentralKitchenRawMaterial) {
+      DestinationRawMaterial = destinationModels.CentralKitchenRawMaterial;
+    } else if (centralKitchenModels && centralKitchenModels.CentralKitchenRawMaterial) {
+      DestinationRawMaterial = centralKitchenModels.CentralKitchenRawMaterial;
+    } else {
+      throw new Error('No valid Central Kitchen Raw Material model found. Ensure centralKitchenModels is initialized.');
+    }
   }
 
   if (!SourceRawMaterial) {
@@ -855,18 +877,54 @@ async function handleFinishedGoodsTransfer(sourceModels, destinationModels, item
   console.log(`   Quantity: ${quantity}`);
   console.log(`   Direction: ${isFromCentralKitchen ? 'FROM Central Kitchen TO outlet' : 'FROM outlet TO Central Kitchen'}`);
   
-  // Get source and destination models
-  const SourceFinishedProduct = sourceModels.CentralKitchenFinishedProduct || 
-    sourceModels.KuwaitCityFinishedProduct || 
-    sourceModels.Mall360FinishedProduct || 
-    sourceModels.VibeComplexFinishedProduct || 
-    sourceModels.TaibaKitchenFinishedProduct;
-    
-  const DestinationFinishedProduct = destinationModels.CentralKitchenFinishedProduct || 
-    destinationModels.KuwaitCityFinishedProduct || 
-    destinationModels.Mall360FinishedProduct || 
-    destinationModels.VibeComplexFinishedProduct || 
-    destinationModels.TaibaKitchenFinishedProduct;
+  // Get source and destination models using the correct database connections
+  let SourceFinishedProduct, DestinationFinishedProduct;
+  
+  if (isFromCentralKitchen) {
+    // Transfer FROM Central Kitchen TO outlet
+    // Use Central Kitchen models from sourceModels (passed from middleware) or fallback to module-level
+    if (sourceModels && sourceModels.CentralKitchenFinishedProduct) {
+      SourceFinishedProduct = sourceModels.CentralKitchenFinishedProduct;
+    } else if (centralKitchenModels && centralKitchenModels.CentralKitchenFinishedProduct) {
+      SourceFinishedProduct = centralKitchenModels.CentralKitchenFinishedProduct;
+    } else {
+      throw new Error('No valid Central Kitchen Finished Product model found. Ensure centralKitchenModels is initialized.');
+    }
+    // Use the models directly from the destinationModels object (already initialized via middleware)
+    if (destinationModels.KuwaitCityFinishedProduct) {
+      DestinationFinishedProduct = destinationModels.KuwaitCityFinishedProduct;
+    } else if (destinationModels.Mall360FinishedProduct) {
+      DestinationFinishedProduct = destinationModels.Mall360FinishedProduct;
+    } else if (destinationModels.VibeComplexFinishedProduct) {
+      DestinationFinishedProduct = destinationModels.VibeComplexFinishedProduct;
+    } else if (destinationModels.TaibaKitchenFinishedProduct) {
+      DestinationFinishedProduct = destinationModels.TaibaKitchenFinishedProduct;
+    } else {
+      throw new Error('No valid destination outlet Finished Product model found in destinationModels');
+    }
+  } else {
+    // Transfer FROM outlet TO Central Kitchen
+    // Use the models directly from the sourceModels object (already initialized via middleware)
+    if (sourceModels.KuwaitCityFinishedProduct) {
+      SourceFinishedProduct = sourceModels.KuwaitCityFinishedProduct;
+    } else if (sourceModels.Mall360FinishedProduct) {
+      SourceFinishedProduct = sourceModels.Mall360FinishedProduct;
+    } else if (sourceModels.VibeComplexFinishedProduct) {
+      SourceFinishedProduct = sourceModels.VibeComplexFinishedProduct;
+    } else if (sourceModels.TaibaKitchenFinishedProduct) {
+      SourceFinishedProduct = sourceModels.TaibaKitchenFinishedProduct;
+    } else {
+      throw new Error('No valid source outlet Finished Product model found in sourceModels');
+    }
+    // Use Central Kitchen models from destinationModels (passed from middleware) or fallback to module-level
+    if (destinationModels && destinationModels.CentralKitchenFinishedProduct) {
+      DestinationFinishedProduct = destinationModels.CentralKitchenFinishedProduct;
+    } else if (centralKitchenModels && centralKitchenModels.CentralKitchenFinishedProduct) {
+      DestinationFinishedProduct = centralKitchenModels.CentralKitchenFinishedProduct;
+    } else {
+      throw new Error('No valid Central Kitchen Finished Product model found. Ensure centralKitchenModels is initialized.');
+    }
+  }
 
   if (!SourceFinishedProduct) {
     throw new Error('No valid source Finished Product model found');
