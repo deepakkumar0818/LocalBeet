@@ -36,7 +36,7 @@ export interface TransferOrder {
   }
   transferDate: string
   priority: 'Low' | 'Medium' | 'High' | 'Urgent' | 'Normal'
-  status: 'Pending' | 'Approved' | 'In Transit' | 'Delivered' | 'Cancelled'
+  status: 'Pending' | 'Approved' | 'Approved by Central Kitchen' | 'In Transit' | 'Delivered' | 'Cancelled'
   totalAmount?: number
   totalValue?: number
   items: TransferOrderItem[]
@@ -79,6 +79,7 @@ const TransferOrderModal: React.FC<TransferOrderModalProps> = ({
   if (!isOpen || !transferOrder) return null
 
   // Check if transfer order is already processed (Approved or Rejected)
+  // Note: 'Approved by Central Kitchen' is NOT processed - outlet can still accept/reject
   const isProcessed = transferOrder.status === 'Approved' || transferOrder.status === 'Rejected'
 
   const getPriorityColor = (priority: string) => {
@@ -96,7 +97,9 @@ const TransferOrderModal: React.FC<TransferOrderModalProps> = ({
     }
   }
 
-  const isPending = transferOrder.status === 'Pending'
+  // Allow accept/reject for 'Pending' or 'Approved by Central Kitchen' status
+  // 'Approved by Central Kitchen' means outlet needs to accept/reject
+  const isPending = transferOrder.status === 'Pending' || transferOrder.status === 'Approved by Central Kitchen'
 
 
   const formatDate = (dateString: string) => {
