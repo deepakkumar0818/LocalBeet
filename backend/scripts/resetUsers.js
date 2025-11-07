@@ -4,15 +4,17 @@
  */
 const connectDB = require('../config/database')
 const User = require('../models/User')
+const bcrypt = require('bcryptjs')
 
 async function createUser({ name, email, password, role = 'Staff', isAdmin = false, assignedOutletCode = '' }) {
-  // Note: Auth route currently uses plain-text comparison.
-  // Store passwords as plain text to match existing login behavior.
-  // If you later switch auth to bcrypt, update this script accordingly.
+  // Hash the password before storing
+  const saltRounds = 10
+  const hashedPassword = await bcrypt.hash(String(password), saltRounds)
+  
   return {
     name,
     email: String(email).toLowerCase(),
-    password: String(password),
+    password: hashedPassword,
     role,
     isAdmin,
     status: 'Active',
