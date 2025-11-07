@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const User = require('../models/User')
+const bcrypt = require('bcryptjs')
 
 // GET /api/users - list users (basic)
 router.get('/', async (req, res) => {
@@ -23,7 +24,12 @@ router.post('/', async (req, res) => {
     if (existing) {
       return res.status(409).json({ success: false, message: 'User with this email already exists' })
     }
-    const user = await User.create({ name, email, password, role, status, isAdmin, assignedOutletCode })
+    
+    // Hash the password before storing
+    const saltRounds = 10
+    const hashedPassword = await bcrypt.hash(password, saltRounds)
+    
+    const user = await User.create({ name, email, password: hashedPassword, role, status, isAdmin, assignedOutletCode })
     const { password: _, ...publicUser } = user.toObject()
     res.status(201).json({ success: true, data: publicUser, message: 'User created' })
   } catch (err) {

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { JWT_SECRET } = require('../middlewares/auth');
 
 // POST /api/auth/login - User login
@@ -27,7 +28,31 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    if (dbUser.password !== password) {
+    // Check if password is hashed (starts with $2) or plain text (for backward compatibility)
+    let isPasswordValid = false;
+    
+    // Ensure password from request is a string and not already hashed
+    const plainPassword = String(password).trim();
+    
+    // If the input password looks like a hash (starts with $2), reject it
+    // Users should always enter their original plain text password
+    if (plainPassword.startsWith('$2')) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Please enter your original password, not a hashed password' 
+      });
+    }
+    
+    if (dbUser.password.startsWith('$2')) {
+      // Password in DB is hashed, use bcrypt comparison with plain text input
+      isPasswordValid = await bcrypt.compare(plainPassword, dbUser.password);
+    } else {
+      // Password in DB is plain text (legacy), compare directly
+      // This allows existing plain text passwords to still work during migration
+      isPasswordValid = dbUser.password === plainPassword;
+    }
+
+    if (!isPasswordValid) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
