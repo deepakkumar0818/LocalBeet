@@ -156,10 +156,12 @@ router.get('/', async (req, res) => {
       success: true,
       data: result.docs,
       pagination: {
-        page: result.page,
-        pages: result.totalPages,
-        total: result.totalDocs,
-        limit: result.limit
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalItems: result.totalDocs,
+        itemsPerPage: result.limit,
+        hasNext: result.hasNextPage,
+        hasPrev: result.hasPrevPage
       }
     });
   } catch (error) {

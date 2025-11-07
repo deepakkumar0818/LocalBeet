@@ -6,6 +6,7 @@ import ConfirmationModal from '../components/ConfirmationModal'
 import NotificationDropdown from '../components/NotificationDropdown'
 import TransferOrderModal, { TransferOrder } from '../components/TransferOrderModal'
 import { useNotifications } from '../hooks/useNotifications'
+import { useDebounce } from '../hooks/useDebounce'
 
 interface OutletInventoryItem {
   id: string
@@ -70,6 +71,13 @@ const CentralKitchenRawMaterials: React.FC = () => {
   const [exportLoading, setExportLoading] = useState(false)
   const [importLoading, setImportLoading] = useState(false)
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Central Kitchen')
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(20)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  // Debounced search term - API will only be called after user stops typing for 500ms
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
   
   // Filter notifications to show Raw Material transfer requests and items received from Ingredient Master
   const rawMaterialNotifications = notifications.filter(notification => 
@@ -105,12 +113,21 @@ const CentralKitchenRawMaterials: React.FC = () => {
     loadCentralKitchenData()
   }, [])
 
-  // Reload inventory when filters change
+  // Reload inventory when filters or pagination change
+  // Use debouncedSearchTerm instead of searchTerm to avoid API calls on every keystroke
   useEffect(() => {
     if (!loading) {
+      setCurrentPage(1) // Reset to first page when filters change
       loadInventory()
     }
-  }, [searchTerm, filterCategory, filterStatus, sortBy, sortOrder])
+  }, [debouncedSearchTerm, filterCategory, filterStatus, sortBy, sortOrder])
+
+  // Reload inventory when page changes
+  useEffect(() => {
+    if (!loading && outlet) {
+      loadInventory()
+    }
+  }, [currentPage, itemsPerPage])
 
   const loadCentralKitchenData = async () => {
     try {
@@ -144,10 +161,12 @@ const CentralKitchenRawMaterials: React.FC = () => {
     try {
       console.log('Loading raw materials from Central Kitchen dedicated database')
       
-      // Load raw materials from Central Kitchen dedicated database
+      // Load raw materials from Central Kitchen dedicated database with pagination
+      // Use debouncedSearchTerm to avoid API calls on every keystroke
       const inventoryResponse = await apiService.getCentralKitchenRawMaterials({
-        limit: 1000,
-        search: searchTerm,
+        page: currentPage,
+        limit: itemsPerPage,
+        search: debouncedSearchTerm,
         subCategory: filterCategory,
         status: filterStatus,
         sortBy: sortBy === 'materialName' ? 'materialName' : sortBy,
@@ -156,6 +175,13 @@ const CentralKitchenRawMaterials: React.FC = () => {
 
       if (inventoryResponse.success) {
         console.log('Loaded Central Kitchen Raw Materials:', inventoryResponse.data)
+        console.log('Pagination info:', inventoryResponse.pagination)
+        
+        // Update pagination state
+        if (inventoryResponse.pagination) {
+          setTotalPages(inventoryResponse.pagination.totalPages)
+          setTotalItems(inventoryResponse.pagination.totalItems)
+        }
         
         if (inventoryResponse.data && inventoryResponse.data.length > 0) {
           // Transform the data to match the expected interface
@@ -208,6 +234,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
     setFilterStatus('')
     setSortBy('materialName')
     setSortOrder('asc')
+    setCurrentPage(1) // Reset to first page when clearing filters
   }
 
   const handleEditItem = (item: OutletInventoryItem) => {
@@ -594,8 +621,8 @@ const CentralKitchenRawMaterials: React.FC = () => {
   }
 
 
-  // Calculate summary statistics
-  const totalItems = inventoryItems.length
+  // Calculate summary statistics (for current page only, as we're using pagination)
+  // Note: For accurate totals across all pages, we'd need separate summary API endpoints
   const totalValue = inventoryItems.reduce((sum, item) => sum + item.totalValue, 0)
   const lowStockItems = inventoryItems.filter(item => item.status === 'Low Stock').length
   const outOfStockItems = inventoryItems.filter(item => item.status === 'Out of Stock').length
@@ -690,6 +717,7 @@ const CentralKitchenRawMaterials: React.FC = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Items</p>
               <p className="text-2xl font-semibold text-gray-900">{totalItems}</p>
+              <p className="text-xs text-gray-500 mt-1">(across all pages)</p>
             </div>
           </div>
         </div>
@@ -835,21 +863,39 @@ const CentralKitchenRawMaterials: React.FC = () => {
         {/* Results Summary */}
         <div className="flex items-center justify-between text-sm text-gray-600">
           <span>
-             Showing {inventoryItems.length} raw material items
+            Showing {totalItems > 0 ? ((currentPage - 1) * itemsPerPage + 1) : 0} - {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} raw material items
             {(searchTerm || filterCategory || filterStatus) && (
               <span className="ml-2 text-blue-600">
                 (filtered)
               </span>
             )}
           </span>
-          {(searchTerm || filterCategory || filterStatus) && (
-            <button
-              onClick={clearFilters}
-              className="text-blue-600 hover:text-blue-800 underline"
-            >
-              Clear filters
-            </button>
-          )}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600">Items per page:</label>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value))
+                  setCurrentPage(1)
+                }}
+                className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+            {(searchTerm || filterCategory || filterStatus) && (
+              <button
+                onClick={clearFilters}
+                className="text-blue-600 hover:text-blue-800 underline"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -923,6 +969,78 @@ const CentralKitchenRawMaterials: React.FC = () => {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="px-4 py-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="First page"
+                >
+                  ««
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Previous page"
+                >
+                  ‹ Previous
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum: number
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = currentPage - 2 + i
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-1 text-sm border rounded-md ${
+                          currentPage === pageNum
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'border-gray-300 hover:bg-gray-100'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  })}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Next page"
+                >
+                  Next ›
+                </button>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Last page"
+                >
+                  »»
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Import Loading Overlay */}
