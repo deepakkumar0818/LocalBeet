@@ -162,15 +162,28 @@ class ApiService {
     limit?: number;
     search?: string;
     category?: string;
+    subCategory?: string;
     status?: string;
     sortBy?: string;
     sortOrder?: string;
-  }) {
+  }): Promise<{
+    success: boolean;
+    data: any[];
+    pagination?: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.search) queryParams.append('search', params.search);
-    if (params?.category) queryParams.append('category', params.category);
+    if (params?.subCategory) queryParams.append('subCategory', params.subCategory);
+    if (params?.category) queryParams.append('subCategory', params.category); // Support both for backward compatibility
     if (params?.status) queryParams.append('status', params.status);
     if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
     if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
@@ -178,7 +191,18 @@ class ApiService {
     const queryString = queryParams.toString();
     const endpoint = `/central-kitchen/raw-materials${queryString ? `?${queryString}` : ''}`;
     
-    return this.request<any[]>(endpoint);
+    return this.request<{
+      success: boolean;
+      data: any[];
+      pagination?: {
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        itemsPerPage: number;
+        hasNext: boolean;
+        hasPrev: boolean;
+      };
+    }>(endpoint);
   }
 
   async getCentralKitchenFinishedProducts(params?: {
@@ -189,7 +213,18 @@ class ApiService {
     status?: string;
     sortBy?: string;
     sortOrder?: string;
-  }) {
+  }): Promise<{
+    success: boolean;
+    data: any[];
+    pagination?: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
@@ -206,10 +241,12 @@ class ApiService {
       success: boolean;
       data: any[];
       pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        itemsPerPage: number;
+        hasNext: boolean;
+        hasPrev: boolean;
       };
     }>(endpoint);
   }
@@ -357,15 +394,28 @@ class ApiService {
     limit?: number;
     search?: string;
     category?: string;
+    subCategory?: string;
     status?: string;
     sortBy?: string;
     sortOrder?: string;
-  }) {
+  }): Promise<{
+    success: boolean;
+    data: any[];
+    pagination?: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.search) queryParams.append('search', params.search);
-    if (params?.category) queryParams.append('category', params.category);
+    if (params?.subCategory) queryParams.append('subCategory', params.subCategory);
+    if (params?.category) queryParams.append('subCategory', params.category); // Support both for backward compatibility
     if (params?.status) queryParams.append('status', params.status);
     if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
     if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
@@ -377,10 +427,12 @@ class ApiService {
       success: boolean;
       data: any[];
       pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        itemsPerPage: number;
+        hasNext: boolean;
+        hasPrev: boolean;
       };
     }>(endpoint);
   }
@@ -393,7 +445,18 @@ class ApiService {
     status?: string;
     sortBy?: string;
     sortOrder?: string;
-  }) {
+  }): Promise<{
+    success: boolean;
+    data: any[];
+    pagination?: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
@@ -410,10 +473,12 @@ class ApiService {
       success: boolean;
       data: any[];
       pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        itemsPerPage: number;
+        hasNext: boolean;
+        hasPrev: boolean;
       };
     }>(endpoint);
   }
@@ -804,15 +869,28 @@ class ApiService {
     limit?: number;
     search?: string;
     category?: string;
+    subCategory?: string;
     status?: string;
     sortBy?: string;
     sortOrder?: string;
-  }) {
+  }): Promise<{
+    success: boolean;
+    data: any[];
+    pagination?: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.search) queryParams.append('search', params.search);
-    if (params?.category) queryParams.append('category', params.category);
+    if (params?.subCategory) queryParams.append('subCategory', params.subCategory);
+    if (params?.category) queryParams.append('subCategory', params.category); // Support both for backward compatibility
     if (params?.status) queryParams.append('status', params.status);
     if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
     if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
@@ -824,10 +902,12 @@ class ApiService {
       success: boolean;
       data: any[];
       pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        itemsPerPage: number;
+        hasNext: boolean;
+        hasPrev: boolean;
       };
     }>(endpoint);
   }
@@ -840,7 +920,18 @@ class ApiService {
     status?: string;
     sortBy?: string;
     sortOrder?: string;
-  }) {
+  }): Promise<{
+    success: boolean;
+    data: any[];
+    pagination?: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
@@ -857,10 +948,12 @@ class ApiService {
       success: boolean;
       data: any[];
       pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        itemsPerPage: number;
+        hasNext: boolean;
+        hasPrev: boolean;
       };
     }>(endpoint);
   }
@@ -871,15 +964,28 @@ class ApiService {
     limit?: number;
     search?: string;
     category?: string;
+    subCategory?: string;
     status?: string;
     sortBy?: string;
     sortOrder?: string;
-  }) {
+  }): Promise<{
+    success: boolean;
+    data: any[];
+    pagination?: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.search) queryParams.append('search', params.search);
-    if (params?.category) queryParams.append('category', params.category);
+    if (params?.subCategory) queryParams.append('subCategory', params.subCategory);
+    if (params?.category) queryParams.append('subCategory', params.category); // Support both for backward compatibility
     if (params?.status) queryParams.append('status', params.status);
     if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
     if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
@@ -891,10 +997,12 @@ class ApiService {
       success: boolean;
       data: any[];
       pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        itemsPerPage: number;
+        hasNext: boolean;
+        hasPrev: boolean;
       };
     }>(endpoint);
   }
@@ -940,7 +1048,18 @@ class ApiService {
     status?: string;
     sortBy?: string;
     sortOrder?: string;
-  }) {
+  }): Promise<{
+    success: boolean;
+    data: any[];
+    pagination?: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
@@ -957,10 +1076,12 @@ class ApiService {
       success: boolean;
       data: any[];
       pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        itemsPerPage: number;
+        hasNext: boolean;
+        hasPrev: boolean;
       };
     }>(endpoint);
   }
@@ -1007,7 +1128,18 @@ class ApiService {
     status?: string;
     sortBy?: string;
     sortOrder?: string;
-  }) {
+  }): Promise<{
+    success: boolean;
+    data: any[];
+    pagination?: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
@@ -1024,10 +1156,12 @@ class ApiService {
       success: boolean;
       data: any[];
       pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        itemsPerPage: number;
+        hasNext: boolean;
+        hasPrev: boolean;
       };
     }>(endpoint);
   }
@@ -1060,15 +1194,28 @@ class ApiService {
     limit?: number;
     search?: string;
     subCategory?: string;
+    category?: string;
     status?: string;
     sortBy?: string;
     sortOrder?: string;
-  }) {
+  }): Promise<{
+    success: boolean;
+    data: any[];
+    pagination?: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.search) queryParams.append('search', params.search);
-    if (params?.subCategory) queryParams.append('subCategory', params.subCategory);
+    if (params?.subCategory) queryParams.append('category', params.subCategory);
+    if (params?.category) queryParams.append('category', params.category);
     if (params?.status) queryParams.append('status', params.status);
     if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
     if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
@@ -1080,10 +1227,12 @@ class ApiService {
       success: boolean;
       data: any[];
       pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        itemsPerPage: number;
+        hasNext: boolean;
+        hasPrev: boolean;
       };
     }>(endpoint);
   }

@@ -5,6 +5,7 @@ import { apiService } from '../services/api'
 import TransferOrderModal, { TransferOrder } from '../components/TransferOrderModal'
 import NotificationDropdown from '../components/NotificationDropdown'
 import { useNotifications } from '../hooks/useNotifications'
+import { useDebounce } from '../hooks/useDebounce'
 
 interface OutletInventoryItem {
   id: string
@@ -95,6 +96,18 @@ const MallFoodCourt: React.FC = () => {
   const [showTransferOrderModal, setShowTransferOrderModal] = useState(false)
   const [selectedTransferOrder, setSelectedTransferOrder] = useState<TransferOrder | null>(null)
   const [transferOrderLoading, setTransferOrderLoading] = useState(false)
+  // Pagination state for raw materials
+  const [rmCurrentPage, setRmCurrentPage] = useState(1)
+  const [rmItemsPerPage, setRmItemsPerPage] = useState(20)
+  const [rmTotalPages, setRmTotalPages] = useState(1)
+  const [rmTotalItems, setRmTotalItems] = useState(0)
+  // Pagination state for finished goods
+  const [fgCurrentPage, setFgCurrentPage] = useState(1)
+  const [fgItemsPerPage, setFgItemsPerPage] = useState(20)
+  const [fgTotalPages, setFgTotalPages] = useState(1)
+  const [fgTotalItems, setFgTotalItems] = useState(0)
+  // Debounced search term - API will only be called after user stops typing for 500ms
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
 
   // Filter notifications based on current section
   const getFilteredNotifications = () => {
@@ -197,12 +210,12 @@ const MallFoodCourt: React.FC = () => {
     console.log(`🔔 360 Mall: Component mounted, loading notifications for: "360 Mall"`)
   }, [])
 
-  // Reload inventory when filters change
+  // Reload inventory when filters or pagination change
   useEffect(() => {
     if (!loading) {
       loadInventory()
     }
-  }, [searchTerm, filterCategory, filterStatus, sortBy, sortOrder])
+  }, [debouncedSearchTerm, filterCategory, filterStatus, sortBy, sortOrder, rmCurrentPage, rmItemsPerPage, fgCurrentPage, fgItemsPerPage])
 
   // Refresh inventory when notifications change (e.g., when transfer orders are received from Central Kitchen)
   useEffect(() => {
@@ -353,6 +366,8 @@ const MallFoodCourt: React.FC = () => {
     setFilterStatus('')
     setSortBy('materialName')
     setSortOrder('asc')
+    setRmCurrentPage(1)
+    setFgCurrentPage(1)
     loadInventory()
   }
 
@@ -391,12 +406,13 @@ const MallFoodCourt: React.FC = () => {
   const loadInventory = async () => {
     try {
       console.log('🔍 Loading 360 Mall inventory from dedicated database')
-      console.log('   Search params:', { searchTerm, filterCategory, filterStatus, sortBy, sortOrder })
+      console.log('   Search params:', { debouncedSearchTerm, filterCategory, filterStatus, sortBy, sortOrder })
       
       // Load raw materials from 360 Mall dedicated database
       const rawMaterialsResponse = await apiService.get360MallRawMaterials({
-        limit: 1000,
-        search: searchTerm,
+        page: rmCurrentPage,
+        limit: rmItemsPerPage,
+        search: debouncedSearchTerm,
         subCategory: filterCategory,
         status: filterStatus,
         sortBy: sortBy === 'materialName' ? 'materialName' : sortBy,
@@ -405,7 +421,8 @@ const MallFoodCourt: React.FC = () => {
 
       console.log('📦 Raw Materials API Response:', {
         success: rawMaterialsResponse.success,
-        dataLength: rawMaterialsResponse.data?.length || 0
+        dataLength: rawMaterialsResponse.data?.length || 0,
+        pagination: rawMaterialsResponse.pagination
       })
 
       if (rawMaterialsResponse.success) {
@@ -442,20 +459,30 @@ const MallFoodCourt: React.FC = () => {
           }))
           
           setInventoryItems(transformedRawMaterials)
+          
+          // Update pagination state
+          if (rawMaterialsResponse.pagination) {
+            setRmTotalPages(rawMaterialsResponse.pagination.totalPages)
+            setRmTotalItems(rawMaterialsResponse.pagination.totalItems)
+          }
         } else {
           console.log('No raw materials inventory found for 360 Mall')
           setInventoryItems([])
-          // Do not set page-level error; let empty state render under the table with actions
+          setRmTotalPages(1)
+          setRmTotalItems(0)
         }
       } else {
         console.error('Failed to load raw materials inventory:', (rawMaterialsResponse as any).error || 'API Error')
         setInventoryItems([])
+        setRmTotalPages(1)
+        setRmTotalItems(0)
       }
 
       // Load finished goods from 360 Mall dedicated database
       const finishedGoodsResponse = await apiService.get360MallFinishedProducts({
-        limit: 1000,
-        search: searchTerm,
+        page: fgCurrentPage,
+        limit: fgItemsPerPage,
+        search: debouncedSearchTerm,
         subCategory: filterCategory,
         status: filterStatus,
         sortBy: sortBy === 'productName' ? 'productName' : sortBy,
@@ -501,13 +528,23 @@ const MallFoodCourt: React.FC = () => {
           }))
           
           setFinishedGoodInventoryItems(transformedFinishedGoods)
+          
+          // Update pagination state
+          if (finishedGoodsResponse.pagination) {
+            setFgTotalPages(finishedGoodsResponse.pagination.totalPages)
+            setFgTotalItems(finishedGoodsResponse.pagination.totalItems)
+          }
         } else {
           console.log('No finished goods inventory found for 360 Mall')
           setFinishedGoodInventoryItems([])
+          setFgTotalPages(1)
+          setFgTotalItems(0)
         }
       } else {
         console.error('Failed to load finished goods inventory:', (finishedGoodsResponse as any).error || 'API Error')
-        // Don't set error for finished goods as it's optional
+        setFinishedGoodInventoryItems([])
+        setFgTotalPages(1)
+        setFgTotalItems(0)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load inventory')
@@ -718,7 +755,31 @@ const MallFoodCourt: React.FC = () => {
             </div>
           </div>
         </div>
-
+        {/* Results Summary */}
+        <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between text-sm text-gray-600">
+          <span>
+            Showing {rmTotalItems > 0 ? ((rmCurrentPage - 1) * rmItemsPerPage + 1) : 0} - {Math.min(rmCurrentPage * rmItemsPerPage, rmTotalItems)} of {rmTotalItems} raw material items
+            {(debouncedSearchTerm || filterCategory || filterStatus) && (
+              <span className="ml-2 text-blue-600">(filtered)</span>
+            )}
+          </span>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Items per page:</label>
+            <select
+              value={rmItemsPerPage}
+              onChange={(e) => {
+                setRmItemsPerPage(Number(e.target.value))
+                setRmCurrentPage(1)
+              }}
+              className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+        </div>
         {/* Raw Materials Table / Empty State */}
         {inventoryItems.length === 0 ? (
           <div className="p-10 text-center text-gray-500">
@@ -744,12 +805,6 @@ const MallFoodCourt: React.FC = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {inventoryItems
                 .filter(item => item.materialId && item.materialCode && item.materialName)
-                .filter(item => 
-                  searchTerm === '' || 
-                  item.materialCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  item.materialName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  (item.category && item.category.toLowerCase().includes(searchTerm.toLowerCase()))
-                )
                 .map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.materialCode}</td>
@@ -765,6 +820,77 @@ const MallFoodCourt: React.FC = () => {
             </tbody>
           </table>
         </div>
+        )}
+        {/* Pagination Controls for Raw Materials */}
+        {rmTotalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Page {rmCurrentPage} of {rmTotalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setRmCurrentPage(1)}
+                  disabled={rmCurrentPage === 1}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="First page"
+                >
+                  ««
+                </button>
+                <button
+                  onClick={() => setRmCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={rmCurrentPage === 1}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Previous page"
+                >
+                  ‹ Previous
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, rmTotalPages) }, (_, i) => {
+                    let pageNum: number
+                    if (rmTotalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (rmCurrentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (rmCurrentPage >= rmTotalPages - 2) {
+                      pageNum = rmTotalPages - 4 + i
+                    } else {
+                      pageNum = rmCurrentPage - 2 + i
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setRmCurrentPage(pageNum)}
+                        className={`px-3 py-1 text-sm border rounded-md ${
+                          rmCurrentPage === pageNum
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'border-gray-300 hover:bg-gray-100'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  })}
+                </div>
+                <button
+                  onClick={() => setRmCurrentPage(prev => Math.min(rmTotalPages, prev + 1))}
+                  disabled={rmCurrentPage === rmTotalPages}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Next page"
+                >
+                  Next ›
+                </button>
+                <button
+                  onClick={() => setRmCurrentPage(rmTotalPages)}
+                  disabled={rmCurrentPage === rmTotalPages}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Last page"
+                >
+                  »»
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -835,7 +961,31 @@ const MallFoodCourt: React.FC = () => {
             </div>
           </div>
         </div>
-
+        {/* Results Summary */}
+        <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between text-sm text-gray-600">
+          <span>
+            Showing {fgTotalItems > 0 ? ((fgCurrentPage - 1) * fgItemsPerPage + 1) : 0} - {Math.min(fgCurrentPage * fgItemsPerPage, fgTotalItems)} of {fgTotalItems} finished goods items
+            {(debouncedSearchTerm || filterCategory || filterStatus) && (
+              <span className="ml-2 text-blue-600">(filtered)</span>
+            )}
+          </span>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Items per page:</label>
+            <select
+              value={fgItemsPerPage}
+              onChange={(e) => {
+                setFgItemsPerPage(Number(e.target.value))
+                setFgCurrentPage(1)
+              }}
+              className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+        </div>
         {/* Finished Goods Table / Empty State */}
         {finishedGoodInventoryItems.length === 0 ? (
           <div className="p-10 text-center text-gray-500">
@@ -862,12 +1012,6 @@ const MallFoodCourt: React.FC = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {finishedGoodInventoryItems
                 .filter(item => item.productId && item.productCode && item.productName)
-                .filter(item => 
-                  searchTerm === '' || 
-                  item.productCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  item.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  (item.category && item.category.toLowerCase().includes(searchTerm.toLowerCase()))
-                )
                 .map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.productCode}</td>
@@ -886,6 +1030,77 @@ const MallFoodCourt: React.FC = () => {
             </tbody>
           </table>
         </div>
+        )}
+        {/* Pagination Controls for Finished Goods */}
+        {fgTotalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Page {fgCurrentPage} of {fgTotalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setFgCurrentPage(1)}
+                  disabled={fgCurrentPage === 1}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="First page"
+                >
+                  ««
+                </button>
+                <button
+                  onClick={() => setFgCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={fgCurrentPage === 1}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Previous page"
+                >
+                  ‹ Previous
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, fgTotalPages) }, (_, i) => {
+                    let pageNum: number
+                    if (fgTotalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (fgCurrentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (fgCurrentPage >= fgTotalPages - 2) {
+                      pageNum = fgTotalPages - 4 + i
+                    } else {
+                      pageNum = fgCurrentPage - 2 + i
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setFgCurrentPage(pageNum)}
+                        className={`px-3 py-1 text-sm border rounded-md ${
+                          fgCurrentPage === pageNum
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'border-gray-300 hover:bg-gray-100'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  })}
+                </div>
+                <button
+                  onClick={() => setFgCurrentPage(prev => Math.min(fgTotalPages, prev + 1))}
+                  disabled={fgCurrentPage === fgTotalPages}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Next page"
+                >
+                  Next ›
+                </button>
+                <button
+                  onClick={() => setFgCurrentPage(fgTotalPages)}
+                  disabled={fgCurrentPage === fgTotalPages}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Last page"
+                >
+                  »»
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
