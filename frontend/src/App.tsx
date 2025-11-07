@@ -1,5 +1,6 @@
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
+import ProtectedOutletRoute from './components/ProtectedOutletRoute'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import RawMaterials from './pages/RawMaterials'
@@ -108,81 +109,74 @@ function App() {
         <Route path="/outlets" element={<OutletMaster />} />
         <Route path="/outlets/add" element={<AddOutlet />} />
         <Route path="/outlets/edit/:id" element={<EditOutlet />} />
-        <Route path="/central-kitchen" element={<CentralKitchen />} />
-        <Route path="/central-kitchen/raw-materials" element={<CentralKitchenRawMaterials />} />
-        <Route path="/central-kitchen/finished-goods" element={<CentralKitchenFinishedGoods />} />
-        <Route path="/central-kitchen/make-finished-good" element={<CentralKitchenMakeFinishedGood />} />
-        <Route path="/central-kitchen/create-transfer" element={<CentralKitchenCreateTransfer />} />
-        <Route path="/kuwait-city" element={<DowntownRestaurant />} />
-        <Route path="/kuwait-city/raw-materials" element={<DowntownRestaurant />} />
-        <Route path="/kuwait-city/finished-goods" element={<DowntownRestaurant />} />
-        <Route path="/kuwait-city/request-raw-materials" element={<KuwaitCityRequestRawMaterials />} />
-        <Route path="/kuwait-city/request-finished-goods" element={<KuwaitCityRequestFinishedGoods />} />
-        <Route path="/360-mall" element={<MallFoodCourt />} />
-        <Route path="/360-mall/raw-materials" element={<MallFoodCourt />} />
-        <Route path="/360-mall/finished-goods" element={<MallFoodCourt />} />
-        <Route path="/360-mall/request-raw-materials" element={<Mall360RequestRawMaterials />} />
-        <Route path="/360-mall/request-finished-goods" element={<Mall360RequestFinishedGoods />} />
-        <Route path="/marina-walk-cafe" element={<MarinaWalkCafe />} />
-        <Route path="/marina-walk-cafe/raw-materials" element={<MarinaWalkCafe />} />
-        <Route path="/marina-walk-cafe/finished-goods" element={<MarinaWalkCafe />} />
-        <Route path="/marina-walk-cafe/request-raw-materials" element={<VibesComplexRequestRawMaterials />} />
-        <Route path="/marina-walk-cafe/request-finished-goods" element={<VibesComplexRequestFinishedGoods />} />
-        <Route path="/mall-food-court" element={<MallFoodCourt />} />
-        <Route path="/360-mall/raw-materials" element={<MallFoodCourt />} />
-        <Route path="/360-mall/finished-goods" element={<MallFoodCourt />} />
-        <Route path="/360-mall/request-raw-materials" element={<Mall360RequestRawMaterials />} />
-        <Route path="/360-mall/request-finished-goods" element={<Mall360RequestFinishedGoods />} />
-        <Route path="/mall-food-court/raw-materials" element={<MallFoodCourt />} />
-        <Route path="/mall-food-court/finished-goods" element={<MallFoodCourt />} />
-        <Route path="/mall-food-court/request-raw-materials" element={<Mall360RequestRawMaterials />} />
-        <Route path="/mall-food-court/request-finished-goods" element={<Mall360RequestFinishedGoods />} />
+        {/* Central Kitchen routes - Admin only */}
+        {isAdmin && (
+          <>
+            <Route path="/central-kitchen" element={<CentralKitchen />} />
+            <Route path="/central-kitchen/raw-materials" element={<CentralKitchenRawMaterials />} />
+            <Route path="/central-kitchen/finished-goods" element={<CentralKitchenFinishedGoods />} />
+            <Route path="/central-kitchen/make-finished-good" element={<CentralKitchenMakeFinishedGood />} />
+            <Route path="/central-kitchen/create-transfer" element={<CentralKitchenCreateTransfer />} />
+          </>
+        )}
+        <Route path="/kuwait-city" element={<ProtectedOutletRoute allowedOutletCodes={['KUWAIT_CITY']}><DowntownRestaurant /></ProtectedOutletRoute>} />
+        <Route path="/kuwait-city/raw-materials" element={<ProtectedOutletRoute allowedOutletCodes={['KUWAIT_CITY']}><DowntownRestaurant /></ProtectedOutletRoute>} />
+        <Route path="/kuwait-city/finished-goods" element={<ProtectedOutletRoute allowedOutletCodes={['KUWAIT_CITY']}><DowntownRestaurant /></ProtectedOutletRoute>} />
+        <Route path="/kuwait-city/request-raw-materials" element={<ProtectedOutletRoute allowedOutletCodes={['KUWAIT_CITY']}><KuwaitCityRequestRawMaterials /></ProtectedOutletRoute>} />
+        <Route path="/kuwait-city/request-finished-goods" element={<ProtectedOutletRoute allowedOutletCodes={['KUWAIT_CITY']}><KuwaitCityRequestFinishedGoods /></ProtectedOutletRoute>} />
+        <Route path="/360-mall" element={<ProtectedOutletRoute allowedOutletCodes={['MALL_360']}><MallFoodCourt /></ProtectedOutletRoute>} />
+        <Route path="/360-mall/raw-materials" element={<ProtectedOutletRoute allowedOutletCodes={['MALL_360']}><MallFoodCourt /></ProtectedOutletRoute>} />
+        <Route path="/360-mall/finished-goods" element={<ProtectedOutletRoute allowedOutletCodes={['MALL_360']}><MallFoodCourt /></ProtectedOutletRoute>} />
+        <Route path="/360-mall/request-raw-materials" element={<ProtectedOutletRoute allowedOutletCodes={['MALL_360']}><Mall360RequestRawMaterials /></ProtectedOutletRoute>} />
+        <Route path="/360-mall/request-finished-goods" element={<ProtectedOutletRoute allowedOutletCodes={['MALL_360']}><Mall360RequestFinishedGoods /></ProtectedOutletRoute>} />
+        <Route path="/marina-walk-cafe" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><MarinaWalkCafe /></ProtectedOutletRoute>} />
+        <Route path="/marina-walk-cafe/raw-materials" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><MarinaWalkCafe /></ProtectedOutletRoute>} />
+        <Route path="/marina-walk-cafe/finished-goods" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><MarinaWalkCafe /></ProtectedOutletRoute>} />
+        <Route path="/marina-walk-cafe/request-raw-materials" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><VibesComplexRequestRawMaterials /></ProtectedOutletRoute>} />
+        <Route path="/marina-walk-cafe/request-finished-goods" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><VibesComplexRequestFinishedGoods /></ProtectedOutletRoute>} />
         {/* Vibes Complex routes */}
-        <Route path="/vibes-complex" element={<MarinaWalkCafe />} />
-        <Route path="/vibes-complex/raw-materials" element={<MarinaWalkCafe />} />
-        <Route path="/vibes-complex/finished-goods" element={<MarinaWalkCafe />} />
-        <Route path="/vibes-complex/request-raw-materials" element={<VibesComplexRequestRawMaterials />} />
-        <Route path="/vibes-complex/request-finished-goods" element={<VibesComplexRequestFinishedGoods />} />
+        <Route path="/vibes-complex" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><MarinaWalkCafe /></ProtectedOutletRoute>} />
+        <Route path="/vibes-complex/raw-materials" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><MarinaWalkCafe /></ProtectedOutletRoute>} />
+        <Route path="/vibes-complex/finished-goods" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><MarinaWalkCafe /></ProtectedOutletRoute>} />
+        <Route path="/vibes-complex/request-raw-materials" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><VibesComplexRequestRawMaterials /></ProtectedOutletRoute>} />
+        <Route path="/vibes-complex/request-finished-goods" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><VibesComplexRequestFinishedGoods /></ProtectedOutletRoute>} />
         {/* Back-compat old drive-thru paths still render Taiba component */}
-        <Route path="/drive-thru-express" element={<DriveThruExpress />} />
-        <Route path="/drive-thru-express/raw-materials" element={<DriveThruExpress />} />
-        <Route path="/drive-thru-express/finished-goods" element={<DriveThruExpress />} />
-        <Route path="/drive-thru-express/request-raw-materials" element={<TaibaHospitalRequestRawMaterials />} />
-        <Route path="/drive-thru-express/request-finished-goods" element={<TaibaHospitalRequestFinishedGoods />} />
+        <Route path="/drive-thru-express" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><DriveThruExpress /></ProtectedOutletRoute>} />
+        <Route path="/drive-thru-express/raw-materials" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><DriveThruExpress /></ProtectedOutletRoute>} />
+        <Route path="/drive-thru-express/finished-goods" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><DriveThruExpress /></ProtectedOutletRoute>} />
+        <Route path="/drive-thru-express/request-raw-materials" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><TaibaHospitalRequestRawMaterials /></ProtectedOutletRoute>} />
+        <Route path="/drive-thru-express/request-finished-goods" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><TaibaHospitalRequestFinishedGoods /></ProtectedOutletRoute>} />
         {/* Primary Taiba Hospital routes */}
-        <Route path="/taiba-hospital" element={<DriveThruExpress />} />
-        <Route path="/taiba-hospital/raw-materials" element={<DriveThruExpress />} />
-        <Route path="/taiba-hospital/finished-goods" element={<DriveThruExpress />} />
-        <Route path="/taiba-hospital/request-raw-materials" element={<TaibaHospitalRequestRawMaterials />} />
-        <Route path="/taiba-hospital/request-finished-goods" element={<TaibaHospitalRequestFinishedGoods />} />
+        <Route path="/taiba-hospital" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><DriveThruExpress /></ProtectedOutletRoute>} />
+        <Route path="/taiba-hospital/raw-materials" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><DriveThruExpress /></ProtectedOutletRoute>} />
+        <Route path="/taiba-hospital/finished-goods" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><DriveThruExpress /></ProtectedOutletRoute>} />
+        <Route path="/taiba-hospital/request-raw-materials" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><TaibaHospitalRequestRawMaterials /></ProtectedOutletRoute>} />
+        <Route path="/taiba-hospital/request-finished-goods" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><TaibaHospitalRequestFinishedGoods /></ProtectedOutletRoute>} />
         <Route path="/raw-material-forecast" element={<RawMaterialForecast />} />
         <Route path="/raw-material-forecast/add" element={<AddForecast />} />
         <Route path="/sales-orders" element={<SalesOrders />} />
         <Route path="/sales-orders/add" element={<AddSalesOrder />} />
-        <Route path="/kuwait-city/sales-orders" element={<SalesOrders />} />
-        <Route path="/kuwait-city/sales-orders/add" element={<AddSalesOrder />} />
-        <Route path="/kuwait-city/pos-sales/create-order" element={<POSCreateOrder />} />
-        <Route path="/marina-walk-cafe/sales-orders" element={<SalesOrders />} />
-        <Route path="/marina-walk-cafe/sales-orders/add" element={<AddSalesOrder />} />
-        <Route path="/marina-walk-cafe/pos-sales/create-order" element={<POSCreateOrder />} />
-        <Route path="/360-mall/sales-orders" element={<SalesOrders />} />
-        <Route path="/360-mall/sales-orders/add" element={<AddSalesOrder />} />
-        <Route path="/360-mall/pos-sales/create-order" element={<POSCreateOrder />} />
-        <Route path="/mall-food-court/sales-orders" element={<SalesOrders />} />
-        <Route path="/mall-food-court/sales-orders/add" element={<AddSalesOrder />} />
-        <Route path="/mall-food-court/pos-sales/create-order" element={<POSCreateOrder />} />
-        <Route path="/vibes-complex/sales-orders" element={<SalesOrders />} />
-        <Route path="/vibes-complex/sales-orders/add" element={<AddSalesOrder />} />
-        <Route path="/vibes-complex/pos-sales/create-order" element={<POSCreateOrder />} />
-        <Route path="/drive-thru-express/sales-orders" element={<SalesOrders />} />
-        <Route path="/drive-thru-express/sales-orders/add" element={<AddSalesOrder />} />
-        <Route path="/drive-thru-express/pos-sales/create-order" element={<POSCreateOrder />} />
-        <Route path="/taiba-hospital/sales-orders" element={<SalesOrders />} />
-        <Route path="/taiba-hospital/sales-orders/add" element={<AddSalesOrder />} />
-        <Route path="/taiba-hospital/pos-sales/create-order" element={<POSCreateOrder />} />
-        <Route path="/taiba-hospital/sales-orders" element={<SalesOrders />} />
-        <Route path="/taiba-hospital/sales-orders/add" element={<AddSalesOrder />} />
-        <Route path="/taiba-hospital/pos-sales/create-order" element={<POSCreateOrder />} />
+        <Route path="/kuwait-city/sales-orders" element={<ProtectedOutletRoute allowedOutletCodes={['KUWAIT_CITY']}><SalesOrders /></ProtectedOutletRoute>} />
+        <Route path="/kuwait-city/sales-orders/add" element={<ProtectedOutletRoute allowedOutletCodes={['KUWAIT_CITY']}><AddSalesOrder /></ProtectedOutletRoute>} />
+        <Route path="/kuwait-city/pos-sales/create-order" element={<ProtectedOutletRoute allowedOutletCodes={['KUWAIT_CITY']}><POSCreateOrder /></ProtectedOutletRoute>} />
+        <Route path="/marina-walk-cafe/sales-orders" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><SalesOrders /></ProtectedOutletRoute>} />
+        <Route path="/marina-walk-cafe/sales-orders/add" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><AddSalesOrder /></ProtectedOutletRoute>} />
+        <Route path="/marina-walk-cafe/pos-sales/create-order" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><POSCreateOrder /></ProtectedOutletRoute>} />
+        <Route path="/360-mall/sales-orders" element={<ProtectedOutletRoute allowedOutletCodes={['MALL_360']}><SalesOrders /></ProtectedOutletRoute>} />
+        <Route path="/360-mall/sales-orders/add" element={<ProtectedOutletRoute allowedOutletCodes={['MALL_360']}><AddSalesOrder /></ProtectedOutletRoute>} />
+        <Route path="/360-mall/pos-sales/create-order" element={<ProtectedOutletRoute allowedOutletCodes={['MALL_360']}><POSCreateOrder /></ProtectedOutletRoute>} />
+        <Route path="/mall-food-court/sales-orders" element={<ProtectedOutletRoute allowedOutletCodes={['MALL_360']}><SalesOrders /></ProtectedOutletRoute>} />
+        <Route path="/mall-food-court/sales-orders/add" element={<ProtectedOutletRoute allowedOutletCodes={['MALL_360']}><AddSalesOrder /></ProtectedOutletRoute>} />
+        <Route path="/mall-food-court/pos-sales/create-order" element={<ProtectedOutletRoute allowedOutletCodes={['MALL_360']}><POSCreateOrder /></ProtectedOutletRoute>} />
+        <Route path="/vibes-complex/sales-orders" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><SalesOrders /></ProtectedOutletRoute>} />
+        <Route path="/vibes-complex/sales-orders/add" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><AddSalesOrder /></ProtectedOutletRoute>} />
+        <Route path="/vibes-complex/pos-sales/create-order" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><POSCreateOrder /></ProtectedOutletRoute>} />
+        <Route path="/drive-thru-express/sales-orders" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><SalesOrders /></ProtectedOutletRoute>} />
+        <Route path="/drive-thru-express/sales-orders/add" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><AddSalesOrder /></ProtectedOutletRoute>} />
+        <Route path="/drive-thru-express/pos-sales/create-order" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><POSCreateOrder /></ProtectedOutletRoute>} />
+        <Route path="/taiba-hospital/sales-orders" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><SalesOrders /></ProtectedOutletRoute>} />
+        <Route path="/taiba-hospital/sales-orders/add" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><AddSalesOrder /></ProtectedOutletRoute>} />
+        <Route path="/taiba-hospital/pos-sales/create-order" element={<ProtectedOutletRoute allowedOutletCodes={['TAIBA_HOSPITAL']}><POSCreateOrder /></ProtectedOutletRoute>} />
         {isAdmin ? (
           <Route path="/settings" element={<Settings />} />
         ) : (
