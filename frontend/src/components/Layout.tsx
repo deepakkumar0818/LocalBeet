@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { 
   LayoutDashboard, 
   Package, 
@@ -123,6 +123,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set())
   const location = useLocation()
+  const navigate = useNavigate()
 
   const authUser = (() => {
     try { return JSON.parse(localStorage.getItem('auth_user') || 'null') } catch { return null }
@@ -655,7 +656,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   Settings
                 </Link>
               )}
-              <button onClick={() => { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_user'); window.location.href = '/login' }} className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg w-full">
+              <button onClick={() => { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_user'); navigate('/login', { replace: true }) }} className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg w-full">
                 <LogOut className="mr-3 h-4 w-4" />
                 Sign out
               </button>
