@@ -33,9 +33,12 @@ export interface RawMaterial extends BaseEntity {
 
 // Bill of Materials (BOM)
 export interface BOMItem {
-  materialId: string;
+  itemType?: 'rawMaterial' | 'bom';
+  materialId?: string;
   materialCode: string;
   materialName: string;
+  bomId?: string;
+  bomCode?: string;
   quantity: number;
   unitOfMeasure: string;
   unitCost: number;

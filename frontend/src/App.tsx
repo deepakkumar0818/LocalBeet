@@ -9,6 +9,7 @@ import EditMaterial from './pages/EditMaterial'
 import BillOfMaterials from './pages/BillOfMaterials'
 import AddBOM from './pages/AddBOM'
 import EditBOM from './pages/EditBOM'
+import AddFinishedGood from './pages/AddFinishedGood'
 import JobOrders from './pages/JobOrders'
 import AddJobOrder from './pages/AddJobOrder'
 import EditJobOrder from './pages/EditJobOrder'
@@ -87,6 +88,7 @@ function App() {
         <Route path="/bill-of-materials" element={<BillOfMaterials />} />
         <Route path="/bill-of-materials/add" element={<AddBOM />} />
         <Route path="/bill-of-materials/edit/:id" element={<EditBOM />} />
+        <Route path="/finished-goods/add" element={<AddFinishedGood />} />
         <Route path="/job-orders" element={<JobOrders />} />
         <Route path="/job-orders/add" element={<AddJobOrder />} />
         <Route path="/job-orders/edit/:id" element={<EditJobOrder />} />

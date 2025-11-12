@@ -1,10 +1,18 @@
 const mongoose = require('mongoose');
 
 const BOMItemSchema = new mongoose.Schema({
-  materialId: {
+  // Item type: 'rawMaterial' or 'bom'
+  itemType: {
     type: String,
     required: true,
-    trim: true
+    enum: ['rawMaterial', 'bom'],
+    default: 'rawMaterial'
+  },
+  // For raw materials
+  materialId: {
+    type: String,
+    trim: true,
+    default: ''
   },
   materialCode: {
     type: String,
@@ -16,6 +24,18 @@ const BOMItemSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  // For nested BOMs
+  bomId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'BillOfMaterials',
+    default: null
+  },
+  bomCode: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  // Common fields
   quantity: {
     type: Number,
     required: true,
@@ -23,8 +43,8 @@ const BOMItemSchema = new mongoose.Schema({
   },
   unitOfMeasure: {
     type: String,
-    required: true,
-    trim: true
+    trim: true,
+    default: 'pcs'
   },
   unitCost: {
     type: Number,
