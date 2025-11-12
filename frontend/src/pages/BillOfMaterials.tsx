@@ -273,13 +273,22 @@ const BillOfMaterialsPage: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Recipes (BOM)</h1>
           <p className="text-gray-600">Manage your restaurant recipes and product formulations</p>
         </div>
-        <button
-          onClick={() => navigate('/bill-of-materials/add')}
-          className="btn-primary flex items-center"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Create Recipe
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate('/bill-of-materials/add')}
+            className="btn-primary flex items-center"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Recipe
+          </button>
+          <button
+            onClick={() => navigate('/finished-goods/add')}
+            className="btn-primary flex items-center"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Finished Good
+          </button>
+        </div>
       </div>
 
       {/* Filters and Search */}

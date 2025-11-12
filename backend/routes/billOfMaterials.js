@@ -136,15 +136,41 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Validate each item (accept unitCost 0 for now but compute totalCost anyway)
+    // Validate each item and handle nested BOMs
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      if (!item.materialCode || !item.materialName || item.quantity == null || !item.unitOfMeasure) {
-        return res.status(400).json({
-          success: false,
-          message: `Item ${i + 1} is missing required fields (materialCode, materialName, quantity, unitOfMeasure)`
-        });
+      const itemType = item.itemType || 'rawMaterial';
+      
+      if (itemType === 'bom') {
+        // For nested BOM items
+        if (!item.bomCode || !item.bomId || !item.materialName || item.quantity == null) {
+          return res.status(400).json({
+            success: false,
+            message: `BOM Item ${i + 1} is missing required fields (bomCode, bomId, materialName, quantity)`
+          });
+        }
+        // Fetch the nested BOM to get its totalCost
+        const nestedBom = await BillOfMaterials.findById(item.bomId);
+        if (!nestedBom) {
+          return res.status(400).json({
+            success: false,
+            message: `Nested BOM not found for item ${i + 1} (BOM ID: ${item.bomId})`
+          });
+        }
+        // Use nested BOM's totalCost as unitCost
+        if (item.unitCost === undefined || item.unitCost === null) {
+          item.unitCost = nestedBom.totalCost || 0;
+        }
+      } else {
+        // For raw material items
+        if (!item.materialCode || !item.materialName || item.quantity == null) {
+          return res.status(400).json({
+            success: false,
+            message: `Raw Material Item ${i + 1} is missing required fields (materialCode, materialName, quantity)`
+          });
+        }
       }
+      
       if (parseFloat(item.quantity) <= 0) {
         return res.status(400).json({
           success: false,
@@ -155,7 +181,7 @@ router.post('/', async (req, res) => {
 
     // Calculate total cost
     const totalCost = items.reduce((sum, item) => {
-      const itemTotal = parseFloat(item.quantity) * parseFloat(item.unitCost);
+      const itemTotal = parseFloat(item.quantity) * parseFloat(item.unitCost || 0);
       return sum + itemTotal;
     }, 0);
 
@@ -168,15 +194,40 @@ router.post('/', async (req, res) => {
       effectiveDate: effectiveDate ? new Date(effectiveDate) : new Date(),
       status,
       totalCost,
-      items: items.map(item => ({
-        materialId: item.materialId,
-        materialCode: item.materialCode,
-        materialName: item.materialName,
-        quantity: item.quantity,
-        unitOfMeasure: item.unitOfMeasure,
-        unitCost: parseFloat(item.unitCost) || 0,
-        totalCost: (parseFloat(item.quantity) || 0) * (parseFloat(item.unitCost) || 0)
-      })),
+      items: items.map(item => {
+        const itemType = item.itemType || 'rawMaterial';
+        const quantity = parseFloat(item.quantity) || 0;
+        const unitCost = parseFloat(item.unitCost) || 0;
+        const totalCost = quantity * unitCost;
+        
+        if (itemType === 'bom') {
+          return {
+            itemType: 'bom',
+            bomId: item.bomId,
+            bomCode: item.bomCode || '',
+            materialCode: item.materialCode || item.bomCode || '',
+            materialName: item.materialName,
+            materialId: '',
+            quantity: quantity,
+            unitOfMeasure: item.unitOfMeasure || 'pcs',
+            unitCost: unitCost,
+            totalCost: totalCost
+          };
+        } else {
+          return {
+            itemType: 'rawMaterial',
+            materialId: item.materialId || '',
+            materialCode: item.materialCode,
+            materialName: item.materialName,
+            bomId: null,
+            bomCode: '',
+            quantity: quantity,
+            unitOfMeasure: item.unitOfMeasure || 'pcs',
+            unitCost: unitCost,
+            totalCost: totalCost
+          };
+        }
+      }),
       createdBy,
       updatedBy
     });
@@ -254,10 +305,85 @@ router.put('/:id', async (req, res) => {
       });
     }
 
+    // Validate and process items (handle nested BOMs)
+    const processedItems = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const itemType = item.itemType || 'rawMaterial';
+      
+      if (itemType === 'bom') {
+        // For nested BOM items
+        if (!item.bomCode || !item.bomId || !item.materialName || item.quantity == null) {
+          return res.status(400).json({
+            success: false,
+            message: `BOM Item ${i + 1} is missing required fields (bomCode, bomId, materialName, quantity)`
+          });
+        }
+        // Fetch the nested BOM to get its totalCost
+        const nestedBom = await BillOfMaterials.findById(item.bomId);
+        if (!nestedBom) {
+          return res.status(400).json({
+            success: false,
+            message: `Nested BOM not found for item ${i + 1} (BOM ID: ${item.bomId})`
+          });
+        }
+        // Use nested BOM's totalCost as unitCost if not provided
+        if (item.unitCost === undefined || item.unitCost === null) {
+          item.unitCost = nestedBom.totalCost || 0;
+        }
+      } else {
+        // For raw material items
+        if (!item.materialCode || !item.materialName || item.quantity == null) {
+          return res.status(400).json({
+            success: false,
+            message: `Raw Material Item ${i + 1} is missing required fields (materialCode, materialName, quantity)`
+          });
+        }
+      }
+      
+      if (parseFloat(item.quantity) <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Item ${i + 1} has invalid quantity (must be greater than 0)`
+        });
+      }
+      
+      const quantity = parseFloat(item.quantity) || 0;
+      const unitCost = parseFloat(item.unitCost) || 0;
+      const totalCost = quantity * unitCost;
+      
+      if (itemType === 'bom') {
+        processedItems.push({
+          itemType: 'bom',
+          bomId: item.bomId,
+          bomCode: item.bomCode || '',
+          materialCode: item.materialCode || item.bomCode || '',
+          materialName: item.materialName,
+          materialId: '',
+          quantity: quantity,
+          unitOfMeasure: item.unitOfMeasure || 'pcs',
+          unitCost: unitCost,
+          totalCost: totalCost
+        });
+      } else {
+        processedItems.push({
+          itemType: 'rawMaterial',
+          materialId: item.materialId || '',
+          materialCode: item.materialCode,
+          materialName: item.materialName,
+          bomId: null,
+          bomCode: '',
+          quantity: quantity,
+          unitOfMeasure: item.unitOfMeasure || 'pcs',
+          unitCost: unitCost,
+          totalCost: totalCost
+        });
+      }
+    }
+
     // Calculate total cost
-    const totalCost = items.reduce((sum, item) => {
-      const itemTotal = item.quantity * item.unitCost;
-      return sum + itemTotal;
+    const totalCost = processedItems.reduce((sum, item) => {
+      return sum + item.totalCost;
     }, 0);
 
     // Update BOM
@@ -271,15 +397,7 @@ router.put('/:id', async (req, res) => {
         effectiveDate: effectiveDate ? new Date(effectiveDate) : undefined,
         status,
         totalCost,
-        items: items.map(item => ({
-          materialId: item.materialId,
-          materialCode: item.materialCode,
-          materialName: item.materialName,
-          quantity: item.quantity,
-          unitOfMeasure: item.unitOfMeasure,
-          unitCost: item.unitCost,
-          totalCost: item.quantity * item.unitCost
-        })),
+        items: processedItems,
         updatedBy,
         updatedAt: new Date()
       },

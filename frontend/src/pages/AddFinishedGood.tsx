@@ -141,10 +141,23 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   )
 }
 
-const AddBOM: React.FC = () => {
+interface FinishedProduct {
+  id?: string;
+  _id?: string;
+  productCode: string;
+  productName: string;
+  salesDescription?: string;
+  description?: string;
+  subCategory?: string;
+  unitPrice?: number;
+  costPrice?: number;
+}
+
+const AddFinishedGood: React.FC = () => {
   const navigate = useNavigate()
   const [materials, setMaterials] = useState<RawMaterial[]>([])
   const [existingBOMs, setExistingBOMs] = useState<BillOfMaterials[]>([])
+  const [finishedGoods, setFinishedGoods] = useState<FinishedProduct[]>([])
   const [formData, setFormData] = useState({
     bomCode: '',
     productName: '',
@@ -211,44 +224,26 @@ const AddBOM: React.FC = () => {
     })()
   }, [formData.bomCode])
 
-  // Auto-generate BOM code on load
+  // Load Central Kitchen finished goods for BOM Code dropdown
   useEffect(() => {
     (async () => {
-      if (formData.bomCode && formData.bomCode.trim().length > 0) return
       try {
-        const res = await apiService.getBillOfMaterials({ limit: 1, page: 1, sortBy: 'createdAt', sortOrder: 'desc' })
-        let nextCode = ''
-        const last = (res as any)?.data?.[0]
-        const lastCode: string | undefined = last?.bomCode
-        if (lastCode) {
-          const m = lastCode.match(/^(.*?)(\d+)$/)
-          if (m) {
-            const prefix = m[1]
-            const num = parseInt(m[2], 10)
-            const width = m[2].length
-            nextCode = `${prefix}${String(num + 1).padStart(width, '0')}`
+        const all: FinishedProduct[] = []
+        let page = 1
+        // Try to fetch up to 10k items in case pagination is enforced
+        while (true) {
+          const res = await apiService.getCentralKitchenFinishedProducts({ page, limit: 1000 })
+          if (res?.success && Array.isArray(res.data)) {
+            all.push(...(res.data as unknown as FinishedProduct[]))
           }
+          const hasNext = (res as any)?.pagination?.hasNext || ((res as any)?.pagination?.currentPage || page) < ((res as any)?.pagination?.totalPages || page)
+          if (!hasNext) break
+          page += 1
+          if (page > 20) break // safety cap
         }
-        if (!nextCode) {
-          const ts = new Date()
-          const y = ts.getFullYear()
-          const mm = String(ts.getMonth() + 1).padStart(2, '0')
-          const dd = String(ts.getDate()).padStart(2, '0')
-          const hh = String(ts.getHours()).padStart(2, '0')
-          const mi = String(ts.getMinutes()).padStart(2, '0')
-          nextCode = `BOM-${y}${mm}${dd}-${hh}${mi}`
-        }
-        setFormData(prev => ({ ...prev, bomCode: nextCode }))
+        setFinishedGoods(all)
       } catch (err) {
-        // Fallback in case API fails
-        const ts = new Date()
-        const y = ts.getFullYear()
-        const mm = String(ts.getMonth() + 1).padStart(2, '0')
-        const dd = String(ts.getDate()).padStart(2, '0')
-        const hh = String(ts.getHours()).padStart(2, '0')
-        const mi = String(ts.getMinutes()).padStart(2, '0')
-        const code = `BOM-${y}${mm}${dd}-${hh}${mi}`
-        setFormData(prev => ({ ...prev, bomCode: code }))
+        console.error('Failed to load central kitchen finished goods', err)
       }
     })()
   }, [])
@@ -529,19 +524,19 @@ const AddBOM: React.FC = () => {
         updatedBy: 'admin'
       }
 
-      console.log('Creating BOM:', bomData)
+      console.log('Creating Finished Good:', bomData)
       
       const response = await apiService.createBillOfMaterial(bomData)
       
       if (response.success) {
-        console.log('BOM created successfully:', response.data)
+        console.log('Finished Good created successfully:', response.data)
         navigate('/bill-of-materials')
       } else {
-        alert('Failed to create BOM: ' + response.message)
+        alert('Failed to create Finished Good: ' + response.message)
       }
     } catch (error) {
-      console.error('Error creating BOM:', error)
-      alert('Error creating BOM: ' + (error instanceof Error ? error.message : 'Unknown error'))
+      console.error('Error creating Finished Good:', error)
+      alert('Error creating Finished Good: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setSubmitting(false)
     }
@@ -631,8 +626,8 @@ const AddBOM: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Create New Recipe</h1>
-          <p className="text-gray-600">Create a new bill of materials</p>
+          <h1 className="text-2xl font-bold text-gray-900">Create Finished Good</h1>
+          <p className="text-gray-600">Create a new finished good recipe</p>
         </div>
         <button
           onClick={() => navigate('/bill-of-materials')}
@@ -652,14 +647,35 @@ const AddBOM: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  BOM Code *
+                  Finished Good (BOM Code) *
                 </label>
-                <input
-                  type="text"
-                  className={`input-field ${errors.bomCode ? 'border-red-500' : ''}`}
+                <SearchableDropdown
                   value={formData.bomCode}
-                  onChange={(e) => handleInputChange('bomCode', e.target.value)}
-                   placeholder="SANDWICH-001"
+                  onChange={(selectedProductCode) => {
+                    const selectedFinishedGood = finishedGoods.find(fg => fg.productCode === selectedProductCode)
+                    
+                    if (selectedFinishedGood) {
+                      // Auto-fill form with selected finished good details
+                      setFormData(prev => ({
+                        ...prev,
+                        bomCode: selectedFinishedGood.productCode,
+                        productName: selectedFinishedGood.productName,
+                        productDescription: selectedFinishedGood.salesDescription || selectedFinishedGood.description || selectedFinishedGood.productName
+                      }))
+                      // Clear errors when selection is made
+                      if (errors.bomCode) {
+                        setErrors(prev => ({ ...prev, bomCode: '' }))
+                      }
+                    } else {
+                      handleInputChange('bomCode', selectedProductCode)
+                    }
+                  }}
+                  options={finishedGoods.map((fg) => ({
+                    value: fg.productCode,
+                    label: `${fg.productCode} - ${fg.productName}`
+                  }))}
+                  placeholder="Select Finished Good"
+                  displayValue={formData.bomCode ? finishedGoods.find(fg => fg.productCode === formData.bomCode)?.productCode || formData.bomCode : ''}
                 />
                 {errors.bomCode && (
                   <p className="mt-1 text-sm text-red-600">{errors.bomCode}</p>
@@ -964,7 +980,7 @@ const AddBOM: React.FC = () => {
               disabled={submitting}
             >
               <Save className="h-4 w-4 mr-2" />
-              {submitting ? 'Creating...' : 'Create BOM'}
+              {submitting ? 'Creating...' : 'Create Finished Good'}
             </button>
           </div>
         </form>
@@ -973,4 +989,5 @@ const AddBOM: React.FC = () => {
   )
 }
 
-export default AddBOM
+export default AddFinishedGood
+
