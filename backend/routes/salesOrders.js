@@ -326,25 +326,121 @@ router.post('/', async (req, res) => {
     // Handle recipe items: aggregate required raw materials and decrement
     const BillOfMaterials = require('../models/BillOfMaterials');
     let OutletRawMaterialModel = null;
+    let OutletFinishedProductModelForRecipe = null;
     try {
       if (outletNameLc.includes('kuwait')) {
         const conn = await connectKuwaitCityDB();
-        try { OutletRawMaterialModel = getKuwaitCityModels(conn).KuwaitCityRawMaterial; } catch (e) { OutletRawMaterialModel = initializeKuwaitCityModels(conn).KuwaitCityRawMaterial; }
+        try { 
+          OutletRawMaterialModel = getKuwaitCityModels(conn).KuwaitCityRawMaterial;
+          OutletFinishedProductModelForRecipe = getKuwaitCityModels(conn).KuwaitCityFinishedProduct;
+        } catch (e) { 
+          const models = initializeKuwaitCityModels(conn);
+          OutletRawMaterialModel = models.KuwaitCityRawMaterial;
+          OutletFinishedProductModelForRecipe = models.KuwaitCityFinishedProduct;
+        }
       } else if (outletNameLc.includes('360') || outletNameLc.includes('mall')) {
         const conn = await connectMall360DB();
-        try { OutletRawMaterialModel = getMall360Models(conn).Mall360RawMaterial; } catch (e) { OutletRawMaterialModel = initializeMall360Models(conn).Mall360RawMaterial; }
+        try { 
+          OutletRawMaterialModel = getMall360Models(conn).Mall360RawMaterial;
+          OutletFinishedProductModelForRecipe = getMall360Models(conn).Mall360FinishedProduct;
+        } catch (e) { 
+          const models = initializeMall360Models(conn);
+          OutletRawMaterialModel = models.Mall360RawMaterial;
+          OutletFinishedProductModelForRecipe = models.Mall360FinishedProduct;
+        }
       } else if (outletNameLc.includes('vibes') || outletNameLc.includes('complex')) {
         const conn = await connectVibeComplexDB();
-        try { OutletRawMaterialModel = getVibeComplexModels(conn).VibeComplexRawMaterial; } catch (e) { OutletRawMaterialModel = initializeVibeComplexModels(conn).VibeComplexRawMaterial; }
+        try { 
+          OutletRawMaterialModel = getVibeComplexModels(conn).VibeComplexRawMaterial;
+          OutletFinishedProductModelForRecipe = getVibeComplexModels(conn).VibeComplexFinishedProduct;
+        } catch (e) { 
+          const models = initializeVibeComplexModels(conn);
+          OutletRawMaterialModel = models.VibeComplexRawMaterial;
+          OutletFinishedProductModelForRecipe = models.VibeComplexFinishedProduct;
+        }
       } else if (outletNameLc.includes('taiba') || outletNameLc.includes('hospital') || outletNameLc.includes('drive')) {
         const conn = await connectTaibaKitchenDB();
-        try { OutletRawMaterialModel = getTaibaKitchenModels(conn).TaibaKitchenRawMaterial; } catch (e) { OutletRawMaterialModel = initializeTaibaKitchenModels(conn).TaibaKitchenRawMaterial; }
+        try { 
+          OutletRawMaterialModel = getTaibaKitchenModels(conn).TaibaKitchenRawMaterial;
+          OutletFinishedProductModelForRecipe = getTaibaKitchenModels(conn).TaibaKitchenFinishedProduct;
+        } catch (e) { 
+          const models = initializeTaibaKitchenModels(conn);
+          OutletRawMaterialModel = models.TaibaKitchenRawMaterial;
+          OutletFinishedProductModelForRecipe = models.TaibaKitchenFinishedProduct;
+        }
       }
     } catch (e) {
       return res.status(500).json({ success:false, message:'Failed to initialize outlet raw material models', error: e.message });
     }
 
-    const requiredByMaterial = {};
+    /**
+     * Recursively process BOM items to aggregate all required raw materials and finished goods
+     * Handles sub-recipes (nested BOMs) and identifies finished goods by checking productCode
+     */
+    async function processBOMItems(bom, quantityMultiplier, processedBOMs = new Set()) {
+      const rawMaterials = {};
+      const finishedGoods = {};
+      
+      // Prevent infinite recursion by tracking processed BOMs
+      if (processedBOMs.has(bom.bomCode)) {
+        console.warn(`Circular reference detected for BOM: ${bom.bomCode}`);
+        return { rawMaterials, finishedGoods };
+      }
+      processedBOMs.add(bom.bomCode);
+
+      for (const item of bom.items) {
+        const itemQuantity = (Number(item.quantity) || 0) * quantityMultiplier;
+        
+        if (item.itemType === 'bom') {
+          // This is a sub-recipe - recursively process it
+          if (!item.bomCode) {
+            throw new Error(`Sub-recipe BOM code missing for item: ${item.materialName}`);
+          }
+          
+          const subBOM = await BillOfMaterials.findOne({ bomCode: item.bomCode });
+          if (!subBOM) {
+            throw new Error(`Sub-recipe BOM not found: ${item.bomCode}`);
+          }
+          
+          // Recursively process the sub-BOM
+          const subResult = await processBOMItems(subBOM, itemQuantity, processedBOMs);
+          
+          // Aggregate results from sub-BOM
+          for (const [code, qty] of Object.entries(subResult.rawMaterials)) {
+            rawMaterials[code] = (rawMaterials[code] || 0) + qty;
+          }
+          for (const [code, qty] of Object.entries(subResult.finishedGoods)) {
+            finishedGoods[code] = (finishedGoods[code] || 0) + qty;
+          }
+        } else if (item.itemType === 'rawMaterial') {
+          // Check if this is a finished good by looking up productCode
+          // Only check for Kuwait City, 360 Mall, VibeComplex, and TaibaKitchen (where we have the finished product model)
+          let isFinishedGood = false;
+          if ((outletNameLc.includes('kuwait') || outletNameLc.includes('360') || outletNameLc.includes('mall') || outletNameLc.includes('vibes') || outletNameLc.includes('complex') || outletNameLc.includes('taiba') || outletNameLc.includes('hospital') || outletNameLc.includes('drive')) && OutletFinishedProductModelForRecipe) {
+            const finishedGood = await OutletFinishedProductModelForRecipe.findOne({ 
+              productCode: item.materialCode 
+            });
+            if (finishedGood) {
+              isFinishedGood = true;
+              finishedGoods[item.materialCode] = (finishedGoods[item.materialCode] || 0) + itemQuantity;
+            }
+          }
+          
+          // If not a finished good, treat as raw material
+          if (!isFinishedGood) {
+            rawMaterials[item.materialCode] = (rawMaterials[item.materialCode] || 0) + itemQuantity;
+          }
+        }
+      }
+
+      processedBOMs.delete(bom.bomCode); // Remove from set after processing
+      return { rawMaterials, finishedGoods };
+    }
+
+    // Process all recipe items
+    const allRawMaterials = {};
+    const allFinishedGoods = {};
+    
     for (const r of (recipeItems || [])) {
       if (!r.bomCode || !r.productName || !r.quantity) {
         return res.status(400).json({ success:false, message:'Each recipeItem requires bomCode, productName, quantity' });
@@ -353,32 +449,84 @@ router.post('/', async (req, res) => {
       if (!bom) {
         return res.status(404).json({ success:false, message:`BOM not found: ${r.bomCode}` });
       }
-      for (const i of bom.items) {
-        const qty = (Number(i.quantity) || 0) * Number(r.quantity);
-        requiredByMaterial[i.materialCode] = (requiredByMaterial[i.materialCode] || 0) + qty;
+      
+      // Process BOM recursively (only for Kuwait City, 360 Mall, VibeComplex, and TaibaKitchen, others use old logic)
+      if (outletNameLc.includes('kuwait') || outletNameLc.includes('360') || outletNameLc.includes('mall') || outletNameLc.includes('vibes') || outletNameLc.includes('complex') || outletNameLc.includes('taiba') || outletNameLc.includes('hospital') || outletNameLc.includes('drive')) {
+        try {
+          const result = await processBOMItems(bom, Number(r.quantity));
+          
+          // Aggregate results
+          for (const [code, qty] of Object.entries(result.rawMaterials)) {
+            allRawMaterials[code] = (allRawMaterials[code] || 0) + qty;
+          }
+          for (const [code, qty] of Object.entries(result.finishedGoods)) {
+            allFinishedGoods[code] = (allFinishedGoods[code] || 0) + qty;
+          }
+        } catch (bomError) {
+          return res.status(400).json({ 
+            success: false, 
+            message: bomError.message 
+          });
+        }
+      } else {
+        // Old logic for other outlets (all outlets now use recursive logic)
+        for (const i of bom.items) {
+          const qty = (Number(i.quantity) || 0) * Number(r.quantity);
+          allRawMaterials[i.materialCode] = (allRawMaterials[i.materialCode] || 0) + qty;
+        }
       }
     }
 
-    for (const [code, totalNeeded] of Object.entries(requiredByMaterial)) {
-      const rm = await OutletRawMaterialModel.findOne({ materialCode: code });
-      if (!rm) {
-        return res.status(404).json({ success:false, message:`Raw material ${code} not found in ${outlet.outletName}` });
+    // Validate and decrement raw materials
+    if (OutletRawMaterialModel) {
+      for (const [code, totalNeeded] of Object.entries(allRawMaterials)) {
+        const rm = await OutletRawMaterialModel.findOne({ materialCode: code });
+        if (!rm) {
+          return res.status(404).json({ success:false, message:`Raw material ${code} not found in ${outlet.outletName}` });
+        }
+        if (rm.currentStock < totalNeeded) {
+          return res.status(400).json({ success:false, message:`Insufficient raw material ${code}. Available: ${rm.currentStock}, Required: ${totalNeeded}` });
+        }
       }
-      if (rm.currentStock < totalNeeded) {
-        return res.status(400).json({ success:false, message:`Insufficient raw material ${code}. Available: ${rm.currentStock}, Required: ${totalNeeded}` });
+
+      for (const [code, totalNeeded] of Object.entries(allRawMaterials)) {
+        const rm = await OutletRawMaterialModel.findOne({ materialCode: code });
+        rm.currentStock = rm.currentStock - totalNeeded;
+        if (rm.currentStock <= 0) {
+          rm.status = 'Out of Stock';
+        } else if (rm.currentStock <= (rm.reorderPoint || 0)) {
+          rm.status = 'Low Stock';
+        }
+        rm.updatedBy = createdBy || 'admin';
+        await rm.save();
       }
     }
 
-    for (const [code, totalNeeded] of Object.entries(requiredByMaterial)) {
-      const rm = await OutletRawMaterialModel.findOne({ materialCode: code });
-      rm.currentStock = rm.currentStock - totalNeeded;
-      if (rm.currentStock <= 0) {
-        rm.status = 'Out of Stock';
-      } else if (rm.currentStock <= (rm.reorderPoint || 0)) {
-        rm.status = 'Low Stock';
+    // Validate and decrement finished goods (only for Kuwait City, 360 Mall, VibeComplex, and TaibaKitchen)
+    if ((outletNameLc.includes('kuwait') || outletNameLc.includes('360') || outletNameLc.includes('mall') || outletNameLc.includes('vibes') || outletNameLc.includes('complex') || outletNameLc.includes('taiba') || outletNameLc.includes('hospital') || outletNameLc.includes('drive')) && OutletFinishedProductModelForRecipe) {
+      for (const [code, totalNeeded] of Object.entries(allFinishedGoods)) {
+        const fg = await OutletFinishedProductModelForRecipe.findOne({ productCode: code });
+        if (!fg) {
+          return res.status(404).json({ success:false, message:`Finished good ${code} not found in ${outlet.outletName}` });
+        }
+        if (fg.currentStock < totalNeeded) {
+          return res.status(400).json({ success:false, message:`Insufficient finished good ${code}. Available: ${fg.currentStock}, Required: ${totalNeeded}` });
+        }
       }
-      rm.updatedBy = createdBy || 'admin';
-      await rm.save();
+
+      for (const [code, totalNeeded] of Object.entries(allFinishedGoods)) {
+        const fg = await OutletFinishedProductModelForRecipe.findOne({ productCode: code });
+        fg.currentStock = fg.currentStock - totalNeeded;
+        if (fg.currentStock <= 0) {
+          fg.status = 'Out of Stock';
+        } else if (fg.currentStock <= (fg.reorderPoint || 0)) {
+          fg.status = 'Low Stock';
+        } else {
+          fg.status = 'In Stock';
+        }
+        fg.updatedBy = createdBy || 'admin';
+        await fg.save();
+      }
     }
 
     // Build combined orderItems for storage/display
