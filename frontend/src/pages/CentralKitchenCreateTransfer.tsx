@@ -355,7 +355,7 @@ const CentralKitchenCreateTransfer: React.FC = () => {
       if (response.success) {
         // Notifications are now automatically created by the backend transfer API
         
-        alert(`Transfer created successfully!\n\nTransfer Details:\nFrom: ${outlet?.outletName}\nTo: ${transferPayload.toOutlet}\nItems: ${transferItems.length}\nTotal Value: ${transferPayload.totalValue.toFixed(2)} KWD\n\nTransfer ID: ${response.data.transferId}\n\nStock has been updated in both Central Kitchen and destination outlet.${(transferPayload.toOutlet === 'Kuwait City' || transferPayload.toOutlet === '360 Mall' || transferPayload.toOutlet === 'Vibe Complex' || transferPayload.toOutlet === 'Taiba Hospital') ? `\n\nNotification sent to ${transferPayload.toOutlet}.` : ''}`)
+        alert(`Transfer created successfully!\n\nTransfer Details:\nFrom: ${outlet?.outletName}\nTo: ${transferPayload.toOutlet}\nItems: ${transferItems.length}\n\nTransfer ID: ${response.data.transferId}\n\nStock has been updated in both Central Kitchen and destination outlet.${(transferPayload.toOutlet === 'Kuwait City' || transferPayload.toOutlet === '360 Mall' || transferPayload.toOutlet === 'Vibe Complex' || transferPayload.toOutlet === 'Taiba Hospital') ? `\n\nNotification sent to ${transferPayload.toOutlet}.` : ''}`)
         
         // Clear all forms and data after successful creation
         setItemForms([])
@@ -599,7 +599,7 @@ const CentralKitchenCreateTransfer: React.FC = () => {
                 Remove Item
               </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Item Type *</label>
                 <select
@@ -648,16 +648,6 @@ const CentralKitchenCreateTransfer: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={form.data.category || ''}
-                  readOnly
-                  placeholder="Auto-filled from selection"
-                />
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Unit of Measure</label>
                 <select
                   className="input-field"
@@ -679,28 +669,6 @@ const CentralKitchenCreateTransfer: React.FC = () => {
                   min="1"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Unit Price (KWD)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input-field"
-                  value={form.data.unitPrice || 0}
-                  onChange={(e) => handleUpdateForm(form.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                  min="0"
-                  placeholder="Auto-filled from selection"
-                />
-              </div>
-              <div className="md:col-span-2 lg:col-span-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Item Notes</label>
-                <textarea
-                  className="input-field"
-                  rows={2}
-                  value={form.data.notes || ''}
-                  onChange={(e) => handleUpdateForm(form.id, 'notes', e.target.value)}
-                  placeholder="Additional notes about this item..."
-                />
-              </div>
             </div>
           </div>
         ))}
@@ -711,7 +679,7 @@ const CentralKitchenCreateTransfer: React.FC = () => {
             {/* Transfer Summary */}
             <div className="bg-blue-50 p-4 rounded-lg">
               <h4 className="text-lg font-medium text-gray-900 mb-2">Transfer Summary</h4>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Total Items</p>
                   <p className="text-xl font-semibold text-gray-900">{itemForms.length}</p>
@@ -720,12 +688,6 @@ const CentralKitchenCreateTransfer: React.FC = () => {
                   <p className="text-sm text-gray-600">Total Quantity</p>
                   <p className="text-xl font-semibold text-gray-900">
                     {itemForms.reduce((sum, form) => sum + (form.data.quantity || 1), 0)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Total Value</p>
-                  <p className="text-xl font-semibold text-gray-900">
-                    {itemForms.reduce((sum, form) => sum + ((form.data.quantity || 1) * (form.data.unitPrice || 0)), 0).toFixed(2)} KWD
                   </p>
                 </div>
                 <div>

@@ -312,6 +312,55 @@ router.put('/:id/approve', ensureConnections, async (req, res) => {
       transferOrder.status = 'Approved';
       transferOrder.approvedBy = `${requestingOutletName} Manager`;
       transferOrder.transferStartedAt = new Date();
+
+      // If outlet manager provided edited quantities during final acceptance, persist them
+      if (editedItems && editedItems.length > 0) {
+        console.log('📝 Final acceptance includes edited quantities. Updating transfer order items with final accepted values.');
+        console.log('📝 Current items before final update:', transferOrder.items.map(item => ({
+          itemCode: item.itemCode,
+          quantity: item.quantity
+        })));
+
+        const updatedItemsArray = transferOrder.items.map(item => {
+          const editedItem = editedItems.find(ei =>
+            ei.itemCode === item.itemCode ||
+            (ei.itemCode && item.itemCode && ei.itemCode.toString() === item.itemCode.toString())
+          );
+
+          if (editedItem) {
+            const newQuantity = editedItem.quantity;
+            const newTotalValue = newQuantity * (item.unitPrice || 0);
+
+            console.log(`📝 Final acceptance item update ${item.itemCode}: quantity ${item.quantity} → ${newQuantity}`);
+
+            return {
+              itemType: item.itemType,
+              itemCode: item.itemCode,
+              itemName: item.itemName,
+              category: item.category,
+              subCategory: item.subCategory,
+              unitOfMeasure: item.unitOfMeasure,
+              quantity: newQuantity,
+              unitPrice: item.unitPrice,
+              totalValue: newTotalValue,
+              notes: editedItem.notes || item.notes || ''
+            };
+          }
+
+          return item.toObject ? item.toObject() : item;
+        });
+
+        const newTotalAmount = updatedItemsArray.reduce((sum, item) => {
+          return sum + (item.totalValue || (item.quantity * (item.unitPrice || 0)));
+        }, 0);
+
+        transferOrder.items = updatedItemsArray;
+        transferOrder.totalAmount = newTotalAmount;
+        transferOrder.markModified('items');
+        transferOrder.markModified('totalAmount');
+
+        console.log('📝 Transfer order items updated with outlet final quantities. New total amount:', newTotalAmount);
+      }
     } else if (isFromCentralKitchen) {
       // Central Kitchen → Outlet: Approved by outlet (final approval)
       console.log('✅ Updating transfer order status to Approved (final approval by outlet)');
@@ -398,7 +447,7 @@ router.put('/:id/approve', ensureConnections, async (req, res) => {
     
     // IMPORTANT: Force update using findByIdAndUpdate to ensure MongoDB saves the items array
     // This is necessary because Mongoose sometimes doesn't detect nested array changes
-    if (editedItems && editedItems.length > 0 && !isFromCentralKitchen && !isFinalAcceptance) {
+    if (editedItems && editedItems.length > 0 && !isFromCentralKitchen) {
       console.log('🔄 Force-updating items array using findByIdAndUpdate...');
       const updated = await TransferOrder.findByIdAndUpdate(
         transferOrder._id,
