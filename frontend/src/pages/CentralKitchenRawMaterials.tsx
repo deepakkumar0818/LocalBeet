@@ -43,6 +43,49 @@ interface Outlet {
   isCentralKitchen: boolean
 }
 
+interface StockChangeIndicator {
+  amount: number
+  type: 'increase' | 'decrease'
+}
+
+const INDICATOR_DURATION = 20000
+
+const isRawMaterialItem = (item: any, fallbackType?: string) => {
+  const type = (item?.itemType || fallbackType || '').toString().toLowerCase()
+  return type.includes('raw')
+}
+
+const matchesOutletName = (outletValue: any, targetName: string) => {
+  if (!outletValue || !targetName) return false
+  const normalizedTarget = targetName.toLowerCase()
+  const normalize = (value: string) => value?.toLowerCase() ?? ''
+
+  if (typeof outletValue === 'string') {
+    const normalizedValue = outletValue.toLowerCase()
+    return (
+      normalizedValue === normalizedTarget ||
+      normalizedValue.includes(normalizedTarget)
+    )
+  }
+
+  const possibleNames = [
+    outletValue.outletName,
+    outletValue.name,
+    outletValue.kitchenName,
+    outletValue.toOutletName,
+    outletValue.fromOutletName
+  ]
+
+  return possibleNames.some(name => {
+    if (typeof name !== 'string') return false
+    const normalizedName = normalize(name)
+    return (
+      normalizedName === normalizedTarget ||
+      normalizedName.includes(normalizedTarget)
+    )
+  })
+}
+
 const CentralKitchenRawMaterials: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { confirmation, closeConfirmation } = useConfirmation()
@@ -70,6 +113,9 @@ const CentralKitchenRawMaterials: React.FC = () => {
   const [transferOrderLoading, setTransferOrderLoading] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
   const [importLoading, setImportLoading] = useState(false)
+  const [stockChangeIndicators, setStockChangeIndicators] = useState<Record<string, StockChangeIndicator>>({})
+  const indicatorTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const processedNotificationsRef = useRef<Set<string>>(new Set())
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Central Kitchen')
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -108,6 +154,129 @@ const CentralKitchenRawMaterials: React.FC = () => {
     
     return () => clearInterval(interval)
   }, [refreshNotifications])
+
+  // Detect when outlet manager accepts transfer and show indicator with final quantities
+  useEffect(() => {
+    const checkForOutletAcceptance = async () => {
+      const now = Date.now()
+      const MAX_NOTIFICATION_AGE = 30000 // Only process notifications from last 30 seconds
+      
+      // Find notifications about transfer completion/final approval
+      const acceptanceNotifications = notifications.filter(notif => {
+        if (!notif.transferOrderId) return false
+        if (processedNotificationsRef.current.has(notif.id)) return false
+        
+        // Only process recent notifications (within last 30 seconds)
+        const notificationAge = now - notif.timestamp.getTime()
+        if (notificationAge > MAX_NOTIFICATION_AGE) return false
+        
+        const isAcceptanceNotification = (
+          notif.title?.includes('Transfer Request Completed') ||
+          notif.title?.includes('Transfer Request Approved by Outlet')
+        )
+        
+        const isRawMaterial = (notif.itemType === 'Raw Material' || notif.itemType === 'Mixed')
+        const isSuccessType = notif.type === 'success' // transfer_acceptance maps to 'success'
+        
+        return isAcceptanceNotification && isRawMaterial && isSuccessType
+      })
+
+      for (const notification of acceptanceNotifications) {
+        console.log('🔔 Central Kitchen: Detected outlet acceptance notification:', notification)
+        processedNotificationsRef.current.add(notification.id)
+
+        try {
+          // Fetch the transfer order to get final accepted quantities
+          const response = await apiService.getTransferOrderById(notification.transferOrderId!)
+          if (response.success && response.data) {
+            const transferOrder = response.data
+            console.log('📦 Central Kitchen: Fetched transfer order after outlet acceptance:', transferOrder)
+
+            // Check if this is an outlet → Central Kitchen transfer (raw materials)
+            if (transferOrder.status === 'Approved' && isRawMaterialItem(transferOrder.items?.[0], transferOrder.itemType)) {
+              // Use final accepted quantities from transfer order items
+              const indicatorItems = (transferOrder.items || [])
+                .filter((item: any) => isRawMaterialItem(item, transferOrder.itemType))
+                .map((item: any) => ({
+                  materialCode: item.itemCode || item.materialCode,
+                  materialId: item.materialId,
+                  itemCode: item.itemCode,
+                  quantity: item.quantity,
+                  itemType: item.itemType
+                }))
+
+              if (indicatorItems.length > 0) {
+                console.log('📊 Central Kitchen: Showing indicator from notification:', indicatorItems)
+                triggerStockChangeIndicators(indicatorItems, 'decrease')
+                await loadInventory()
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching transfer order for indicator:', error)
+        }
+      }
+    }
+
+    checkForOutletAcceptance()
+  }, [notifications])
+
+  // Clear all indicators on component mount
+  useEffect(() => {
+    // Clear any existing indicators when component mounts
+    setStockChangeIndicators({})
+    // Clear all timeouts
+    Object.values(indicatorTimeoutsRef.current).forEach(timeoutId => {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    })
+    indicatorTimeoutsRef.current = {}
+    
+    return () => {
+      Object.values(indicatorTimeoutsRef.current).forEach(timeoutId => {
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+        }
+      })
+    }
+  }, [])
+
+  const triggerStockChangeIndicators = (
+    items: Array<{ materialCode?: string; materialId?: string; itemCode?: string; quantity?: number }>,
+    type: 'increase' | 'decrease'
+  ) => {
+    if (!items || items.length === 0) return
+
+    setStockChangeIndicators(prev => {
+      const next = { ...prev }
+      items.forEach(item => {
+        const indicatorKey = item.materialCode || item.materialId || item.itemCode
+        const amount = Number(item.quantity)
+        if (!indicatorKey || !amount) return
+
+        next[indicatorKey] = {
+          amount: Math.abs(amount),
+          type
+        }
+
+        if (indicatorTimeoutsRef.current[indicatorKey]) {
+          clearTimeout(indicatorTimeoutsRef.current[indicatorKey])
+        }
+
+        indicatorTimeoutsRef.current[indicatorKey] = setTimeout(() => {
+          setStockChangeIndicators(current => {
+            const copy = { ...current }
+            delete copy[indicatorKey]
+            return copy
+          })
+          delete indicatorTimeoutsRef.current[indicatorKey]
+        }, INDICATOR_DURATION)
+      })
+
+      return next
+    })
+  }
 
   useEffect(() => {
     loadCentralKitchenData()
@@ -502,6 +671,8 @@ const CentralKitchenRawMaterials: React.FC = () => {
         const hasModifications = editedItems && editedItems.some((item, index) => 
           item.quantity !== transferOrder.items[index]?.quantity
         )
+        await loadInventory()
+
         alert(`Transfer order accepted successfully!${hasModifications ? ' (Quantities modified)' : ''}`)
         setShowTransferOrderModal(false)
         setSelectedTransferOrder(null)
@@ -952,7 +1123,31 @@ const CentralKitchenRawMaterials: React.FC = () => {
                       KWD {item.unitPrice ? Number(item.unitPrice).toFixed(3) : '0.000'}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.currentStock}
+                      <div className="flex items-center gap-2">
+                        <span>{item.currentStock}</span>
+                        {(stockChangeIndicators[item.materialCode] ||
+                          stockChangeIndicators[item.materialId] ||
+                          stockChangeIndicators[item.id]) && (
+                          <span
+                            className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              (stockChangeIndicators[item.materialCode] ||
+                                stockChangeIndicators[item.materialId] ||
+                                stockChangeIndicators[item.id])?.type === 'increase'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-red-100 text-red-700'
+                            }`}
+                          >
+                            {(stockChangeIndicators[item.materialCode] ||
+                              stockChangeIndicators[item.materialId] ||
+                              stockChangeIndicators[item.id])?.type === 'increase'
+                              ? '+'
+                              : '-'}
+                            {(stockChangeIndicators[item.materialCode] ||
+                              stockChangeIndicators[item.materialId] ||
+                              stockChangeIndicators[item.id])?.amount}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                       <button

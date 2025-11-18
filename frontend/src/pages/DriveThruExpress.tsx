@@ -76,6 +76,54 @@ interface FinishedGoodInventoryItem {
   isActive: boolean
 }
 
+interface StockChangeIndicator {
+  amount: number
+  type: 'increase' | 'decrease'
+}
+
+const INDICATOR_DURATION = 20000
+
+const isRawMaterialItem = (item: any, fallbackType?: string) => {
+  const type = (item?.itemType || fallbackType || '').toString().toLowerCase()
+  return type.includes('raw')
+}
+
+const isFinishedGoodItem = (item: any, fallbackType?: string) => {
+  const type = (item?.itemType || fallbackType || '').toString().toLowerCase()
+  return type.includes('finished')
+}
+
+const matchesOutletName = (outletValue: any, targetName: string) => {
+  if (!outletValue || !targetName) return false
+  const normalizedTarget = targetName.toLowerCase()
+  const normalize = (value: string) => value?.toLowerCase() ?? ''
+
+  if (typeof outletValue === 'string') {
+    const normalizedValue = outletValue.toLowerCase()
+    return (
+      normalizedValue === normalizedTarget ||
+      normalizedValue.includes(normalizedTarget)
+    )
+  }
+
+  const possibleNames = [
+    outletValue.outletName,
+    outletValue.name,
+    outletValue.kitchenName,
+    outletValue.toOutletName,
+    outletValue.fromOutletName
+  ]
+
+  return possibleNames.some(name => {
+    if (typeof name !== 'string') return false
+    const normalizedName = normalize(name)
+    return (
+      normalizedName === normalizedTarget ||
+      normalizedName.includes(normalizedTarget)
+    )
+  })
+}
+
 const DriveThruExpress: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -92,6 +140,8 @@ const DriveThruExpress: React.FC = () => {
   const [importLoading, setImporting] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [stockChangeIndicators, setStockChangeIndicators] = useState<Record<string, StockChangeIndicator>>({})
+  const indicatorTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const { notifications, markAsRead, markAllAsRead, clearAll, refreshNotifications } = useNotifications('Taiba Hospital')
   const [showTransferOrderModal, setShowTransferOrderModal] = useState(false)
   const [selectedTransferOrder, setSelectedTransferOrder] = useState<TransferOrder | null>(null)
@@ -276,6 +326,51 @@ const DriveThruExpress: React.FC = () => {
     loadInventory()
   }
 
+  useEffect(() => {
+    return () => {
+      Object.values(indicatorTimeoutsRef.current).forEach(timeoutId => {
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+        }
+      })
+    }
+  }, [])
+
+  const triggerStockChangeIndicators = (
+    items: Array<{ materialCode?: string; materialId?: string; itemCode?: string; quantity?: number }>,
+    type: 'increase' | 'decrease'
+  ) => {
+    if (!items || items.length === 0) return
+
+    setStockChangeIndicators(prev => {
+      const next = { ...prev }
+      items.forEach(item => {
+        const indicatorKey = item.materialCode || item.materialId || item.itemCode
+        const amount = Number(item.quantity)
+        if (!indicatorKey || !amount) return
+
+        next[indicatorKey] = {
+          amount: Math.abs(amount),
+          type
+        }
+
+        if (indicatorTimeoutsRef.current[indicatorKey]) {
+          clearTimeout(indicatorTimeoutsRef.current[indicatorKey])
+        }
+
+        indicatorTimeoutsRef.current[indicatorKey] = setTimeout(() => {
+          setStockChangeIndicators(current => {
+            const copy = { ...current }
+            delete copy[indicatorKey]
+            return copy
+          })
+          delete indicatorTimeoutsRef.current[indicatorKey]
+        }, INDICATOR_DURATION)
+      })
+      return next
+    })
+  }
+
   // Approve transfer order (supports edited quantities)
   const handleAcceptTransferOrder = async (transferOrderId: string, editedItems?: any[], notes?: string) => {
     try {
@@ -321,6 +416,46 @@ const DriveThruExpress: React.FC = () => {
         
         // Refresh inventory
         await loadInventory()
+
+        const targetOutletName = outlet?.outletName || 'Taiba Hospital'
+        if (matchesOutletName(transferOrder.toOutlet, targetOutletName)) {
+          // Handle raw materials
+          const rawMaterialItems = (transferOrder.items || [])
+            .map((item, index) => {
+              const quantity = editedItems && editedItems[index] ? editedItems[index].quantity : item.quantity
+              return {
+                materialCode: item.itemCode || item.materialCode,
+                materialId: item.materialId,
+                itemCode: item.itemCode,
+                quantity,
+                itemType: item.itemType
+              }
+            })
+            .filter(item => isRawMaterialItem(item, transferOrder.itemType))
+
+          if (rawMaterialItems.length > 0) {
+            triggerStockChangeIndicators(rawMaterialItems, 'increase')
+          }
+
+          // Handle finished goods
+          const finishedGoodItems = (transferOrder.items || [])
+            .map((item, index) => {
+              const quantity = editedItems && editedItems[index] ? editedItems[index].quantity : item.quantity
+              // For finished goods, use productCode/productId as the key to match inventory items
+              return {
+                materialCode: item.productCode || item.itemCode, // productCode first for finished goods
+                materialId: item.productId || item.materialId,
+                itemCode: item.productCode || item.itemCode,
+                quantity,
+                itemType: item.itemType
+              }
+            })
+            .filter(item => isFinishedGoodItem(item, transferOrder.itemType))
+
+          if (finishedGoodItems.length > 0) {
+            triggerStockChangeIndicators(finishedGoodItems, 'increase')
+          }
+        }
         
         // Refresh notifications
         refreshNotifications()
@@ -926,7 +1061,33 @@ const DriveThruExpress: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                     KWD {item.unitPrice ? Number(item.unitPrice).toFixed(3) : '0.000'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.currentStock}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div className="flex items-center gap-2">
+                      <span>{item.currentStock}</span>
+                      {(stockChangeIndicators[item.materialCode] ||
+                        stockChangeIndicators[item.materialId] ||
+                        stockChangeIndicators[item.id]) && (
+                        <span
+                          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            (stockChangeIndicators[item.materialCode] ||
+                              stockChangeIndicators[item.materialId] ||
+                              stockChangeIndicators[item.id])?.type === 'increase'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}
+                        >
+                          {(stockChangeIndicators[item.materialCode] ||
+                            stockChangeIndicators[item.materialId] ||
+                            stockChangeIndicators[item.id])?.type === 'increase'
+                            ? '+'
+                            : '-'}
+                          {(stockChangeIndicators[item.materialCode] ||
+                            stockChangeIndicators[item.materialId] ||
+                            stockChangeIndicators[item.id])?.amount}
+                        </span>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1131,7 +1292,33 @@ const DriveThruExpress: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.productName}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.category}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.unitOfMeasure}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.currentStock}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 relative">
+                    <div className="flex items-center gap-2">
+                      <span>{item.currentStock}</span>
+                      {(stockChangeIndicators[item.productCode] ||
+                        stockChangeIndicators[item.productId] ||
+                        stockChangeIndicators[item.id]) && (
+                        <span
+                          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            (stockChangeIndicators[item.productCode] ||
+                              stockChangeIndicators[item.productId] ||
+                              stockChangeIndicators[item.id])?.type === 'increase'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}
+                        >
+                          {(stockChangeIndicators[item.productCode] ||
+                            stockChangeIndicators[item.productId] ||
+                            stockChangeIndicators[item.id])?.type === 'increase'
+                            ? '+'
+                            : '-'}
+                          {(stockChangeIndicators[item.productCode] ||
+                            stockChangeIndicators[item.productId] ||
+                            stockChangeIndicators[item.id])?.amount}
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">KWD {item.unitPrice.toFixed(2)}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(item.status)}`}>

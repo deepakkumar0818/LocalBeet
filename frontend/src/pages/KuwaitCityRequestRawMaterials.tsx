@@ -500,8 +500,8 @@ const KuwaitCityRequestRawMaterials: React.FC = () => {
             ) : (
               <div className="space-y-4">
                 {formData.items.map((item, index) => (
-                  <div key={index} className="grid grid-cols-8 gap-3 p-4 border border-gray-200 rounded-lg bg-blue-50">
-                    <div className="col-span-2">
+                  <div key={index} className="flex items-end gap-3 p-4 border border-gray-200 rounded-lg bg-blue-50">
+                    <div className="flex-1">
                       <label className="block text-xs font-medium text-gray-700 mb-1">Material Code</label>
                       <SearchableDropdown
                         value={item.materialCode}
@@ -513,7 +513,7 @@ const KuwaitCityRequestRawMaterials: React.FC = () => {
                         }))}
                       />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <label className="block text-xs font-medium text-gray-700 mb-1">Material Name</label>
                       <input
                         type="text"
@@ -523,17 +523,17 @@ const KuwaitCityRequestRawMaterials: React.FC = () => {
                         readOnly
                       />
                     </div>
-                    <div>
+                    <div className="w-24">
                       <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
                       <input
                         type="number"
-                        className="input-field text-sm w-24"
+                        className="input-field text-sm"
                         value={item.quantity}
                         onChange={(e) => updateTransferOrderItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                         placeholder="0"
                       />
                     </div>
-                    <div>
+                    <div className="w-32">
                       <label className="block text-xs font-medium text-gray-700 mb-1">Unit</label>
                       <input
                         type="text"
@@ -543,28 +543,7 @@ const KuwaitCityRequestRawMaterials: React.FC = () => {
                         readOnly
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Unit Price</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        className="input-field text-sm bg-gray-100"
-                        value={item.unitPrice}
-                        placeholder="0.00"
-                        readOnly
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Remarks</label>
-                      <input
-                        type="text"
-                        className="input-field text-sm"
-                        value={item.remarks || ''}
-                        onChange={(e) => updateTransferOrderItem(index, 'remarks', e.target.value)}
-                        placeholder="Notes"
-                      />
-                    </div>
-                    <div className="flex items-end justify-end">
+                    <div className="flex items-center pb-0.5">
                       <button
                         type="button"
                         onClick={() => removeTransferOrderItem(index)}
@@ -573,25 +552,11 @@ const KuwaitCityRequestRawMaterials: React.FC = () => {
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
-                    <div className="col-span-8">
-                      <div className="text-sm text-gray-600">
-                        Total Price: {item.totalPrice.toFixed(2)} KWD
-                      </div>
-                    </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {formData.items.length > 0 && (
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                <div className="text-right">
-                  <span className="text-lg font-semibold text-gray-900">
-                    Total Transfer Amount: {formData.items.reduce((sum, item) => sum + item.totalPrice, 0).toFixed(2)} KWD
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Additional Information */}
