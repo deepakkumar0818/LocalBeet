@@ -6,6 +6,7 @@ const TransferOrder = require('../models/TransferOrder');
 const LocationList = require('../models/LocationList');
 const ItemList = require('../models/ItemList');
 const { getZohoAccessToken } = require('../scripts/getZohoAccessToken');
+const { verifyToken } = require('../middlewares/auth');
 
 // Helper functions to get outlet details
 const getOutletCode = (outletName) => {
@@ -39,6 +40,17 @@ const getOutletLocation = (outletName) => {
     'Taiba Hospital': 'Taiba Hospital, Kuwait'
   };
   return outletLocations[outletName] || 'Kuwait';
+};
+
+// Helper function to map outlet code to outlet name(s) - handles variations
+const getOutletNameFromCode = (outletCode) => {
+  const outletCodeMap = {
+    'KUWAIT_CITY': ['Kuwait City'],
+    'MALL_360': ['360 Mall'],
+    'VIBE_COMPLEX': ['Vibes Complex', 'Vibe Complex'], // Handle both variations
+    'TAIBA_HOSPITAL': ['Taiba Hospital']
+  };
+  return outletCodeMap[outletCode] || [];
 };
 
 // Map internal outlet names to Zoho location names
@@ -312,7 +324,7 @@ async function pushTransferOrderToZoho(transferOrder) {
 }
 
 // GET all transfer orders with pagination, search, and filtering
-router.get('/', async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
   try {
     const { 
       page = 1, 
@@ -354,6 +366,54 @@ router.get('/', async (req, res) => {
 
     // Only show active transfer orders
     query.isActive = true;
+
+    // Role-based filtering: Non-admin users can only see transfer orders involving their outlet
+    if (!req.user.isAdmin && req.user.assignedOutletCode) {
+      const outletNames = getOutletNameFromCode(req.user.assignedOutletCode);
+      
+      if (outletNames.length > 0) {
+        // Build regex conditions for each outlet name variation
+        const outletFilterConditions = [];
+        
+        // Create conditions for fromOutlet matching any outlet name variation
+        outletNames.forEach(name => {
+          outletFilterConditions.push({ fromOutlet: { $regex: name, $options: 'i' } });
+          outletFilterConditions.push({ toOutlet: { $regex: name, $options: 'i' } });
+        });
+        
+        // Create outlet filter: fromOutlet OR toOutlet matches user's outlet
+        const outletFilter = {
+          $or: outletFilterConditions
+        };
+        
+        // If user has a search filter, we need to combine it properly
+        if (query.$or) {
+          // If there's already a $or from search, we need to combine filters
+          // Use $and to ensure both search and outlet filter are applied
+          const searchFilter = { $or: query.$or };
+          query.$and = [
+            searchFilter, // Original search filter
+            outletFilter // Outlet filter
+          ];
+          delete query.$or; // Remove the old $or since it's now in $and
+        } else {
+          // No search filter, just apply outlet filter
+          query.$or = outletFilter.$or;
+        }
+      } else {
+        // User has assignedOutletCode but it's not mapped - return empty results
+        return res.json({
+          success: true,
+          data: [],
+          pagination: {
+            page: parseInt(page),
+            pages: 0,
+            total: 0,
+            limit: parseInt(limit)
+          }
+        });
+      }
+    }
 
     const options = {
       page: parseInt(page),
@@ -439,7 +499,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET a single transfer order by ID or transfer number
-router.get('/:id', async (req, res) => {
+router.get('/:id', verifyToken, async (req, res) => {
   try {
     let transferOrder;
     
@@ -456,6 +516,45 @@ router.get('/:id', async (req, res) => {
         success: false, 
         message: 'Transfer Order not found' 
       });
+    }
+
+    // Role-based access control: Non-admin users can only access transfer orders involving their outlet
+    if (!req.user.isAdmin && req.user.assignedOutletCode) {
+      const outletNames = getOutletNameFromCode(req.user.assignedOutletCode);
+      
+      if (outletNames.length > 0) {
+        // Check if transfer order involves user's outlet
+        const fromOutletMatches = outletNames.some(name => 
+          transferOrder.fromOutlet && 
+          transferOrder.fromOutlet.toLowerCase().includes(name.toLowerCase())
+        );
+        const toOutletMatches = outletNames.some(name => 
+          transferOrder.toOutlet && 
+          transferOrder.toOutlet.toLowerCase().includes(name.toLowerCase())
+        );
+        
+        // Also check for Central Kitchen variations
+        const isFromCentralKitchen = transferOrder.fromOutlet && 
+          (transferOrder.fromOutlet.toLowerCase().includes('central kitchen') || 
+           transferOrder.fromOutlet.toLowerCase().includes('main central kitchen'));
+        const isToCentralKitchen = transferOrder.toOutlet && 
+          (transferOrder.toOutlet.toLowerCase().includes('central kitchen') || 
+           transferOrder.toOutlet.toLowerCase().includes('main central kitchen'));
+        
+        // User can access if their outlet is in fromOutlet or toOutlet
+        if (!fromOutletMatches && !toOutletMatches) {
+          return res.status(403).json({ 
+            success: false, 
+            message: 'Access denied. You can only view transfer orders involving your outlet.' 
+          });
+        }
+      } else {
+        // User has assignedOutletCode but it's not mapped - deny access
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Access denied. Invalid outlet assignment.' 
+        });
+      }
     }
 
     // Helper function to check if an outlet is Central Kitchen
