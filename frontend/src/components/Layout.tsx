@@ -291,7 +291,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         filtered.push({ ...outlets, children: onlyAssigned })
       }
     }
-    // For managers: do not show Transfer Orders or Inventory
+    // Add Transfer Orders for outlet owners
+    const transferOrders = baseNavigation.find(n => n.name === 'Transfer Orders')
+    if (transferOrders) {
+      filtered.push(transferOrders)
+    }
     return filtered
   }, [isAdmin, assignedOutlet])
 
