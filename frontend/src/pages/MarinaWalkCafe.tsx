@@ -440,11 +440,12 @@ const MarinaWalkCafe: React.FC = () => {
           const finishedGoodItems = (transferOrder.items || [])
             .map((item, index) => {
               const quantity = editedItems && editedItems[index] ? editedItems[index].quantity : item.quantity
-              // For finished goods, use productCode/productId as the key to match inventory items
+              // For finished goods, itemCode in transfer order IS the productCode (since schema doesn't have productCode field)
+              // So we use itemCode directly to match with inventory's productCode (stored as materialCode)
               return {
-                materialCode: item.productCode || item.itemCode, // productCode first for finished goods
+                materialCode: item.itemCode, // itemCode IS productCode for finished goods in transfer orders
                 materialId: item.productId || item.materialId,
-                itemCode: item.productCode || item.itemCode,
+                itemCode: item.itemCode,
                 quantity,
                 itemType: item.itemType
               }

@@ -367,6 +367,65 @@ router.put('/:id/approve', ensureConnections, async (req, res) => {
       transferOrder.status = 'Approved';
       transferOrder.approvedBy = `${requestingOutletName} Manager`;
       transferOrder.transferStartedAt = new Date();
+      
+      // IMPORTANT: Update transfer order items with edited quantities if outlet edited them
+      // This ensures Central Kitchen sees the final accepted quantities (5) instead of original (10)
+      if (editedItems && editedItems.length > 0) {
+        console.log('📝 Updating transfer order items with edited quantities from outlet');
+        console.log('📝 Original items before update:', transferOrder.items.map(item => ({
+          itemCode: item.itemCode,
+          productCode: item.productCode,
+          quantity: item.quantity
+        })));
+        
+        // Build updated items array with edited quantities
+        const updatedItemsArray = transferOrder.items.map(item => {
+          const editedItem = editedItems.find(ei => {
+            // Match by itemCode (for raw materials) or productCode (for finished goods)
+            const matchesItemCode = ei.itemCode === item.itemCode || 
+              (ei.itemCode && item.itemCode && ei.itemCode.toString() === item.itemCode.toString());
+            const matchesProductCode = ei.productCode === item.productCode || 
+              (ei.productCode && item.productCode && ei.productCode.toString() === item.productCode.toString());
+            return matchesItemCode || matchesProductCode;
+          });
+          
+          if (editedItem) {
+            // Use edited quantity and recalculate totalValue
+            const originalQuantity = item.quantity;
+            const newQuantity = editedItem.quantity;
+            const newTotalValue = newQuantity * (item.unitPrice || 0);
+            
+            console.log(`📝 Updating item ${item.itemCode || item.productCode}: quantity ${originalQuantity} → ${newQuantity}`);
+            
+            return {
+              itemType: item.itemType,
+              itemCode: item.itemCode,
+              productCode: item.productCode, // Preserve productCode for finished goods
+              itemName: item.itemName,
+              category: item.category,
+              subCategory: item.subCategory,
+              unitOfMeasure: item.unitOfMeasure,
+              quantity: newQuantity, // Use edited quantity
+              unitPrice: item.unitPrice,
+              totalValue: newTotalValue,
+              notes: editedItem.notes || item.notes || ''
+            };
+          }
+
+          return item.toObject ? item.toObject() : item;
+        });
+
+        const newTotalAmount = updatedItemsArray.reduce((sum, item) => {
+          return sum + (item.totalValue || (item.quantity * (item.unitPrice || 0)));
+        }, 0);
+
+        transferOrder.items = updatedItemsArray;
+        transferOrder.totalAmount = newTotalAmount;
+        transferOrder.markModified('items');
+        transferOrder.markModified('totalAmount');
+
+        console.log('📝 Transfer order items updated with outlet final quantities. New total amount:', newTotalAmount);
+      }
     } else {
       // Outlet → Central Kitchen: Approved by Central Kitchen (pending outlet final acceptance)
       console.log('✅ Updating transfer order status to Approved by Central Kitchen (pending outlet acceptance)');
@@ -447,7 +506,8 @@ router.put('/:id/approve', ensureConnections, async (req, res) => {
     
     // IMPORTANT: Force update using findByIdAndUpdate to ensure MongoDB saves the items array
     // This is necessary because Mongoose sometimes doesn't detect nested array changes
-    if (editedItems && editedItems.length > 0 && !isFromCentralKitchen) {
+    // Apply force update for both directions when editedItems are provided
+    if (editedItems && editedItems.length > 0) {
       console.log('🔄 Force-updating items array using findByIdAndUpdate...');
       const updated = await TransferOrder.findByIdAndUpdate(
         transferOrder._id,

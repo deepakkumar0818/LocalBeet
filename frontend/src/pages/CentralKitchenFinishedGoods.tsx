@@ -186,30 +186,77 @@ const CentralKitchenFinishedGoods: React.FC = () => {
         processedNotificationsRef.current.add(notification.id)
 
         try {
+          // Add a small delay to ensure backend has saved the updated transfer order
+          await new Promise(resolve => setTimeout(resolve, 500))
+          
           // Fetch the transfer order to get final accepted quantities
           const response = await apiService.getTransferOrderById(notification.transferOrderId!)
           if (response.success && response.data) {
             const transferOrder = response.data
             console.log('📦 Central Kitchen Finished Goods: Fetched transfer order after outlet acceptance:', transferOrder)
+            console.log('📦 Transfer order items quantities:', transferOrder.items?.map((item: any) => ({
+              itemCode: item.itemCode,
+              productCode: item.productCode,
+              quantity: item.quantity
+            })))
 
-            // Check if this is an outlet → Central Kitchen transfer (finished goods)
-            if (transferOrder.status === 'Approved' && isFinishedGoodItem(transferOrder.items?.[0], transferOrder.itemType)) {
+            // Check transfer direction and show appropriate indicator
+            const isFromCentralKitchen = matchesOutletName(transferOrder.fromOutlet, 'Central Kitchen')
+            const isToCentralKitchen = matchesOutletName(transferOrder.toOutlet, 'Central Kitchen')
+            
+            console.log('🔍 Central Kitchen Finished Goods: Checking transfer order:', {
+              status: transferOrder.status,
+              itemType: transferOrder.itemType,
+              firstItemType: transferOrder.items?.[0]?.itemType,
+              isFromCentralKitchen,
+              isToCentralKitchen,
+              itemsCount: transferOrder.items?.length
+            })
+            
+            // Check if this is a finished goods transfer (either by itemType or by checking items)
+            const hasFinishedGoods = transferOrder.items?.some((item: any) => isFinishedGoodItem(item, transferOrder.itemType))
+            const isFinishedGoodTransfer = transferOrder.itemType === 'Finished Goods' || transferOrder.itemType === 'Mixed' || hasFinishedGoods
+            
+            console.log('🔍 Central Kitchen Finished Goods: Transfer check:', {
+              status: transferOrder.status === 'Approved',
+              isFinishedGoodTransfer,
+              hasFinishedGoods,
+              itemType: transferOrder.itemType
+            })
+            
+            if (transferOrder.status === 'Approved' && isFinishedGoodTransfer) {
               // Use final accepted quantities from transfer order items
+              // For finished goods, itemCode in transfer order IS the productCode (since schema doesn't have productCode field)
+              // So we use itemCode directly to match with inventory's productCode (stored as materialCode)
               const indicatorItems = (transferOrder.items || [])
                 .filter((item: any) => isFinishedGoodItem(item, transferOrder.itemType))
                 .map((item: any) => ({
-                  materialCode: item.itemCode || item.productCode,
+                  materialCode: item.itemCode, // itemCode IS productCode for finished goods in transfer orders
                   materialId: item.materialId || item.productId,
-                  itemCode: item.itemCode || item.productCode,
-                  quantity: item.quantity, // This is the final accepted quantity
+                  itemCode: item.itemCode,
+                  quantity: item.quantity, // This should be the final accepted quantity
                   itemType: item.itemType
                 }))
 
+              console.log('🔍 Central Kitchen Finished Goods: Indicator items after filtering:', indicatorItems)
+
               if (indicatorItems.length > 0) {
-                console.log('📊 Central Kitchen Finished Goods: Showing indicator from notification:', indicatorItems)
-                triggerStockChangeIndicators(indicatorItems, 'decrease')
+                // Central Kitchen → Outlet: show decrease (items going out)
+                // Outlet → Central Kitchen: show increase (items coming in)
+                const indicatorType = isFromCentralKitchen ? 'decrease' : 'increase'
+                console.log(`📊 Central Kitchen Finished Goods: Showing ${indicatorType} indicator from notification (${isFromCentralKitchen ? 'CK → Outlet' : 'Outlet → CK'}):`, indicatorItems)
+                console.log(`📊 Quantities being shown:`, indicatorItems.map(item => ({ code: item.materialCode, qty: item.quantity })))
+                triggerStockChangeIndicators(indicatorItems, indicatorType)
                 await loadInventory()
+              } else {
+                console.warn('⚠️ Central Kitchen Finished Goods: No indicator items found after filtering')
               }
+            } else {
+              console.log('⚠️ Central Kitchen Finished Goods: Transfer order not processed:', {
+                status: transferOrder.status,
+                isFinishedGoodTransfer,
+                reason: transferOrder.status !== 'Approved' ? 'Status not Approved' : 'Not a finished goods transfer'
+              })
             }
           }
         } catch (error) {
