@@ -186,13 +186,23 @@ const CentralKitchenRawMaterials: React.FC = () => {
         processedNotificationsRef.current.add(notification.id)
 
         try {
+          // Add a small delay to ensure backend has saved the updated transfer order
+          await new Promise(resolve => setTimeout(resolve, 500))
+          
           // Fetch the transfer order to get final accepted quantities
           const response = await apiService.getTransferOrderById(notification.transferOrderId!)
           if (response.success && response.data) {
             const transferOrder = response.data
             console.log('📦 Central Kitchen: Fetched transfer order after outlet acceptance:', transferOrder)
+            console.log('📦 Transfer order items quantities:', transferOrder.items?.map((item: any) => ({
+              itemCode: item.itemCode,
+              quantity: item.quantity
+            })))
 
-            // Check if this is an outlet → Central Kitchen transfer (raw materials)
+            // Check transfer direction and show appropriate indicator
+            const isFromCentralKitchen = matchesOutletName(transferOrder.fromOutlet, 'Central Kitchen')
+            const isToCentralKitchen = matchesOutletName(transferOrder.toOutlet, 'Central Kitchen')
+            
             if (transferOrder.status === 'Approved' && isRawMaterialItem(transferOrder.items?.[0], transferOrder.itemType)) {
               // Use final accepted quantities from transfer order items
               const indicatorItems = (transferOrder.items || [])
@@ -201,13 +211,17 @@ const CentralKitchenRawMaterials: React.FC = () => {
                   materialCode: item.itemCode || item.materialCode,
                   materialId: item.materialId,
                   itemCode: item.itemCode,
-                  quantity: item.quantity,
+                  quantity: item.quantity, // This should be the final accepted quantity
                   itemType: item.itemType
                 }))
 
               if (indicatorItems.length > 0) {
-                console.log('📊 Central Kitchen: Showing indicator from notification:', indicatorItems)
-                triggerStockChangeIndicators(indicatorItems, 'decrease')
+                // Central Kitchen → Outlet: show decrease (items going out)
+                // Outlet → Central Kitchen: show increase (items coming in)
+                const indicatorType = isFromCentralKitchen ? 'decrease' : 'increase'
+                console.log(`📊 Central Kitchen: Showing ${indicatorType} indicator from notification (${isFromCentralKitchen ? 'CK → Outlet' : 'Outlet → CK'}):`, indicatorItems)
+                console.log(`📊 Quantities being shown:`, indicatorItems.map(item => ({ code: item.materialCode, qty: item.quantity })))
+                triggerStockChangeIndicators(indicatorItems, indicatorType)
                 await loadInventory()
               }
             }
