@@ -238,6 +238,14 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ success:false, message:'Outlet not found. Provide a valid outletId or outletName.'});
     }
 
+    // TEMPORARY: Disable POS sales for Kuwait City only
+    if (outlet.outletCode === 'KUWAIT_CITY' || outlet.outletName === 'Kuwait City') {
+      return res.status(503).json({ 
+        success: false, 
+        message: 'POS sales functionality for Kuwait City is temporarily disabled' 
+      });
+    }
+
     // Generate robust unique order number per outlet using timestamp + random suffix
     const nowTs = new Date();
     const ymd = `${nowTs.getFullYear()}${String(nowTs.getMonth() + 1).padStart(2, '0')}${String(nowTs.getDate()).padStart(2, '0')}`;

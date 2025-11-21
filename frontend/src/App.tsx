@@ -160,7 +160,8 @@ function App() {
         <Route path="/sales-orders/add" element={<AddSalesOrder />} />
         <Route path="/kuwait-city/sales-orders" element={<ProtectedOutletRoute allowedOutletCodes={['KUWAIT_CITY']}><SalesOrders /></ProtectedOutletRoute>} />
         <Route path="/kuwait-city/sales-orders/add" element={<ProtectedOutletRoute allowedOutletCodes={['KUWAIT_CITY']}><AddSalesOrder /></ProtectedOutletRoute>} />
-        <Route path="/kuwait-city/pos-sales/create-order" element={<ProtectedOutletRoute allowedOutletCodes={['KUWAIT_CITY']}><POSCreateOrder /></ProtectedOutletRoute>} />
+        {/* TEMPORARY: Kuwait City POS sales disabled - uncomment when needed */}
+        {/* <Route path="/kuwait-city/pos-sales/create-order" element={<ProtectedOutletRoute allowedOutletCodes={['KUWAIT_CITY']}><POSCreateOrder /></ProtectedOutletRoute>} /> */}
         <Route path="/marina-walk-cafe/sales-orders" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><SalesOrders /></ProtectedOutletRoute>} />
         <Route path="/marina-walk-cafe/sales-orders/add" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><AddSalesOrder /></ProtectedOutletRoute>} />
         <Route path="/marina-walk-cafe/pos-sales/create-order" element={<ProtectedOutletRoute allowedOutletCodes={['VIBE_COMPLEX']}><POSCreateOrder /></ProtectedOutletRoute>} />
