@@ -35,7 +35,10 @@ const LOCATION_MAPPING = {
   'CLINIC': 'taiba-kitchen',
   'Taiba Hospital': 'taiba-kitchen',
   'taiba hospital': 'taiba-kitchen',
-  'TAIBA HOSPITAL': 'taiba-kitchen'
+  'TAIBA HOSPITAL': 'taiba-kitchen',
+  'TLB Taiba': 'taiba-kitchen',
+  'TLB TAIBA': 'taiba-kitchen',
+  'TLB taiba': 'taiba-kitchen'
 };
 
 /**
