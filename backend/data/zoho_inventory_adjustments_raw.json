@@ -3,29 +3,29 @@
   "message": "success",
   "inventory_adjustments": [
     {
-      "inventory_adjustment_id": "6531063000000759001",
+      "inventory_adjustment_id": "6531063000000763585",
       "status": "adjusted",
       "adjustment_type": "quantity",
-      "date": "2025-11-24",
+      "date": "2025-11-25",
       "reason": "Stock on fire",
       "description": "",
       "total": 0,
-      "created_time": "2025-11-24T09:50:32+0300",
-      "last_modified_time": "2025-11-24T09:50:32+0300",
+      "created_time": "2025-11-25T14:16:27+0300",
+      "last_modified_time": "2025-11-25T14:16:55+0300",
       "item_id": "6531063000000641873",
       "name": "10 Oz Pet Ice cream Cup",
       "tags": [],
-      "quantity_adjusted": -6,
+      "quantity_adjusted": -10,
       "value_adjusted": 0,
       "custom_fields": [],
       "custom_field_hash": {},
-      "reference_number": "0001",
+      "reference_number": "",
       "created_by_id": "6531063000000093001",
       "created_by_name": "itdb",
       "last_modified_by_id": "6531063000000093001",
       "last_modified_by_name": "itdb",
-      "location_id": "6531063000000143064",
-      "location_name": "TLB Central Kitchen"
+      "location_id": "6531063000000756001",
+      "location_name": "TLB Taiba"
     }
   ]
 }
