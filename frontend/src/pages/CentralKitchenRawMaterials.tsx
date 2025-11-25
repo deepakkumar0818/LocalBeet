@@ -296,6 +296,48 @@ const CentralKitchenRawMaterials: React.FC = () => {
     loadCentralKitchenData()
   }, [])
 
+  // Listen for inventory adjustment events
+  useEffect(() => {
+    const handleInventoryAdjustment = (event: CustomEvent) => {
+      const { quantityChanges, location, module } = event.detail
+      
+      // Check if this adjustment is for Central Kitchen
+      const isCentralKitchen = module === 'central-kitchen' || 
+        location?.toLowerCase().includes('central kitchen') ||
+        location?.toLowerCase().includes('tlb central kitchen') ||
+        module === 'multiple'
+      
+      if (isCentralKitchen && quantityChanges && Array.isArray(quantityChanges)) {
+        // Filter for raw materials only
+        const rawMaterialChanges = quantityChanges.filter((qc: any) => qc.type === 'raw_material')
+        
+        if (rawMaterialChanges.length > 0) {
+          // Trigger indicators for each item
+          rawMaterialChanges.forEach((qc: any) => {
+            const type: 'increase' | 'decrease' = qc.quantityChange > 0 ? 'increase' : 'decrease'
+            const item = {
+              materialCode: qc.sku,
+              quantity: Math.abs(qc.quantityChange),
+              materialId: qc.sku
+            }
+            triggerStockChangeIndicators([item], type)
+          })
+          
+          // Reload inventory to show updated quantities
+          setTimeout(() => {
+            loadInventory()
+          }, 500)
+        }
+      }
+    }
+    
+    window.addEventListener('inventoryAdjustmentProcessed', handleInventoryAdjustment as EventListener)
+    
+    return () => {
+      window.removeEventListener('inventoryAdjustmentProcessed', handleInventoryAdjustment as EventListener)
+    }
+  }, [])
+
   // Reload inventory when filters or pagination change
   // Use debouncedSearchTerm instead of searchTerm to avoid API calls on every keystroke
   useEffect(() => {

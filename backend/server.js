@@ -54,6 +54,9 @@ app.use('/api/sync-zoho-bills', require('./routes/syncZohoBills'));
 // Bill Processing routes (Inventory Updates)
 app.use('/api/bill-processing', require('./routes/billProcessing'));
 
+// Inventory Adjustments routes
+app.use('/api/inventory-adjustments', require('./routes/inventoryAdjustments'));
+
 // Ingredient Master Transfer routes
 app.use('/api/ingredient-master', require('./routes/ingredientMasterTransfers'));
 

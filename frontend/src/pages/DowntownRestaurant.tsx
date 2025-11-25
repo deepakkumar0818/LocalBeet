@@ -265,6 +265,60 @@ const DowntownRestaurant: React.FC = () => {
     }
   }, [handleViewTransferOrder])
 
+  // Listen for inventory adjustment events
+  useEffect(() => {
+    const handleInventoryAdjustment = (event: CustomEvent) => {
+      const { quantityChanges, location, module } = event.detail
+      
+      // Check if this adjustment is for Kuwait City
+      const isKuwaitCity = module === 'kuwait-city' || 
+        location?.toLowerCase().includes('kuwait city') ||
+        module === 'multiple'
+      
+      if (isKuwaitCity && quantityChanges && Array.isArray(quantityChanges)) {
+        // Handle raw materials
+        const rawMaterialChanges = quantityChanges.filter((qc: any) => qc.type === 'raw_material')
+        if (rawMaterialChanges.length > 0) {
+          rawMaterialChanges.forEach((qc: any) => {
+            const type: 'increase' | 'decrease' = qc.quantityChange > 0 ? 'increase' : 'decrease'
+            const item = {
+              materialCode: qc.sku,
+              quantity: Math.abs(qc.quantityChange),
+              materialId: qc.sku
+            }
+            triggerStockChangeIndicators([item], type)
+          })
+        }
+        
+        // Handle finished goods
+        const finishedGoodChanges = quantityChanges.filter((qc: any) => qc.type === 'finished_good')
+        if (finishedGoodChanges.length > 0) {
+          finishedGoodChanges.forEach((qc: any) => {
+            const type: 'increase' | 'decrease' = qc.quantityChange > 0 ? 'increase' : 'decrease'
+            const item = {
+              materialCode: qc.sku,
+              productCode: qc.sku,
+              quantity: Math.abs(qc.quantityChange),
+              materialId: qc.sku
+            }
+            triggerStockChangeIndicators([item], type)
+          })
+        }
+        
+        // Reload inventory to show updated quantities
+        setTimeout(() => {
+          loadInventory()
+        }, 500)
+      }
+    }
+    
+    window.addEventListener('inventoryAdjustmentProcessed', handleInventoryAdjustment as EventListener)
+    
+    return () => {
+      window.removeEventListener('inventoryAdjustmentProcessed', handleInventoryAdjustment as EventListener)
+    }
+  }, [])
+
   // Reload inventory when filters change
   // Use debouncedSearchTerm instead of searchTerm to avoid API calls on every keystroke
   useEffect(() => {

@@ -13,7 +13,8 @@ class ApiService {
 
   constructor() {
     // this.baseURL = import.meta.env.VITE_API_URL || 'https://localbeet.onrender.com/api';
-    this.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    this.baseURL = import.meta.env.VITE_API_URL;
+    this.baseURL = 'http://localhost:5000/api';
 
   }
 
@@ -1829,6 +1830,152 @@ class ApiService {
     }>('/sync-zoho-bills/purchase-orders', {
       method: 'POST'
     });
+  }
+
+  // Inventory Adjustments API
+  async getInventoryAdjustments(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    processingStatus?: string;
+    syncStatus?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.processingStatus) queryParams.append('processingStatus', params.processingStatus);
+    if (params?.syncStatus) queryParams.append('syncStatus', params.syncStatus);
+    if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+    if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+
+    const query = queryParams.toString();
+    return this.request<{
+      success: boolean;
+      data: {
+        adjustments: any[];
+        pagination: {
+          currentPage: number;
+          totalPages: number;
+          totalItems: number;
+          itemsPerPage: number;
+        };
+      };
+    }>(`/inventory-adjustments${query ? `?${query}` : ''}`);
+  }
+
+  async getInventoryAdjustment(id: string) {
+    return this.request<{
+      success: boolean;
+      data: any;
+    }>(`/inventory-adjustments/${id}`);
+  }
+
+  async syncZohoInventoryAdjustments() {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: {
+        totalAdjustments: number;
+        addedAdjustments: number;
+        updatedAdjustments: number;
+        errorCount: number;
+        syncTimestamp: string;
+        processingResult?: {
+          processedAdjustments: number;
+          totalProcessedAdjustments: number;
+          processingMessage: string;
+        };
+      };
+    }>('/inventory-adjustments/sync', {
+      method: 'POST'
+    });
+  }
+
+  async processInventoryAdjustment(adjustmentId: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: {
+        adjustmentId: string;
+        adjustmentNumber: string;
+        location: string;
+        module: string;
+        inventoryUpdated: boolean;
+        stats: any;
+        quantityChanges: Array<{
+          sku: string;
+          name: string;
+          quantityChange: number;
+          type: 'raw_material' | 'finished_good';
+        }>;
+      };
+    }>(`/inventory-adjustments/process/${adjustmentId}`, {
+      method: 'POST'
+    });
+  }
+
+  async processMultipleInventoryAdjustments(adjustmentIds: string[]) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: {
+        totalAdjustments: number;
+        processedAdjustments: number;
+        successfulAdjustments: number;
+        failedAdjustments: number;
+        summary: any;
+        adjustmentResults: any[];
+        allQuantityChanges: Array<{
+          sku: string;
+          name: string;
+          quantityChange: number;
+          type: 'raw_material' | 'finished_good';
+        }>;
+      };
+    }>('/inventory-adjustments/process-multiple', {
+      method: 'POST',
+      body: JSON.stringify({ adjustmentIds })
+    });
+  }
+
+  async processAllSyncedInventoryAdjustments() {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: {
+        totalAdjustments: number;
+        processedAdjustments: number;
+        successfulAdjustments: number;
+        failedAdjustments: number;
+        summary: any;
+        adjustmentResults: any[];
+        allQuantityChanges: Array<{
+          sku: string;
+          name: string;
+          quantityChange: number;
+          type: 'raw_material' | 'finished_good';
+        }>;
+      };
+    }>('/inventory-adjustments/process-all-synced', {
+      method: 'POST'
+    });
+  }
+
+  async getInventoryAdjustmentStatus(adjustmentId: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: {
+        adjustmentId: string;
+        adjustmentNumber: string;
+        syncStatus: string;
+        processingStatus: string;
+        itemsCount: number;
+      };
+    }>(`/inventory-adjustments/status/${adjustmentId}`);
   }
 
   // Zoho Sales Order Push API

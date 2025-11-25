@@ -106,6 +106,7 @@ const baseNavigation: NavigationItem[] = [
   },
   { name: 'Transfer Orders', href: '/transfer-orders', icon: Truck },
   { name: 'Purchase Orders', href: '/purchase-orders', icon: ShoppingCart },
+  { name: 'Inventory Adjustments', href: '/inventory-adjustments', icon: Package },
   // { 
   //   name: 'Master', 
   //   icon: Database, 
@@ -295,6 +296,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const transferOrders = baseNavigation.find(n => n.name === 'Transfer Orders')
     if (transferOrders) {
       filtered.push(transferOrders)
+    }
+    // Add Inventory Adjustments for outlet owners
+    const inventoryAdjustments = baseNavigation.find(n => n.name === 'Inventory Adjustments')
+    if (inventoryAdjustments) {
+      filtered.push(inventoryAdjustments)
     }
     return filtered
   }, [isAdmin, assignedOutlet])
