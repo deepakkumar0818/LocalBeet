@@ -15,7 +15,8 @@
     "zoho:sync-bills": "node scripts/syncZohoBillsToPurchaseOrders.js",
     "zoho:fetch-bill": "node scripts/fetchZohoBillById.js",
     "process:bill": "node scripts/processBillForInventory.js",
-    "clear:purchase-orders": "node scripts/clearPurchaseOrders.js"
+    "clear:purchase-orders": "node scripts/clearPurchaseOrders.js",
+    "clear:inventory-adjustments": "node scripts/clearInventoryAdjustments.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

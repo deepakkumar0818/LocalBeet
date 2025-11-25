@@ -16,6 +16,7 @@ import EditJobOrder from './pages/EditJobOrder'
 import PurchaseOrders from './pages/PurchaseOrders'
 import AddPurchaseOrder from './pages/AddPurchaseOrder'
 import EditPurchaseOrder from './pages/EditPurchaseOrder'
+import InventoryAdjustments from './pages/InventoryAdjustments'
 import GoodReceiptNotes from './pages/GoodReceiptNotes'
 import AddGRN from './pages/AddGRN'
 import EditGRN from './pages/EditGRN'
@@ -95,6 +96,7 @@ function App() {
         <Route path="/purchase-orders" element={<PurchaseOrders />} />
         <Route path="/purchase-orders/add" element={<AddPurchaseOrder />} />
         <Route path="/purchase-orders/edit/:id" element={<EditPurchaseOrder />} />
+        <Route path="/inventory-adjustments" element={<InventoryAdjustments />} />
         <Route path="/items-list" element={<ItemsList />} />
         
         <Route path="/locations-list" element={<LocationsList />} />

@@ -341,6 +341,61 @@ const MallFoodCourt: React.FC = () => {
     return () => clearInterval(interval)
   }, [refreshNotifications])
 
+  // Listen for inventory adjustment events
+  useEffect(() => {
+    const handleInventoryAdjustment = (event: CustomEvent) => {
+      const { quantityChanges, location, module } = event.detail
+      
+      // Check if this adjustment is for 360 Mall
+      const isMall360 = module === 'mall-360' || 
+        location?.toLowerCase().includes('360 mall') ||
+        location?.toLowerCase().includes('mall 360') ||
+        module === 'multiple'
+      
+      if (isMall360 && quantityChanges && Array.isArray(quantityChanges)) {
+        // Handle raw materials
+        const rawMaterialChanges = quantityChanges.filter((qc: any) => qc.type === 'raw_material')
+        if (rawMaterialChanges.length > 0) {
+          rawMaterialChanges.forEach((qc: any) => {
+            const type: 'increase' | 'decrease' = qc.quantityChange > 0 ? 'increase' : 'decrease'
+            const item = {
+              materialCode: qc.sku,
+              quantity: Math.abs(qc.quantityChange),
+              materialId: qc.sku
+            }
+            triggerStockChangeIndicators([item], type)
+          })
+        }
+        
+        // Handle finished goods
+        const finishedGoodChanges = quantityChanges.filter((qc: any) => qc.type === 'finished_good')
+        if (finishedGoodChanges.length > 0) {
+          finishedGoodChanges.forEach((qc: any) => {
+            const type: 'increase' | 'decrease' = qc.quantityChange > 0 ? 'increase' : 'decrease'
+            const item = {
+              materialCode: qc.sku,
+              productCode: qc.sku,
+              quantity: Math.abs(qc.quantityChange),
+              materialId: qc.sku
+            }
+            triggerStockChangeIndicators([item], type)
+          })
+        }
+        
+        // Reload inventory to show updated quantities
+        setTimeout(() => {
+          loadInventory()
+        }, 500)
+      }
+    }
+    
+    window.addEventListener('inventoryAdjustmentProcessed', handleInventoryAdjustment as EventListener)
+    
+    return () => {
+      window.removeEventListener('inventoryAdjustmentProcessed', handleInventoryAdjustment as EventListener)
+    }
+  }, [])
+
   const loadOutletData = async () => {
     try {
       setLoading(true)

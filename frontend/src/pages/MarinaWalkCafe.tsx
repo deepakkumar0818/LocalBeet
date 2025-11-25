@@ -344,6 +344,61 @@ const MarinaWalkCafe: React.FC = () => {
     }
   }, [debouncedSearchTerm, filterCategory, filterStatus, sortBy, sortOrder, rmCurrentPage, rmItemsPerPage, fgCurrentPage, fgItemsPerPage])
 
+  // Listen for inventory adjustment events
+  useEffect(() => {
+    const handleInventoryAdjustment = (event: CustomEvent) => {
+      const { quantityChanges, location, module } = event.detail
+      
+      // Check if this adjustment is for Vibes Complex
+      const isVibesComplex = module === 'vibe-complex' || 
+        location?.toLowerCase().includes('vibes complex') ||
+        location?.toLowerCase().includes('vibe complex') ||
+        module === 'multiple'
+      
+      if (isVibesComplex && quantityChanges && Array.isArray(quantityChanges)) {
+        // Handle raw materials
+        const rawMaterialChanges = quantityChanges.filter((qc: any) => qc.type === 'raw_material')
+        if (rawMaterialChanges.length > 0) {
+          rawMaterialChanges.forEach((qc: any) => {
+            const type: 'increase' | 'decrease' = qc.quantityChange > 0 ? 'increase' : 'decrease'
+            const item = {
+              materialCode: qc.sku,
+              quantity: Math.abs(qc.quantityChange),
+              materialId: qc.sku
+            }
+            triggerStockChangeIndicators([item], type)
+          })
+        }
+        
+        // Handle finished goods
+        const finishedGoodChanges = quantityChanges.filter((qc: any) => qc.type === 'finished_good')
+        if (finishedGoodChanges.length > 0) {
+          finishedGoodChanges.forEach((qc: any) => {
+            const type: 'increase' | 'decrease' = qc.quantityChange > 0 ? 'increase' : 'decrease'
+            const item = {
+              materialCode: qc.sku,
+              productCode: qc.sku,
+              quantity: Math.abs(qc.quantityChange),
+              materialId: qc.sku
+            }
+            triggerStockChangeIndicators([item], type)
+          })
+        }
+        
+        // Reload inventory to show updated quantities
+        setTimeout(() => {
+          loadInventory()
+        }, 500)
+      }
+    }
+    
+    window.addEventListener('inventoryAdjustmentProcessed', handleInventoryAdjustment as EventListener)
+    
+    return () => {
+      window.removeEventListener('inventoryAdjustmentProcessed', handleInventoryAdjustment as EventListener)
+    }
+  }, [])
+
   const loadOutletData = async () => {
     try {
       setLoading(true)

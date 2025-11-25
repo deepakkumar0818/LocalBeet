@@ -264,6 +264,60 @@ const DriveThruExpress: React.FC = () => {
     }
   }, [handleViewTransferOrder])
 
+  // Listen for inventory adjustment events
+  useEffect(() => {
+    const handleInventoryAdjustment = (event: CustomEvent) => {
+      const { quantityChanges, location, module } = event.detail
+      
+      // Check if this adjustment is for Taiba Kitchen
+      const isTaibaKitchen = module === 'taiba-kitchen' || 
+        location?.toLowerCase().includes('taiba') ||
+        module === 'multiple'
+      
+      if (isTaibaKitchen && quantityChanges && Array.isArray(quantityChanges)) {
+        // Handle raw materials
+        const rawMaterialChanges = quantityChanges.filter((qc: any) => qc.type === 'raw_material')
+        if (rawMaterialChanges.length > 0) {
+          rawMaterialChanges.forEach((qc: any) => {
+            const type: 'increase' | 'decrease' = qc.quantityChange > 0 ? 'increase' : 'decrease'
+            const item = {
+              materialCode: qc.sku,
+              quantity: Math.abs(qc.quantityChange),
+              materialId: qc.sku
+            }
+            triggerStockChangeIndicators([item], type)
+          })
+        }
+        
+        // Handle finished goods
+        const finishedGoodChanges = quantityChanges.filter((qc: any) => qc.type === 'finished_good')
+        if (finishedGoodChanges.length > 0) {
+          finishedGoodChanges.forEach((qc: any) => {
+            const type: 'increase' | 'decrease' = qc.quantityChange > 0 ? 'increase' : 'decrease'
+            const item = {
+              materialCode: qc.sku,
+              productCode: qc.sku,
+              quantity: Math.abs(qc.quantityChange),
+              materialId: qc.sku
+            }
+            triggerStockChangeIndicators([item], type)
+          })
+        }
+        
+        // Reload inventory to show updated quantities
+        setTimeout(() => {
+          loadInventory()
+        }, 500)
+      }
+    }
+    
+    window.addEventListener('inventoryAdjustmentProcessed', handleInventoryAdjustment as EventListener)
+    
+    return () => {
+      window.removeEventListener('inventoryAdjustmentProcessed', handleInventoryAdjustment as EventListener)
+    }
+  }, [])
+
   // Refresh inventory when notifications change (e.g., when transfer orders are received from Central Kitchen)
   useEffect(() => {
     if (notifications.length > 0) {
