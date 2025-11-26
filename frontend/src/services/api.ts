@@ -12,7 +12,6 @@ class ApiService {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_URL || 'https://localbeet.onrender.com/api';
     this.baseURL = import.meta.env.VITE_API_URL;
     // this.baseURL = 'http://localhost:5000/api';
 
