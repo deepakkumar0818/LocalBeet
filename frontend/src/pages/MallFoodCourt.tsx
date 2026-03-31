@@ -35,12 +35,24 @@ interface OutletInventoryItem {
 }
 
 interface Outlet {
-  id: string
+  id?: string
+  _id?: string
   outletCode: string
   outletName: string
   outletType: string
   isCentralKitchen: boolean
   status?: string
+}
+
+/** When mall360_db has Zoho data but main DB has no Outlets row */
+const MALL_360_SYNTHETIC_OUTLET: Outlet = {
+  id: 'mall-360-local',
+  _id: 'mall-360-local',
+  outletCode: 'MALL_360',
+  outletName: '360 Mall',
+  outletType: 'Food Court',
+  isCentralKitchen: false,
+  status: 'Active'
 }
 
 interface FinishedGoodInventoryItem {
@@ -401,15 +413,28 @@ const MallFoodCourt: React.FC = () => {
       setLoading(true)
       setError(null)
       
-      // Get 360 Mall outlet
       const outletsResponse = await apiService.getOutlets({ limit: 1000 })
       if (outletsResponse.success) {
-        const mall360 = outletsResponse.data.find(outlet => outlet.outletName === '360 Mall')
+        const raw = outletsResponse.data
+        const list = Array.isArray(raw) ? raw : []
+        const mall360 = list.find((o) => {
+          const c = o.outletCode ? String(o.outletCode).toUpperCase() : ''
+          return (
+            matchesOutletName(o, '360 Mall') ||
+            c === 'MALL_360' ||
+            c === 'OUT-003'
+          )
+        })
         if (mall360) {
           setOutlet(mall360)
           await loadInventory()
         } else {
-          setError('360 Mall not found')
+          console.warn(
+            '[360 Mall] No outlet in /api/outlets; using synthetic outlet. ' +
+              'Run: node backend/scripts/ensure360MallOutlet.js'
+          )
+          setOutlet(MALL_360_SYNTHETIC_OUTLET)
+          await loadInventory()
         }
       } else {
         setError('Failed to load outlet data')
@@ -777,7 +802,10 @@ const MallFoodCourt: React.FC = () => {
           </div>
           <p className="text-red-600 mb-4">{error}</p>
           <button
-            onClick={loadOutletData}
+            onClick={() => {
+              void loadOutletData()
+              void loadInventory()
+            }}
             className="btn-primary"
           >
             Retry
@@ -1439,7 +1467,10 @@ const MallFoodCourt: React.FC = () => {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={loadOutletData}
+            onClick={() => {
+              void loadOutletData()
+              void loadInventory()
+            }}
             className="btn-secondary flex items-center"
             title="Refresh data"
           >

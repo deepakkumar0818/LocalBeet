@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 // Central Kitchen dedicated database URI
 const getCentralKitchenUri = () => {
-  const baseUri = process.env.MONGODB_URI || 'mongodb+srv://dk0133964_db_user:Pehq6BWkL0nJbpch@cluster0.ljxhwyd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+  const baseUri = process.env.MONGODB_URI || 'mongodb+srv://rohanrana1022_db_user:kczw5OEjLxVErjYg@cluster0.ug8v777.mongodb.net';
   const uri = new URL(baseUri);
   uri.pathname = '/centralkitchen_db'; // Dedicated database for Central Kitchen
   return uri.toString();

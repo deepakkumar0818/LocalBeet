@@ -12,8 +12,11 @@ const { getZohoAccessToken } = require('./getZohoAccessToken');
 
 /**
  * Fetch items from Zoho Inventory API using Bulk fetch item details
+ * @param {object} [options]
+ * @param {boolean} [options.saveToDisk=true] - Write backend/data/zoho_items_raw.json
  */
-async function fetchZohoItems(accessToken, organizationId = null) {
+async function fetchZohoItems(accessToken, organizationId = null, options = {}) {
+  const { saveToDisk = true } = options;
   let apiDomain = 'www.zohoapis.com';
   let allItems = [];
   let currentPage = 1;
@@ -173,22 +176,22 @@ async function fetchZohoItems(accessToken, organizationId = null) {
   console.log(`🎉 Successfully fetched ALL ${totalItems} items from Zoho Inventory`);
   console.log(`📊 Fetched ${currentPage} pages total`);
   
-  // Save all items to file
-  const outputDir = path.join(__dirname, '../data');
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-  }
-  
-  const outputFile = path.join(outputDir, 'zoho_items_raw.json');
   const fullResponse = {
     code: 0,
     message: 'success',
     items: allItems
   };
-  
-  fs.writeFileSync(outputFile, JSON.stringify(fullResponse, null, 2));
-  console.log(`💾 All items saved to: ${outputFile}`);
-  
+
+  if (saveToDisk) {
+    const outputDir = path.join(__dirname, '../data');
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+    const outputFile = path.join(outputDir, 'zoho_items_raw.json');
+    fs.writeFileSync(outputFile, JSON.stringify(fullResponse, null, 2));
+    console.log(`💾 All items saved to: ${outputFile}`);
+  }
+
   return fullResponse;
 }
 

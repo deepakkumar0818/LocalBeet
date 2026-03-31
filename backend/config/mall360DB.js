@@ -1,12 +1,26 @@
 const mongoose = require('mongoose');
 
+const MALL360_DB_NAME = 'mall360_db';
+
+const getMall360Uri = () => {
+  if (process.env.MALL360_MONGODB_URI) {
+    return process.env.MALL360_MONGODB_URI;
+  }
+  const baseUri =
+    process.env.MONGODB_URI ||
+    'mongodb+srv://rohanrana1022_db_user:kczw5OEjLxVErjYg@cluster0.ug8v777.mongodb.net';
+  const uri = new URL(baseUri);
+  uri.pathname = `/${MALL360_DB_NAME}`;
+  return uri.toString();
+};
+
 const connectMall360DB = async () => {
   try {
-    const mongoUri = process.env.MALL360_MONGODB_URI || 'mongodb+srv://dk0133964_db_user:Pehq6BWkL0nJbpch@cluster0.ljxhwyd.mongodb.net/mall360_db?retryWrites=true&w=majority&appName=Cluster0';
-    
+    const mongoUri = getMall360Uri();
+
     console.log('🔗 Connecting to 360 Mall MongoDB...');
-    console.log('📋 360 Mall MongoDB URI:', mongoUri ? 'Found' : 'Not found');
-    
+    console.log(`📋 360 Mall database: ${MALL360_DB_NAME}`);
+
     const conn = await mongoose.createConnection(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,

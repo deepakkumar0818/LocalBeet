@@ -1,12 +1,27 @@
 const mongoose = require('mongoose');
 
+/** Database name used in MongoDB Compass / Atlas (collections: kuwaitcityrawmaterials, etc.) */
+const KUWAIT_CITY_DB_NAME = 'kuwaitcity_db';
+
+const getKuwaitCityUri = () => {
+  if (process.env.KUWAIT_CITY_MONGODB_URI) {
+    return process.env.KUWAIT_CITY_MONGODB_URI;
+  }
+  const baseUri =
+    process.env.MONGODB_URI ||
+    'mongodb+srv://rohanrana1022_db_user:kczw5OEjLxVErjYg@cluster0.ug8v777.mongodb.net';
+  const uri = new URL(baseUri);
+  uri.pathname = `/${KUWAIT_CITY_DB_NAME}`;
+  return uri.toString();
+};
+
 const connectKuwaitCityDB = async () => {
   try {
-    const mongoUri = process.env.KUWAIT_CITY_MONGODB_URI || 'mongodb+srv://dk0133964_db_user:Pehq6BWkL0nJbpch@cluster0.ljxhwyd.mongodb.net/kuwaitcity_db?retryWrites=true&w=majority&appName=Cluster0';
-    
+    const mongoUri = getKuwaitCityUri();
+
     console.log('🔗 Connecting to Kuwait City MongoDB...');
-    console.log('📋 Kuwait City MongoDB URI:', mongoUri ? 'Found' : 'Not found');
-    
+    console.log(`📋 Kuwait City database: ${KUWAIT_CITY_DB_NAME}`);
+
     const conn = await mongoose.createConnection(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,

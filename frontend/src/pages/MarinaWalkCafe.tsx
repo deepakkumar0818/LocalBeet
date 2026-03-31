@@ -77,6 +77,17 @@ interface Outlet {
   status?: string
 }
 
+/** When vibecomplex_db has Zoho data but main DB has no matching Outlets row */
+const VIBES_COMPLEX_SYNTHETIC_OUTLET: Outlet = {
+  id: 'vibes-complex-local',
+  _id: 'vibes-complex-local',
+  outletCode: 'VIBE_COMPLEX',
+  outletName: 'Vibes Complex',
+  outletType: 'Cafe',
+  isCentralKitchen: false,
+  status: 'Active'
+}
+
 interface StockChangeIndicator {
   amount: number
   type: 'increase' | 'decrease'
@@ -123,6 +134,16 @@ const matchesOutletName = (outletValue: any, targetName: string) => {
       normalizedName.includes(normalizedTarget)
     )
   })
+}
+
+const isVibesOutlet = (o: Outlet | Record<string, unknown>) => {
+  const c = o.outletCode != null ? String(o.outletCode).toUpperCase() : ''
+  return (
+    matchesOutletName(o, 'Vibes Complex') ||
+    matchesOutletName(o, 'Vibe Complex') ||
+    c === 'VIBE_COMPLEX' ||
+    c === 'OUT-002'
+  )
 }
 
 const MarinaWalkCafe: React.FC = () => {
@@ -407,12 +428,19 @@ const MarinaWalkCafe: React.FC = () => {
       // Get Vibes Complex outlet
       const outletsResponse = await apiService.getOutlets({ limit: 1000 })
       if (outletsResponse.success) {
-        const vibesComplex = outletsResponse.data.find(outlet => outlet.outletName === 'Vibes Complex')
+        const raw = outletsResponse.data
+        const list = Array.isArray(raw) ? raw : []
+        const vibesComplex = list.find((o) => isVibesOutlet(o as Outlet))
         if (vibesComplex) {
-          setOutlet(vibesComplex)
+          setOutlet(vibesComplex as Outlet)
           await loadInventory()
         } else {
-          setError('Vibes Complex not found')
+          console.warn(
+            '[Vibes Complex] No outlet in /api/outlets; using synthetic outlet. ' +
+              'Run: node backend/scripts/ensureVibeComplexOutlet.js'
+          )
+          setOutlet(VIBES_COMPLEX_SYNTHETIC_OUTLET)
+          await loadInventory()
         }
       } else {
         setError('Failed to load outlet data')
@@ -850,7 +878,10 @@ const MarinaWalkCafe: React.FC = () => {
           </div>
           <p className="text-red-600 mb-4">{error}</p>
           <button
-            onClick={loadOutletData}
+            onClick={() => {
+              void loadOutletData()
+              void loadInventory()
+            }}
             className="btn-primary"
           >
             Retry
@@ -1545,7 +1576,10 @@ const MarinaWalkCafe: React.FC = () => {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={loadOutletData}
+            onClick={() => {
+              void loadOutletData()
+              void loadInventory()
+            }}
             className="btn-secondary flex items-center"
             title="Refresh data"
           >

@@ -76,6 +76,15 @@ interface Outlet {
   isCentralKitchen: boolean
 }
 
+/** Used when Kuwait inventory DB has data but main DB `Outlets` has no Kuwait row yet */
+const KUWAIT_CITY_SYNTHETIC_OUTLET: Outlet = {
+  _id: 'kuwait-city-local',
+  outletCode: 'KUWAIT_CITY',
+  outletName: 'Kuwait City',
+  outletType: 'Restaurant',
+  isCentralKitchen: false
+}
+
 interface StockChangeIndicator {
   amount: number
   type: 'increase' | 'decrease'
@@ -342,14 +351,28 @@ const DowntownRestaurant: React.FC = () => {
       setLoading(true)
       setError(null)
       
-      // Get Kuwait City outlet
+      // Main DB outlet record (for POS / sales). Inventory itself comes from kuwaitcity_db via loadInventory.
       const outletsResponse = await apiService.getOutlets({ limit: 1000 })
       if (outletsResponse.success) {
-        const downtownRestaurant = outletsResponse.data.find(outlet => outlet.outletName === 'Kuwait City')
+        const raw = outletsResponse.data
+        const list = Array.isArray(raw) ? raw : []
+        const downtownRestaurant = list.find((o) => {
+          const c = o.outletCode ? String(o.outletCode).toUpperCase() : ''
+          return (
+            matchesOutletName(o, 'Kuwait City') ||
+            c === 'KUWAIT_CITY' ||
+            c === 'OUT-001'
+          )
+        })
         if (downtownRestaurant) {
           setOutlet(downtownRestaurant)
         } else {
-          setError('Kuwait City not found')
+          // Do not block the page: raw/finished data loads from dedicated DB without this row.
+          console.warn(
+            '[Kuwait City] No matching outlet in /api/outlets; using synthetic outlet. ' +
+              'Add one with: node backend/scripts/ensureKuwaitCityOutlet.js'
+          )
+          setOutlet(KUWAIT_CITY_SYNTHETIC_OUTLET)
         }
       } else {
         setError('Failed to load outlet data')
@@ -839,7 +862,10 @@ const DowntownRestaurant: React.FC = () => {
           </div>
           <p className="text-red-600 mb-4">{error}</p>
           <button
-            onClick={loadOutletData}
+            onClick={() => {
+              void loadOutletData()
+              void loadInventory()
+            }}
             className="btn-primary"
           >
             Retry

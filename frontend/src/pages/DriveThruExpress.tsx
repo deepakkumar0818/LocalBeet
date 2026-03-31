@@ -35,12 +35,24 @@ interface OutletInventoryItem {
 }
 
 interface Outlet {
-  id: string
+  id?: string
+  _id?: string
   outletCode: string
   outletName: string
   outletType: string
   isCentralKitchen: boolean
   status?: string
+}
+
+/** When taibakitchen_db has Zoho data but main DB has no matching Outlets row */
+const TAIBA_HOSPITAL_SYNTHETIC_OUTLET: Outlet = {
+  id: 'taiba-hospital-local',
+  _id: 'taiba-hospital-local',
+  outletCode: 'TAIBA_HOSPITAL',
+  outletName: 'Taiba Hospital',
+  outletType: 'Drive Thru',
+  isCentralKitchen: false,
+  status: 'Active'
 }
 
 interface FinishedGoodInventoryItem {
@@ -122,6 +134,18 @@ const matchesOutletName = (outletValue: any, targetName: string) => {
       normalizedName.includes(normalizedTarget)
     )
   })
+}
+
+const isTaibaOutlet = (o: Outlet | Record<string, unknown>) => {
+  const c = o.outletCode != null ? String(o.outletCode).toUpperCase() : ''
+  const name = typeof o.outletName === 'string' ? o.outletName.toLowerCase() : ''
+  return (
+    matchesOutletName(o, 'Taiba Hospital') ||
+    matchesOutletName(o, 'Clinic') ||
+    c === 'TAIBA_HOSPITAL' ||
+    c === 'OUT-004' ||
+    (name.length > 0 && name.includes('taiba'))
+  )
 }
 
 const DriveThruExpress: React.FC = () => {
@@ -338,7 +362,7 @@ const DriveThruExpress: React.FC = () => {
 
   // Reload inventory when filters or pagination change
   useEffect(() => {
-    if (outlet && !loading) {
+    if (!loading) {
       loadInventory()
     }
   }, [debouncedSearchTerm, filterCategory, filterStatus, sortBy, sortOrder, rmCurrentPage, rmItemsPerPage, fgCurrentPage, fgItemsPerPage])
@@ -348,15 +372,21 @@ const DriveThruExpress: React.FC = () => {
       setLoading(true)
       setError(null)
       
-      // Get Taiba Hospital outlet (by name to avoid code mismatches)
       const outletsResponse = await apiService.getOutlets({ limit: 1000 })
       if (outletsResponse.success) {
-        const taiba = outletsResponse.data.find(o => o.outletName === 'Taiba Hospital')
+        const raw = outletsResponse.data
+        const list = Array.isArray(raw) ? raw : []
+        const taiba = list.find((o) => isTaibaOutlet(o as Outlet))
         if (taiba) {
-          setOutlet(taiba)
+          setOutlet(taiba as Outlet)
           await loadInventory()
         } else {
-          setError('Taiba Hospital not found')
+          console.warn(
+            '[Taiba Hospital] No outlet in /api/outlets; using synthetic outlet. ' +
+              'Run: node backend/scripts/ensureTaibaHospitalOutlet.js'
+          )
+          setOutlet(TAIBA_HOSPITAL_SYNTHETIC_OUTLET)
+          await loadInventory()
         }
       } else {
         setError('Failed to load outlet data')
@@ -615,9 +645,9 @@ const DriveThruExpress: React.FC = () => {
           // Transform the data to match the expected interface
           const transformedRawMaterials: OutletInventoryItem[] = rawMaterialsResponse.data.map((item: any) => ({
             id: item._id || item.id,
-            outletId: 'taiba-kitchen',
-            outletCode: 'OUT-004',
-            outletName: 'Taiba Hospital',
+            outletId: String(outlet?._id || outlet?.id || ''),
+            outletCode: outlet?.outletCode || 'TAIBA_HOSPITAL',
+            outletName: outlet?.outletName || 'Taiba Hospital',
             materialId: item._id || item.id,
             materialCode: item.materialCode,
             materialName: item.materialName,
@@ -678,9 +708,9 @@ const DriveThruExpress: React.FC = () => {
           // Transform the data to match the expected interface
           const transformedFinishedGoods: FinishedGoodInventoryItem[] = finishedGoodsResponse.data.map((item: any) => ({
             id: item._id || item.id,
-            outletId: 'taiba-kitchen',
-            outletCode: 'OUT-004',
-            outletName: 'Taiba Hospital',
+            outletId: String(outlet?._id || outlet?.id || ''),
+            outletCode: outlet?.outletCode || 'TAIBA_HOSPITAL',
+            outletName: outlet?.outletName || 'Taiba Hospital',
             productId: item._id || item.id,
             productCode: item.productCode,
             productName: item.productName,
@@ -889,7 +919,10 @@ const DriveThruExpress: React.FC = () => {
           </div>
           <p className="text-red-600 mb-4">{error}</p>
           <button
-            onClick={loadOutletData}
+            onClick={() => {
+              void loadOutletData()
+              void loadInventory()
+            }}
             className="btn-primary"
           >
             Retry
@@ -1542,7 +1575,7 @@ const DriveThruExpress: React.FC = () => {
             <Car className="h-8 w-8 text-purple-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Taiba Hospital</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{outlet?.outletName || 'Taiba Hospital'}</h1>
             <p className="text-gray-600">
               {currentSection === 'raw-materials' ? 'Raw Materials Inventory' :
                currentSection === 'finished-goods' ? 'Finished Goods Inventory' :
@@ -1553,7 +1586,10 @@ const DriveThruExpress: React.FC = () => {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={loadOutletData}
+            onClick={() => {
+              void loadOutletData()
+              void loadInventory()
+            }}
             className="btn-secondary flex items-center"
             title="Refresh data"
           >

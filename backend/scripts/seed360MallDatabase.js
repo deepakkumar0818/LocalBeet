@@ -1,71 +1,114 @@
-const connect360MallDB = require('../config/360MallDB');
+/**
+ * Seed 360 Mall outlet DB from Zoho Inventory (same rules as Kuwait City).
+ * - Stock: Zoho locations mapped to mall-360 (e.g. TLB 360 RNA), see locationMapping.js.
+ * - Raw: Inventory Raw; Finished: Inventory Asset.
+ *
+ * Usage:
+ *   node backend/scripts/seed360MallDatabase.js
+ *   node backend/scripts/seed360MallDatabase.js --dry-run
+ *   node backend/scripts/seed360MallDatabase.js --from-file=data/zoho_items_raw.json
+ */
+
+const fs = require('fs');
+const path = require('path');
+const connectMall360DB = require('../config/mall360DB');
 const { initializeMall360Models } = require('../models/mall360Models');
+const { fetchZohoItems } = require('./fetchZohoItems');
+const { getZohoAccessToken } = require('./getZohoAccessToken');
+const {
+  hasValidSKU,
+  classifyZohoOutletItem,
+  mapZohoItemToOutletRawMaterial,
+  mapZohoItemToOutletFinishedProduct
+} = require('./mapZohoOutletInventoryShared');
 
-const rawMaterialsData = [
-  { materialCode: '360-001', materialName: 'Fresh Chicken', category: 'Meat', subCategory: 'Poultry', unitOfMeasure: 'kg', unitPrice: 28.00, currentStock: 90, minimumStock: 20, maximumStock: 200, reorderPoint: 40, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-002', materialName: 'Premium Beef', category: 'Meat', subCategory: 'Red Meat', unitOfMeasure: 'kg', unitPrice: 45.00, currentStock: 70, minimumStock: 15, maximumStock: 150, reorderPoint: 30, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-003', materialName: 'Fresh Fish', category: 'Seafood', subCategory: 'Fresh', unitOfMeasure: 'kg', unitPrice: 35.00, currentStock: 50, minimumStock: 10, maximumStock: 100, reorderPoint: 20, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-004', materialName: 'Basmati Rice', category: 'Grains', subCategory: 'Premium', unitOfMeasure: 'kg', unitPrice: 12.00, currentStock: 200, minimumStock: 40, maximumStock: 500, reorderPoint: 80, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-005', materialName: 'Organic Vegetables', category: 'Vegetables', subCategory: 'Organic', unitOfMeasure: 'kg', unitPrice: 8.50, currentStock: 120, minimumStock: 25, maximumStock: 300, reorderPoint: 50, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-006', materialName: 'Fresh Herbs', category: 'Vegetables', subCategory: 'Herbs', unitOfMeasure: 'bunch', unitPrice: 3.00, currentStock: 80, minimumStock: 15, maximumStock: 150, reorderPoint: 30, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-007', materialName: 'Premium Spices', category: 'Spices', subCategory: 'Premium', unitOfMeasure: 'kg', unitPrice: 25.00, currentStock: 40, minimumStock: 8, maximumStock: 80, reorderPoint: 16, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-008', materialName: 'Extra Virgin Olive Oil', category: 'Cooking', subCategory: 'Premium', unitOfMeasure: 'liter', unitPrice: 18.00, currentStock: 60, minimumStock: 12, maximumStock: 120, reorderPoint: 24, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-009', materialName: 'Artisan Bread', category: 'Bakery', subCategory: 'Premium', unitOfMeasure: 'loaf', unitPrice: 4.50, currentStock: 100, minimumStock: 20, maximumStock: 200, reorderPoint: 40, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-010', materialName: 'Fresh Dairy', category: 'Dairy', subCategory: 'Fresh', unitOfMeasure: 'liter', unitPrice: 8.00, currentStock: 75, minimumStock: 15, maximumStock: 150, reorderPoint: 30, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-011', materialName: 'Organic Eggs', category: 'Dairy', subCategory: 'Organic', unitOfMeasure: 'dozen', unitPrice: 12.00, currentStock: 50, minimumStock: 10, maximumStock: 100, reorderPoint: 20, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-012', materialName: 'Premium Pasta', category: 'Grains', subCategory: 'Premium', unitOfMeasure: 'kg', unitPrice: 15.00, currentStock: 80, minimumStock: 16, maximumStock: 160, reorderPoint: 32, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-013', materialName: 'Gourmet Cheese', category: 'Dairy', subCategory: 'Premium', unitOfMeasure: 'kg', unitPrice: 35.00, currentStock: 30, minimumStock: 6, maximumStock: 60, reorderPoint: 12, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-014', materialName: 'Fresh Mushrooms', category: 'Vegetables', subCategory: 'Fresh', unitOfMeasure: 'kg', unitPrice: 12.00, currentStock: 40, minimumStock: 8, maximumStock: 80, reorderPoint: 16, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-015', materialName: 'Premium Nuts', category: 'Snacks', subCategory: 'Premium', unitOfMeasure: 'kg', unitPrice: 20.00, currentStock: 60, minimumStock: 12, maximumStock: 120, reorderPoint: 24, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-016', materialName: 'Fresh Berries', category: 'Fruits', subCategory: 'Fresh', unitOfMeasure: 'kg', unitPrice: 18.00, currentStock: 25, minimumStock: 5, maximumStock: 50, reorderPoint: 10, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-017', materialName: 'Premium Coffee Beans', category: 'Beverages', subCategory: 'Premium', unitOfMeasure: 'kg', unitPrice: 30.00, currentStock: 35, minimumStock: 7, maximumStock: 70, reorderPoint: 14, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-018', materialName: 'Artisan Chocolate', category: 'Confectionery', subCategory: 'Premium', unitOfMeasure: 'kg', unitPrice: 25.00, currentStock: 20, minimumStock: 4, maximumStock: 40, reorderPoint: 8, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-019', materialName: 'Fresh Seafood Mix', category: 'Seafood', subCategory: 'Premium', unitOfMeasure: 'kg', unitPrice: 40.00, currentStock: 30, minimumStock: 6, maximumStock: 60, reorderPoint: 12, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-020', materialName: 'Organic Grains', category: 'Grains', subCategory: 'Organic', unitOfMeasure: 'kg', unitPrice: 10.00, currentStock: 150, minimumStock: 30, maximumStock: 300, reorderPoint: 60, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-021', materialName: 'Premium Wine', category: 'Beverages', subCategory: 'Alcoholic', unitOfMeasure: 'bottle', unitPrice: 45.00, currentStock: 40, minimumStock: 8, maximumStock: 80, reorderPoint: 16, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-022', materialName: 'Fresh Truffles', category: 'Vegetables', subCategory: 'Premium', unitOfMeasure: 'kg', unitPrice: 150.00, currentStock: 5, minimumStock: 1, maximumStock: 10, reorderPoint: 2, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-023', materialName: 'Artisan Sourdough', category: 'Bakery', subCategory: 'Artisan', unitOfMeasure: 'loaf', unitPrice: 6.00, currentStock: 60, minimumStock: 12, maximumStock: 120, reorderPoint: 24, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-024', materialName: 'Premium Honey', category: 'Sweeteners', subCategory: 'Premium', unitOfMeasure: 'kg', unitPrice: 22.00, currentStock: 25, minimumStock: 5, maximumStock: 50, reorderPoint: 10, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-025', materialName: 'Fresh Herbs Mix', category: 'Vegetables', subCategory: 'Herbs', unitOfMeasure: 'bunch', unitPrice: 4.50, currentStock: 45, minimumStock: 9, maximumStock: 90, reorderPoint: 18, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-026', materialName: 'Premium Balsamic', category: 'Condiments', subCategory: 'Premium', unitOfMeasure: 'bottle', unitPrice: 35.00, currentStock: 15, minimumStock: 3, maximumStock: 30, reorderPoint: 6, createdBy: 'System', updatedBy: 'System' },
-  { materialCode: '360-027', materialName: 'Organic Quinoa', category: 'Grains', subCategory: 'Superfood', unitOfMeasure: 'kg', unitPrice: 18.00, currentStock: 35, minimumStock: 7, maximumStock: 70, reorderPoint: 14, createdBy: 'System', updatedBy: 'System' }
-];
+const MALL_360_MODULE = 'mall-360';
+const MALL_360_DB_NAME = 'mall360_db';
 
-const finishedProductsData = [
-  { productCode: '360fg-001', productName: 'Gourmet Burger Deluxe', salesDescription: 'Premium beef burger with artisan ingredients', category: 'Main Course', subCategory: 'Gourmet', unitOfMeasure: 'piece', unitPrice: 18.50, costPrice: 12.00, currentStock: 45, minimumStock: 10, maximumStock: 90, reorderPoint: 20, productionTime: 25, shelfLife: 2, storageRequirements: { temperature: 'Chilled' }, dietaryRestrictions: ['Halal'], allergens: ['Gluten', 'Dairy'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-002', productName: 'Truffle Pasta', salesDescription: 'Premium pasta with truffle cream sauce', category: 'Main Course', subCategory: 'Gourmet', unitOfMeasure: 'serving', unitPrice: 22.00, costPrice: 15.00, currentStock: 30, minimumStock: 6, maximumStock: 60, reorderPoint: 12, productionTime: 20, shelfLife: 2, storageRequirements: { temperature: 'Hot' }, dietaryRestrictions: ['Vegetarian'], allergens: ['Gluten', 'Dairy'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-003', productName: 'Seafood Platter', salesDescription: 'Fresh seafood selection with premium accompaniments', category: 'Main Course', subCategory: 'Seafood', unitOfMeasure: 'serving', unitPrice: 35.00, costPrice: 25.00, currentStock: 20, minimumStock: 4, maximumStock: 40, reorderPoint: 8, productionTime: 30, shelfLife: 1, storageRequirements: { temperature: 'Chilled' }, dietaryRestrictions: ['Halal'], allergens: ['Fish', 'Shellfish'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-004', productName: 'Artisan Pizza', salesDescription: 'Wood-fired pizza with premium toppings', category: 'Main Course', subCategory: 'Italian', unitOfMeasure: 'piece', unitPrice: 16.00, costPrice: 10.00, currentStock: 40, minimumStock: 8, maximumStock: 80, reorderPoint: 16, productionTime: 15, shelfLife: 1, storageRequirements: { temperature: 'Hot' }, dietaryRestrictions: ['Vegetarian'], allergens: ['Gluten', 'Dairy'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-005', productName: 'Gourmet Salad Bowl', salesDescription: 'Organic mixed greens with premium ingredients', category: 'Appetizer', subCategory: 'Healthy', unitOfMeasure: 'serving', unitPrice: 14.00, costPrice: 8.50, currentStock: 35, minimumStock: 7, maximumStock: 70, reorderPoint: 14, productionTime: 10, shelfLife: 1, storageRequirements: { temperature: 'Chilled' }, dietaryRestrictions: ['Vegetarian', 'Vegan'], allergens: [], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-006', productName: 'Premium Steak', salesDescription: 'Grilled premium beef steak with herbs', category: 'Main Course', subCategory: 'Grilled', unitOfMeasure: 'serving', unitPrice: 45.00, costPrice: 30.00, currentStock: 15, minimumStock: 3, maximumStock: 30, reorderPoint: 6, productionTime: 25, shelfLife: 2, storageRequirements: { temperature: 'Chilled' }, dietaryRestrictions: ['Halal'], allergens: [], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-007', productName: 'Lobster Roll', salesDescription: 'Fresh lobster with artisan bread', category: 'Main Course', subCategory: 'Seafood', unitOfMeasure: 'piece', unitPrice: 28.00, costPrice: 18.00, currentStock: 25, minimumStock: 5, maximumStock: 50, reorderPoint: 10, productionTime: 20, shelfLife: 1, storageRequirements: { temperature: 'Chilled' }, dietaryRestrictions: ['Halal'], allergens: ['Gluten', 'Shellfish'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-008', productName: 'Gourmet Soup', salesDescription: 'Premium soup with organic vegetables', category: 'Soup', subCategory: 'Premium', unitOfMeasure: 'bowl', unitPrice: 12.00, costPrice: 7.50, currentStock: 50, minimumStock: 10, maximumStock: 100, reorderPoint: 20, productionTime: 30, shelfLife: 2, storageRequirements: { temperature: 'Hot' }, dietaryRestrictions: ['Vegetarian'], allergens: [], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-009', productName: 'Craft Cocktail', salesDescription: 'Premium cocktail with premium spirits', category: 'Beverage', subCategory: 'Alcoholic', unitOfMeasure: 'glass', unitPrice: 18.00, costPrice: 12.00, currentStock: 60, minimumStock: 12, maximumStock: 120, reorderPoint: 24, productionTime: 5, shelfLife: 0, storageRequirements: { temperature: 'Cold' }, dietaryRestrictions: [], allergens: [], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-010', productName: 'Premium Coffee', salesDescription: 'Single-origin premium coffee', category: 'Beverage', subCategory: 'Hot', unitOfMeasure: 'cup', unitPrice: 6.50, costPrice: 3.50, currentStock: 100, minimumStock: 20, maximumStock: 200, reorderPoint: 40, productionTime: 5, shelfLife: 0, storageRequirements: { temperature: 'Hot' }, dietaryRestrictions: ['Vegetarian', 'Vegan'], allergens: [], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-011', productName: 'Fresh Juice Blend', salesDescription: 'Organic fresh fruit juice blend', category: 'Beverage', subCategory: 'Fresh', unitOfMeasure: 'glass', unitPrice: 8.00, costPrice: 4.50, currentStock: 40, minimumStock: 8, maximumStock: 80, reorderPoint: 16, productionTime: 5, shelfLife: 1, storageRequirements: { temperature: 'Cold' }, dietaryRestrictions: ['Vegetarian', 'Vegan'], allergens: [], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-012', productName: 'Artisan Dessert', salesDescription: 'Premium dessert with premium ingredients', category: 'Dessert', subCategory: 'Premium', unitOfMeasure: 'piece', unitPrice: 12.00, costPrice: 7.50, currentStock: 30, minimumStock: 6, maximumStock: 60, reorderPoint: 12, productionTime: 20, shelfLife: 3, storageRequirements: { temperature: 'Chilled' }, dietaryRestrictions: ['Vegetarian'], allergens: ['Dairy', 'Gluten'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-013', productName: 'Chocolate Soufflé', salesDescription: 'Premium chocolate soufflé', category: 'Dessert', subCategory: 'Premium', unitOfMeasure: 'piece', unitPrice: 15.00, costPrice: 9.00, currentStock: 20, minimumStock: 4, maximumStock: 40, reorderPoint: 8, productionTime: 25, shelfLife: 1, storageRequirements: { temperature: 'Hot' }, dietaryRestrictions: ['Vegetarian'], allergens: ['Dairy', 'Eggs'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-014', productName: 'Gourmet Sandwich', salesDescription: 'Artisan bread with premium fillings', category: 'Main Course', subCategory: 'Sandwich', unitOfMeasure: 'piece', unitPrice: 14.50, costPrice: 9.00, currentStock: 35, minimumStock: 7, maximumStock: 70, reorderPoint: 14, productionTime: 10, shelfLife: 1, storageRequirements: { temperature: 'Chilled' }, dietaryRestrictions: ['Vegetarian'], allergens: ['Gluten'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-015', productName: 'Premium Wrap', salesDescription: 'Fresh wrap with organic ingredients', category: 'Main Course', subCategory: 'Healthy', unitOfMeasure: 'piece', unitPrice: 11.50, costPrice: 7.00, currentStock: 45, minimumStock: 9, maximumStock: 90, reorderPoint: 18, productionTime: 8, shelfLife: 1, storageRequirements: { temperature: 'Chilled' }, dietaryRestrictions: ['Vegetarian', 'Vegan'], allergens: ['Gluten'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-016', productName: 'Gourmet Tacos', salesDescription: 'Premium tacos with fresh ingredients', category: 'Main Course', subCategory: 'Mexican', unitOfMeasure: 'serving', unitPrice: 13.00, costPrice: 8.00, currentStock: 40, minimumStock: 8, maximumStock: 80, reorderPoint: 16, productionTime: 15, shelfLife: 1, storageRequirements: { temperature: 'Hot' }, dietaryRestrictions: ['Vegetarian'], allergens: ['Gluten'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-017', productName: 'Premium Sushi', salesDescription: 'Fresh sushi with premium fish', category: 'Main Course', subCategory: 'Japanese', unitOfMeasure: 'serving', unitPrice: 25.00, costPrice: 16.00, currentStock: 25, minimumStock: 5, maximumStock: 50, reorderPoint: 10, productionTime: 20, shelfLife: 1, storageRequirements: { temperature: 'Chilled' }, dietaryRestrictions: ['Halal'], allergens: ['Fish', 'Soy'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-018', productName: 'Artisan Bruschetta', salesDescription: 'Premium bruschetta with fresh ingredients', category: 'Appetizer', subCategory: 'Italian', unitOfMeasure: 'serving', unitPrice: 9.50, costPrice: 5.50, currentStock: 30, minimumStock: 6, maximumStock: 60, reorderPoint: 12, productionTime: 10, shelfLife: 1, storageRequirements: { temperature: 'Chilled' }, dietaryRestrictions: ['Vegetarian'], allergens: ['Gluten'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-019', productName: 'Gourmet Quesadilla', salesDescription: 'Premium quesadilla with artisan cheese', category: 'Main Course', subCategory: 'Mexican', unitOfMeasure: 'piece', unitPrice: 12.00, costPrice: 7.50, currentStock: 35, minimumStock: 7, maximumStock: 70, reorderPoint: 14, productionTime: 12, shelfLife: 1, storageRequirements: { temperature: 'Hot' }, dietaryRestrictions: ['Vegetarian'], allergens: ['Gluten', 'Dairy'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-020', productName: 'Premium Smoothie', salesDescription: 'Organic fruit smoothie with superfoods', category: 'Beverage', subCategory: 'Healthy', unitOfMeasure: 'glass', unitPrice: 9.00, costPrice: 5.00, currentStock: 50, minimumStock: 10, maximumStock: 100, reorderPoint: 20, productionTime: 5, shelfLife: 1, storageRequirements: { temperature: 'Cold' }, dietaryRestrictions: ['Vegetarian', 'Vegan'], allergens: [], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-021', productName: 'Gourmet Nachos', salesDescription: 'Premium nachos with artisan toppings', category: 'Appetizer', subCategory: 'Mexican', unitOfMeasure: 'serving', unitPrice: 11.00, costPrice: 6.50, currentStock: 25, minimumStock: 5, maximumStock: 50, reorderPoint: 10, productionTime: 8, shelfLife: 1, storageRequirements: { temperature: 'Hot' }, dietaryRestrictions: ['Vegetarian'], allergens: ['Dairy'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-022', productName: 'Premium Caesar Salad', salesDescription: 'Classic Caesar with premium ingredients', category: 'Appetizer', subCategory: 'Classic', unitOfMeasure: 'serving', unitPrice: 13.50, costPrice: 8.00, currentStock: 30, minimumStock: 6, maximumStock: 60, reorderPoint: 12, productionTime: 10, shelfLife: 1, storageRequirements: { temperature: 'Chilled' }, dietaryRestrictions: ['Vegetarian'], allergens: ['Dairy', 'Eggs'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-023', productName: 'Artisan Panini', salesDescription: 'Premium panini with fresh ingredients', category: 'Main Course', subCategory: 'Sandwich', unitOfMeasure: 'piece', unitPrice: 15.50, costPrice: 9.50, currentStock: 25, minimumStock: 5, maximumStock: 50, reorderPoint: 10, productionTime: 12, shelfLife: 1, storageRequirements: { temperature: 'Hot' }, dietaryRestrictions: ['Vegetarian'], allergens: ['Gluten'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-024', productName: 'Gourmet Mac & Cheese', salesDescription: 'Premium mac and cheese with artisan cheese', category: 'Main Course', subCategory: 'Comfort', unitOfMeasure: 'serving', unitPrice: 14.00, costPrice: 8.50, currentStock: 40, minimumStock: 8, maximumStock: 80, reorderPoint: 16, productionTime: 15, shelfLife: 1, storageRequirements: { temperature: 'Hot' }, dietaryRestrictions: ['Vegetarian'], allergens: ['Gluten', 'Dairy'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-025', productName: 'Premium Ice Cream', salesDescription: 'Artisan ice cream with premium ingredients', category: 'Dessert', subCategory: 'Frozen', unitOfMeasure: 'scoop', unitPrice: 6.00, costPrice: 3.50, currentStock: 60, minimumStock: 12, maximumStock: 120, reorderPoint: 24, productionTime: 0, shelfLife: 30, storageRequirements: { temperature: 'Frozen' }, dietaryRestrictions: ['Vegetarian'], allergens: ['Dairy'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-026', productName: 'Gourmet Hot Chocolate', salesDescription: 'Premium hot chocolate with artisan chocolate', category: 'Beverage', subCategory: 'Hot', unitOfMeasure: 'cup', unitPrice: 7.50, costPrice: 4.00, currentStock: 80, minimumStock: 16, maximumStock: 160, reorderPoint: 32, productionTime: 5, shelfLife: 0, storageRequirements: { temperature: 'Hot' }, dietaryRestrictions: ['Vegetarian'], allergens: ['Dairy'], createdBy: 'System', updatedBy: 'System' },
-  { productCode: '360fg-027', productName: 'Artisan Croissant', salesDescription: 'Fresh baked artisan croissant', category: 'Bakery', subCategory: 'Premium', unitOfMeasure: 'piece', unitPrice: 4.50, costPrice: 2.50, currentStock: 50, minimumStock: 10, maximumStock: 100, reorderPoint: 20, productionTime: 0, shelfLife: 1, storageRequirements: { temperature: 'Room Temperature' }, dietaryRestrictions: ['Vegetarian'], allergens: ['Gluten', 'Dairy'], createdBy: 'System', updatedBy: 'System' }
-];
+function parseArgs(argv) {
+  const dryRun = argv.includes('--dry-run') || argv.includes('-d');
+  const fromFileArg = argv.find((a) => a.startsWith('--from-file='));
+  const fromFile = fromFileArg ? fromFileArg.split('=').slice(1).join('=').trim() : null;
+  return { dryRun, fromFile };
+}
 
-const seed360MallDatabase = async () => {
+function loadItemsFromFile(relativeOrAbsolute) {
+  const resolved = path.isAbsolute(relativeOrAbsolute)
+    ? relativeOrAbsolute
+    : path.join(__dirname, '..', relativeOrAbsolute.replace(/^\//, ''));
+  if (!fs.existsSync(resolved)) {
+    throw new Error(`--from-file not found: ${resolved}`);
+  }
+  const raw = JSON.parse(fs.readFileSync(resolved, 'utf8'));
+  const items = raw.items || raw;
+  if (!Array.isArray(items)) {
+    throw new Error('JSON must be { items: [...] } or an array of items');
+  }
+  return items;
+}
+
+async function loadZohoItems(argv) {
+  const { fromFile } = parseArgs(argv);
+  if (fromFile) {
+    console.log(`📂 Loading Zoho items from file: ${fromFile}`);
+    return loadItemsFromFile(fromFile);
+  }
+  console.log('📡 Getting Zoho access token...');
+  const tokenData = await getZohoAccessToken();
+  console.log('📦 Fetching items from Zoho Inventory (no local JSON write)...');
+  const zohoResponse = await fetchZohoItems(tokenData.access_token, null, {
+    saveToDisk: false
+  });
+  if (!zohoResponse.items || zohoResponse.items.length === 0) {
+    throw new Error('No items returned from Zoho Inventory');
+  }
+  return zohoResponse.items;
+}
+
+const seed360MallDatabase = async (argv = process.argv.slice(2)) => {
+  const { dryRun } = parseArgs(argv);
   let connection;
+
   try {
-    connection = await connect360MallDB();
-    const { Mall360RawMaterial, Mall360FinishedProduct } = initializeMall360Models(connection);
+    const allItems = await loadZohoItems(argv);
+    const withSku = allItems.filter(hasValidSKU);
+    const skipped = allItems.length - withSku.length;
+
+    const rawPayloads = [];
+    const finishedPayloads = [];
+    for (const item of withSku) {
+      const kind = classifyZohoOutletItem(item);
+      if (kind === 'finished') {
+        finishedPayloads.push(
+          mapZohoItemToOutletFinishedProduct(item, MALL_360_MODULE)
+        );
+      } else {
+        rawPayloads.push(mapZohoItemToOutletRawMaterial(item, MALL_360_MODULE));
+      }
+    }
+
+    console.log('');
+    console.log('📊 Zoho → 360 Mall (TLB 360 RNA / mall-360)');
+    console.log(`   Total items: ${allItems.length}`);
+    console.log(`   With SKU (will seed): ${withSku.length}`);
+    console.log(`   Skipped (no SKU): ${skipped}`);
+    console.log(`   Raw materials: ${rawPayloads.length}`);
+    console.log(`   Finished products: ${finishedPayloads.length}`);
+    console.log('');
+
+    if (dryRun) {
+      console.log('🔍 Dry run — no database changes.');
+      return {
+        dryRun: true,
+        rawCount: rawPayloads.length,
+        finishedCount: finishedPayloads.length,
+        skippedNoSku: skipped
+      };
+    }
+
+    connection = await connectMall360DB();
+    const { Mall360RawMaterial, Mall360FinishedProduct } =
+      initializeMall360Models(connection);
 
     console.log('🔄 Clearing existing 360 Mall Raw Materials...');
     await Mall360RawMaterial.deleteMany({});
@@ -75,21 +118,30 @@ const seed360MallDatabase = async () => {
     await Mall360FinishedProduct.deleteMany({});
     console.log('🗑️ Cleared existing 360 Mall Finished Products.');
 
-    console.log('📝 Seeding Raw Materials...');
-    for (const data of rawMaterialsData) {
+    console.log('📝 Inserting Raw Materials from Zoho...');
+    for (const data of rawPayloads) {
       await Mall360RawMaterial.create(data);
-      console.log(`✅ Created Raw Material: ${data.materialName} (${data.materialCode})`);
+      console.log(`✅ Raw: ${data.materialName} (${data.materialCode})`);
     }
 
-    console.log('📝 Seeding Finished Products...');
-    for (const data of finishedProductsData) {
+    console.log('📝 Inserting Finished Products from Zoho...');
+    for (const data of finishedPayloads) {
       await Mall360FinishedProduct.create(data);
-      console.log(`✅ Created Finished Product: ${data.productName} (${data.productCode})`);
+      console.log(`✅ Finished: ${data.productName} (${data.productCode})`);
     }
 
+    console.log('');
     console.log('🎉 360 Mall database seeding completed successfully!');
-    console.log(`📊 Summary:\n   - Raw Materials: ${rawMaterialsData.length}\n   - Finished Products: ${finishedProductsData.length}\n   - Database: 360mall_db`);
+    console.log(
+      `📊 Summary:\n   - Raw Materials: ${rawPayloads.length}\n   - Finished Products: ${finishedPayloads.length}\n   - Database: ${MALL_360_DB_NAME}\n   - Source: Zoho Inventory`
+    );
 
+    return {
+      dryRun: false,
+      rawCount: rawPayloads.length,
+      finishedCount: finishedPayloads.length,
+      skippedNoSku: skipped
+    };
   } catch (error) {
     console.error('❌ Error seeding 360 Mall database:', error);
     process.exit(1);

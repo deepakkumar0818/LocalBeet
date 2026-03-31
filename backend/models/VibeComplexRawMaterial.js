@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const mongoosePaginate = require('mongoose-paginate-v2');
+const OUTLET_UNIT_OF_MEASURE = require('../constants/outletUnitOfMeasure');
 
 const VibeComplexRawMaterialSchema = new mongoose.Schema({
   materialCode: { type: String, required: true, unique: true, trim: true },
@@ -10,10 +11,7 @@ const VibeComplexRawMaterialSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    enum: [
-      'box', 'cm', 'dz', 'ft', 'g', 'in', 'kg', 'km', 'lb', 'mg', 'ml', 'm',
-      'pcs', 'pcs 6', 'pcs 12', 'No.s', 'ltr', 'kg 2', 'kg 5', 'kg 10', 'Pr'
-    ],
+    enum: OUTLET_UNIT_OF_MEASURE,
     default: 'kg'
   }, // e.g., kg, liter, piece
   description: { type: String, trim: true },

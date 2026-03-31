@@ -12,8 +12,8 @@ class ApiService {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_URL;
-    // this.baseURL = 'http://localhost:5000/api';
+    // this.baseURL = import.meta.env.VITE_API_URL;
+    this.baseURL = 'http://localhost:5000/api';
 
   }
 
@@ -1316,11 +1316,33 @@ class ApiService {
   }
 
   // Additional common methods that might be missing
-  async getOutlets(_params?: any) {
+  async getOutlets(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    outletType?: string;
+    status?: string;
+    isCentralKitchen?: boolean;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page != null) queryParams.append('page', String(params.page));
+    queryParams.append('limit', String(params?.limit ?? 1000));
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.outletType) queryParams.append('outletType', params.outletType);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.isCentralKitchen !== undefined) {
+      queryParams.append('isCentralKitchen', String(params.isCentralKitchen));
+    }
+    if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+    if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+    const qs = queryParams.toString();
     return this.request<{
       success: boolean;
       data: any[];
-    }>(`/outlets`);
+      pagination?: unknown;
+    }>(`/outlets?${qs}`);
   }
 
   async getFinishedGoods(params?: {
